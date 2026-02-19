@@ -1,0 +1,46 @@
+{
+  "name": "openself",
+  "version": "0.1.0",
+  "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
+  "type": "module",
+  "bin": {
+    "openself": "./src/cli/index.js"
+  },
+  "main": "./src/index.js",
+  "scripts": {
+    "start": "node src/cli/index.js start",
+    "test": "node src/cli/index.js test",
+    "feed": "node src/cli/index.js feed",
+    "setup": "node src/cli/index.js setup"
+  },
+  "keywords": [
+    "ai",
+    "clone",
+    "personality",
+    "whatsapp",
+    "telegram",
+    "discord",
+    "chatbot",
+    "llm",
+    "openself"
+  ],
+  "author": "OpenSelf",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Open-Self/open-self.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "inquirer": "^12.4.2",
+    "openai": "^4.85.4",
+    "ora": "^8.2.0",
+    "yaml": "^2.7.0"
+  }
+}
