@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
   "type": "module",
   "bin": {
@@ -38,9 +38,12 @@
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "dotenv": "^16.4.7",
+    "express": "^4.21.0",
+    "grammy": "^1.35.0",
     "inquirer": "^12.4.2",
     "openai": "^4.85.4",
     "ora": "^8.2.0",
+    "vectra": "^0.9.0",
     "yaml": "^2.7.0"
   }
 }

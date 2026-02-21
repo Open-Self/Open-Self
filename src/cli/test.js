@@ -1,16 +1,23 @@
 /**
- * `openself test` — Clone Score Test
+ * `openself test` — Clone Score Test + Interactive Chat
  * Replay real conversations and compare clone replies vs real replies
+ * Or chat live with your clone in the terminal
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFileSync, existsSync } from 'fs';
+import { createInterface } from 'readline';
 import { CloneBrain, loadSoul } from '../brain/clone.js';
 import { createProvider, autoDetectProvider } from '../brain/router.js';
+import { ClonePipeline } from '../brain/pipeline.js';
 import { loadConfig } from '../config/loader.js';
 
 export async function testCommand(options) {
+    if (options.interactive) {
+        return interactiveMode(options);
+    }
+
     console.log('');
     console.log(chalk.bold.cyan('🧪 OpenSelf — Clone Score Test'));
     console.log(chalk.gray('━'.repeat(40)));
@@ -175,4 +182,106 @@ function getScoreColor(score) {
 function truncate(str, len) {
     if (!str) return '';
     return str.length > len ? str.substring(0, len) + '...' : str;
+}
+
+/**
+ * Interactive mode — chat with your clone in the terminal
+ */
+async function interactiveMode(options) {
+    console.log('');
+    console.log(chalk.bold.cyan('💬 OpenSelf — Interactive Clone Chat'));
+    console.log(chalk.gray('━'.repeat(40)));
+    console.log('');
+
+    if (!existsSync('./data/SOUL.md')) {
+        console.log(chalk.red('❌ SOUL.md not found. Run `openself feed` first.'));
+        return;
+    }
+
+    let pipeline;
+    try {
+        pipeline = new ClonePipeline({
+            dataDir: './data',
+        });
+    } catch (err) {
+        console.log(chalk.red(`❌ Failed to init: ${err.message}`));
+        console.log(chalk.yellow('   Set your API key in .env or run `openself setup`'));
+        return;
+    }
+
+    // Index memory if available
+    if (existsSync('./data/conversations.json')) {
+        const spinner = ora('Loading memory...').start();
+        try {
+            const convs = JSON.parse(readFileSync('./data/conversations.json', 'utf-8'));
+            const indexed = await pipeline.indexMemory(convs);
+            spinner.succeed(`Loaded ${indexed} memories`);
+        } catch {
+            spinner.warn('Memory indexing skipped');
+        }
+    }
+
+    console.log('');
+    console.log(chalk.white('  Chat with your clone! Type a message and press Enter.'));
+    console.log(chalk.gray('  Type "quit" or "exit" to leave.'));
+    console.log(chalk.gray('  Type "/contact <name>" to set who you are.'));
+    console.log('');
+
+    let contactName = 'Friend';
+
+    const rl = createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
+    const prompt = () => {
+        rl.question(chalk.blue(`  ${contactName}: `), async (input) => {
+            const text = input.trim();
+            if (!text) return prompt();
+
+            if (text === 'quit' || text === 'exit') {
+                console.log(chalk.yellow('\n  👋 Bye!\n'));
+                rl.close();
+                return;
+            }
+
+            if (text.startsWith('/contact ')) {
+                contactName = text.slice(9).trim() || 'Friend';
+                console.log(chalk.gray(`  → Now chatting as ${chalk.cyan(contactName)}\n`));
+                return prompt();
+            }
+
+            // Process through pipeline
+            const spinner = ora({ text: chalk.gray('  typing...'), indent: 2 }).start();
+
+            try {
+                const result = await pipeline.processMessage(
+                    { text },
+                    { name: contactName, relationship: 'friend', channel: 'terminal' },
+                );
+
+                spinner.stop();
+
+                if (result.action === 'reply') {
+                    for (const reply of result.replies) {
+                        console.log(chalk.green(`  Clone: ${reply}`));
+                    }
+                } else if (result.action === 'ignore') {
+                    console.log(chalk.gray('  (clone ignored this message)'));
+                } else if (result.action === 'queued') {
+                    console.log(chalk.yellow('  (queued for review — safety check flagged this)'));
+                } else if (result.action === 'blocked') {
+                    console.log(chalk.red('  (blocked by safety guard)'));
+                }
+            } catch (err) {
+                spinner.stop();
+                console.log(chalk.red(`  Error: ${err.message}`));
+            }
+
+            console.log('');
+            prompt();
+        });
+    };
+
+    prompt();
 }
