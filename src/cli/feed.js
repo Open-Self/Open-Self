@@ -10,6 +10,8 @@ import { parseGeneric } from '../parsers/generic.js';
 import { extractPersonality } from '../personality/extractor.js';
 import { createFingerprint } from '../personality/fingerprint.js';
 import { generateSoulMd, saveSoulMd } from '../personality/soul-generator.js';
+import { ChatMemory } from '../rag/memory.js';
+import { createEmbedding } from '../rag/embeddings.js';
 import inquirer from 'inquirer';
 
 export async function feedCommand(options) {
@@ -151,11 +153,28 @@ export async function feedCommand(options) {
             'utf-8',
         );
 
+        // RAG indexing — auto-index conversations for memory
+        if (conversations.length > 0) {
+            const spinnerRAG = ora('Indexing memories for RAG search...').start();
+            try {
+                const embedding = createEmbedding();
+                const memory = new ChatMemory(embedding, dataDir);
+                const indexed = await memory.indexHistory(conversations);
+                const stats = await memory.getStats();
+                spinnerRAG.succeed(
+                    `Indexed ${chalk.cyan(indexed)} memories for RAG search (${chalk.gray(stats.totalMemories + ' total')})`
+                );
+            } catch (err) {
+                spinnerRAG.warn(`RAG indexing skipped: ${err.message}`);
+            }
+        }
+
         console.log('');
         console.log(chalk.bold.green('🎉 Personality fed successfully!'));
         console.log('');
         console.log(chalk.white('Next:'));
         console.log(chalk.yellow('  npx openself test       ') + chalk.gray('— Test how well your clone mimics you'));
+        console.log(chalk.yellow('  npx openself arena      ') + chalk.gray('— Watch your clone debate a rival'));
         console.log(chalk.yellow('  cat data/SOUL.md        ') + chalk.gray('— Review/edit your personality profile'));
         console.log('');
     }

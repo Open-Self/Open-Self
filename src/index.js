@@ -13,3 +13,12 @@ export { HumanMimicry } from './mimicry/humanlike.js';
 export { SafetyGuard } from './safety/guard.js';
 export { ReviewQueue } from './safety/review-queue.js';
 export { loadConfig } from './config/loader.js';
+
+// Week 3
+export { CloneArena } from './arena/arena.js';
+export { GhostMode } from './ghost/ghost.js';
+export { ChatMemory } from './rag/memory.js';
+export { createEmbedding } from './rag/embeddings.js';
+export { generateBadge } from './web/badge.js';
+export { DiscordGateway } from './gateway/discord.js';
+

@@ -5,7 +5,8 @@
 
 import express from 'express';
 import { ClonePipeline } from '../brain/pipeline.js';
-import { readFileSync, existsSync } from 'fs';
+import { generateBadge } from './badge.js';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -44,6 +45,60 @@ export function createWebServer(options = {}) {
             });
         } catch {
             res.json({ name: 'Clone', language: 'Unknown', status: 'offline' });
+        }
+    });
+
+    // Badge: SVG clone score badge
+    app.get('/badge/:name', (req, res) => {
+        try {
+            const soul = readFileSync(join(dataDir, 'SOUL.md'), 'utf-8');
+            const scoreMatch = soul.match(/Clone Score:\s*(\d+)/);
+            const score = scoreMatch ? parseInt(scoreMatch[1]) : 75;
+            const name = req.params.name || 'Clone';
+            const dark = req.query.dark === 'true';
+
+            const svg = generateBadge(name, score, { dark });
+            res.setHeader('Content-Type', 'image/svg+xml');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.send(svg);
+        } catch {
+            const svg = generateBadge(req.params.name || 'Clone', 0);
+            res.setHeader('Content-Type', 'image/svg+xml');
+            res.send(svg);
+        }
+    });
+
+    // Arena: View debate transcript
+    app.get('/arena/:id', (req, res) => {
+        try {
+            const filepath = join(dataDir, `arena-${req.params.id}.md`);
+            if (existsSync(filepath)) {
+                const content = readFileSync(filepath, 'utf-8');
+                res.setHeader('Content-Type', 'text/html');
+                res.send(`<!DOCTYPE html>
+<html><head><title>Clone Arena</title>
+<style>body{font-family:system-ui;max-width:700px;margin:2rem auto;padding:0 1rem;background:#0f172a;color:#e2e8f0}
+h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
+<body>${content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</body></html>`);
+            } else {
+                res.status(404).send('Arena debate not found');
+            }
+        } catch {
+            res.status(500).send('Error loading arena debate');
+        }
+    });
+
+    // Arena: List all debates
+    app.get('/arena', (req, res) => {
+        try {
+            const files = readdirSync(dataDir).filter(f => f.startsWith('arena-') && f.endsWith('.md'));
+            const debates = files.map(f => ({
+                id: f.replace('arena-', '').replace('.md', ''),
+                url: `/arena/${f.replace('arena-', '').replace('.md', '')}`,
+            }));
+            res.json({ debates });
+        } catch {
+            res.json({ debates: [] });
         }
     });
 

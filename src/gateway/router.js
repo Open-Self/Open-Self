@@ -1,17 +1,15 @@
 /**
- * Gateway Router
- * Multi-channel message gateway manager
+ * Gateway Router — Multi-channel message gateway manager
  */
 
 import { TelegramGateway } from './telegram.js';
+import { DiscordGateway } from './discord.js';
 
 const GATEWAYS = {
     telegram: TelegramGateway,
+    discord: DiscordGateway,
 };
 
-/**
- * Create and start a messaging gateway
- */
 export function createGateway(name, config = {}) {
     const GatewayClass = GATEWAYS[name.toLowerCase()];
     if (!GatewayClass) {
@@ -22,27 +20,11 @@ export function createGateway(name, config = {}) {
     return new GatewayClass(config);
 }
 
-/**
- * List available gateways and their status
- */
 export function listGateways() {
     return [
-        {
-            name: 'telegram',
-            available: true,
-            envVar: 'TELEGRAM_BOT_TOKEN',
-            configured: !!process.env.TELEGRAM_BOT_TOKEN,
-        },
-        {
-            name: 'whatsapp',
-            available: false,
-            note: 'Coming in Week 4 (Baileys)',
-        },
-        {
-            name: 'discord',
-            available: false,
-            note: 'Coming in Week 4 (discord.js)',
-        },
+        { name: 'telegram', available: true, envVar: 'TELEGRAM_BOT_TOKEN', configured: !!process.env.TELEGRAM_BOT_TOKEN },
+        { name: 'discord', available: true, envVar: 'DISCORD_BOT_TOKEN', configured: !!process.env.DISCORD_BOT_TOKEN },
+        { name: 'whatsapp', available: false, note: 'Coming soon (Baileys)' },
     ];
 }
 

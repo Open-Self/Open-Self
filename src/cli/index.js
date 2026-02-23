@@ -11,13 +11,15 @@ import { testCommand } from './test.js';
 import { startCommand } from './start.js';
 import { reviewCommand } from './review.js';
 import { shareCommand } from './share.js';
+import { arenaCommand } from './arena.js';
+import { ghostCommand } from './ghost.js';
 
 const program = new Command();
 
 program
     .name('openself')
     .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
-    .version('0.2.0');
+    .version('0.3.0');
 
 program
     .command('setup')
@@ -60,5 +62,22 @@ program
     .command('review')
     .description('Review what your clone said — daily report')
     .action(reviewCommand);
+
+program
+    .command('arena')
+    .description('🏟️ Clone Arena — two clones debate each other')
+    .option('--topic <topic>', 'Debate topic', 'Cà phê hay trà sữa?')
+    .option('--rounds <n>', 'Number of exchange rounds', '5')
+    .option('--soul2 <path>', 'Second clone SOUL.md path')
+    .option('--name2 <name>', 'Second clone name')
+    .option('--provider <name>', 'LLM provider')
+    .option('--export', 'Save transcript to file')
+    .action(arenaCommand);
+
+program
+    .command('ghost')
+    .description('👻 Ghost Mode — clone replies when you are offline')
+    .argument('[action]', 'on/off/status/ping', 'status')
+    .action((action, options) => ghostCommand([action], options));
 
 program.parse();

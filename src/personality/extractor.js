@@ -307,12 +307,21 @@ function detectLanguage(texts) {
     let vnCount = 0;
     let enCount = 0;
     const vnPattern = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
+    const vnSlangPattern = /\b(k[oô]ng?|vl|đm|ck|cmn|vcl|ntn|bt|bn)\b/i;
 
     for (const text of texts) {
-        if (vnPattern.test(text)) vnCount++;
+        if (vnPattern.test(text) || vnSlangPattern.test(text)) vnCount++;
         else enCount++;
     }
 
+    const total = vnCount + enCount || 1;
+    const vnPercent = Math.round((vnCount / total) * 100);
+    const enPercent = Math.round((enCount / total) * 100);
+
+    // Detect mixed usage (both > 20%)
+    if (vnPercent > 20 && enPercent > 20) {
+        return `Mixed (Vietnamese ${vnPercent}% / English ${enPercent}%)`;
+    }
     if (vnCount > enCount) return 'Vietnamese';
     if (enCount > vnCount) return 'English';
     return 'Mixed';

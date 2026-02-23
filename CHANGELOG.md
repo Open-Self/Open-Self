@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0] — 2026-02-23
+
+### Added
+- **Clone Arena** — Two clones debate each other on any topic (`openself arena --topic "..."`)
+- **Ghost Mode** — Clone auto-replies when you're offline, stops when you're back (`openself ghost on/off`)
+- **Discord Gateway** — Clone lives on Discord via discord.js, responds to DMs and @mentions (`openself start --discord`)
+- **Shareable Badge** — SVG clone score badge via `/badge/:name` endpoint for README embeds
+- **Arena Spectate** — View debate transcripts via `/arena/:id` web routes
+- **RAG Auto-Index** — `openself feed` now automatically indexes conversations into vector memory
+
+### Changed
+- CLI bumped to v0.3.0 with `arena` and `ghost` commands
+- Enhanced language detection: percentage-based mixed Vietnamese/English detection with slang awareness
+- Web server now serves badge and arena routes alongside chat
+- Feed command shows arena command in "Next steps" output
+
+### Dependencies
+- Added: `discord.js`
+
+---
+
 ## [0.2.0] — 2026-02-21
 
 ### Added
