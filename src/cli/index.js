@@ -13,13 +13,14 @@ import { reviewCommand } from './review.js';
 import { shareCommand } from './share.js';
 import { arenaCommand } from './arena.js';
 import { ghostCommand } from './ghost.js';
+import { profileCommand } from './profile.js';
 
 const program = new Command();
 
 program
     .name('openself')
     .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
-    .version('0.3.0');
+    .version('0.4.0');
 
 program
     .command('setup')
@@ -79,5 +80,13 @@ program
     .description('👻 Ghost Mode — clone replies when you are offline')
     .argument('[action]', 'on/off/status/ping', 'status')
     .action((action, options) => ghostCommand([action], options));
+
+program
+    .command('profile')
+    .description('👤 Export/import personality profiles')
+    .argument('[action]', 'export/import/info', 'info')
+    .option('--file <path>', 'Profile file to import')
+    .option('--output <dir>', 'Export output directory', '.')
+    .action((action, options) => profileCommand(action, options));
 
 program.parse();

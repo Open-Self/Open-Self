@@ -22,8 +22,10 @@ npx openself feed --whatsapp ./my-chat-export.txt
 # Test your clone
 npx openself test
 
-# Go live on Telegram (coming soon)
+# Go live
 npx openself start --telegram
+npx openself start --discord
+npx openself start --whatsapp
 ```
 
 ## 🧠 How It Works
@@ -41,14 +43,21 @@ You export chat history → Feed into OpenSelf → Clone learns personality
 
 ## 🎭 Features
 
-- **Personality Cloning** — Learns from your real messages, not generic AI
-- **Human Mimicry** — Random reply delays, typing indicators, occasional typos
-- **Safety First** — Boundaries, topic avoidance, review queue for uncertain replies
-- **SOUL.md** — Your personality in a file, fully editable and transparent
-- **Multi-channel** — WhatsApp, Telegram, Discord (more coming)
-- **BYOK** — Claude, GPT, DeepSeek, or Ollama (free, local)
-- **100% Local** — Your data never leaves your machine
-- **Clone Score** — Test how accurately your clone mimics you
+| Feature | Description |
+|---------|-------------|
+| **Personality Cloning** | Learns from your real messages, not generic AI |
+| **Human Mimicry** | Random reply delays, typing indicators, occasional typos |
+| **Safety First** | Boundaries, topic avoidance, review queue |
+| **SOUL.md** | Your personality in a file — editable and transparent |
+| **Multi-channel** | WhatsApp, Telegram, Discord — all ready |
+| **Clone Arena** | Two clones debate each other on any topic |
+| **Ghost Mode** | Clone auto-replies when you're offline |
+| **BYOK** | Claude, GPT, DeepSeek, or Ollama (free, local) |
+| **100% Local** | Your data never leaves your machine |
+| **Clone Score** | Test how accurately your clone mimics you |
+| **Shareable Badge** | SVG badge for your README or profile |
+| **Profile Sharing** | Export/import personality for cross-clone debates |
+| **RAG Memory** | Clone references past conversations naturally |
 
 ## 📊 Clone Score
 
@@ -60,6 +69,31 @@ Your clone is 89% you.
 ```
 
 Share your score and challenge your friends!
+
+## 🏟️ Clone Arena
+
+Two clones debate each other — the viral "Clone vs Clone" feature:
+
+```bash
+npx openself arena --topic "Cà phê hay trà sữa?"
+```
+
+Export a friend's profile and pit your clones against each other:
+
+```bash
+npx openself profile export        # Bundle your profile
+npx openself arena --soul2 friend.openself  # Debate!
+```
+
+## 👻 Ghost Mode
+
+Your clone replies when you're offline and stops when you're back:
+
+```bash
+npx openself ghost on    # Clone takes over
+npx openself ghost off   # You're back
+npx openself ghost       # Check status
+```
 
 ## 🔧 Setup
 
@@ -98,15 +132,41 @@ npx openself feed --telegram ./telegram-export/result.json
 npx openself feed --manual ./my-personality.md
 ```
 
-### 4. Test Your Clone
+### 4. Test & Go Live
 
 ```bash
-npx openself test
+npx openself test                   # Clone Score test
+npx openself test --interactive     # Chat with your clone
+npx openself start --whatsapp       # QR code pairing — no API key needed!
+npx openself start --telegram       # Telegram bot
+npx openself start --discord        # Discord bot
 ```
 
 ### 5. SOUL.md
 
 After feeding, OpenSelf generates a `SOUL.md` file — your personality in readable markdown. You can edit it to fine-tune your clone. See [SOUL.md.example](./SOUL.md.example) for reference.
+
+## 📋 CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `openself setup` | Interactive setup wizard |
+| `openself feed` | Feed chat history to train personality |
+| `openself test` | Clone Score test or interactive chat |
+| `openself start` | Start clone on messaging apps |
+| `openself share --web` | "Talk to My Clone" web page |
+| `openself review` | Review what your clone said |
+| `openself arena` | Clone vs Clone debate |
+| `openself ghost` | Ghost Mode — clone replies when offline |
+| `openself profile` | Export/import personality profiles |
+
+## 🏷️ Clone Score Badge
+
+Add to your GitHub README or website:
+
+```markdown
+[![OpenSelf Clone Score](http://localhost:3000/badge/yourname)](http://localhost:3000)
+```
 
 ## 🔐 Privacy
 

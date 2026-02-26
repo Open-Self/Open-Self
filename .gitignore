@@ -9,6 +9,7 @@ AGENTS.md
 openself-viral-plan.md
 plans
 .agent
+.agents
 release-manifest.json
 # dependencies
 /node_modules

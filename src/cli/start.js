@@ -5,6 +5,7 @@
 import chalk from 'chalk';
 import { TelegramGateway } from '../gateway/telegram.js';
 import { DiscordGateway } from '../gateway/discord.js';
+import { WhatsAppGateway } from '../gateway/whatsapp.js';
 import { loadConfig } from '../config/loader.js';
 
 export async function startCommand(options) {
@@ -65,18 +66,31 @@ export async function startCommand(options) {
         await gateway.start();
 
     } else if (options.whatsapp) {
-        console.log(chalk.yellow('📱 WhatsApp gateway coming in Week 4'));
-        console.log(chalk.gray('   Will use Baileys (unofficial WhatsApp Web API)'));
+        const config = loadConfig();
+
+        console.log(chalk.white('  📱 Starting WhatsApp...'));
+        console.log(chalk.gray('  A QR code will appear below — scan it with your phone.'));
+        console.log('');
+
+        const gateway = new WhatsAppGateway({ appConfig: config });
+
+        process.on('SIGINT', () => gateway.stop());
+        process.on('SIGTERM', () => gateway.stop());
+
+        await gateway.start();
+
     } else {
         console.log(chalk.white('Choose a platform to connect:'));
         console.log('');
-        console.log(chalk.green('  ✅ Telegram') + chalk.gray(' — Ready!'));
+        console.log(chalk.green('  ✅ Telegram') + chalk.gray(' — Bot token required'));
         console.log(chalk.yellow('     npx openself start --telegram'));
         console.log('');
-        console.log(chalk.green('  ✅ Discord') + chalk.gray(' — Ready!'));
+        console.log(chalk.green('  ✅ Discord') + chalk.gray(' — Bot token required'));
         console.log(chalk.yellow('     npx openself start --discord'));
         console.log('');
-        console.log(chalk.gray('  ⏳ WhatsApp — Coming Week 4'));
+        console.log(chalk.green('  ✅ WhatsApp') + chalk.gray(' — QR code pairing (no API key needed!)'));
+        console.log(chalk.yellow('     npx openself start --whatsapp'));
     }
     console.log('');
 }
+

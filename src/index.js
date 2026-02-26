@@ -21,4 +21,5 @@ export { ChatMemory } from './rag/memory.js';
 export { createEmbedding } from './rag/embeddings.js';
 export { generateBadge } from './web/badge.js';
 export { DiscordGateway } from './gateway/discord.js';
+export { WhatsAppGateway } from './gateway/whatsapp.js';
 

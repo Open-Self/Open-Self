@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0] — 2026-02-26
+
+### Added
+- **WhatsApp Gateway** — Clone on WhatsApp via Baileys with QR code pairing (`openself start --whatsapp`)
+- **Profile Export/Import** — Share personality as `.openself` files (`openself profile export/import`)
+- All 3 messaging platforms now fully live: Telegram, Discord, WhatsApp
+
+### Changed
+- CLI bumped to v0.4.0 with `profile` command
+- `openself start` now shows all 3 platforms as ready
+- Gateway router registers WhatsApp gateway
+
+### Dependencies
+- Added: `@whiskeysockets/baileys`, `qrcode-terminal`
+
+---
+
 ## [0.3.0] — 2026-02-23
 
 ### Added

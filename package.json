@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
   "type": "module",
   "bin": {
@@ -13,7 +13,8 @@
     "feed": "node src/cli/index.js feed",
     "setup": "node src/cli/index.js setup",
     "arena": "node src/cli/index.js arena",
-    "ghost": "node src/cli/index.js ghost"
+    "ghost": "node src/cli/index.js ghost",
+    "profile": "node src/cli/index.js profile"
   },
   "keywords": [
     "ai",
@@ -37,6 +38,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@whiskeysockets/baileys": "^6.7.0",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "discord.js": "^14.16.0",
@@ -46,6 +48,7 @@
     "inquirer": "^12.4.2",
     "openai": "^4.85.4",
     "ora": "^8.2.0",
+    "qrcode-terminal": "^0.12.0",
     "vectra": "^0.9.0",
     "yaml": "^2.7.0"
   }
