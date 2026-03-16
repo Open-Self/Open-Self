@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: CLI --help smoke test
+        run: node src/cli/index.js --help
+
+      - name: Feed sample data
+        run: node src/cli/index.js feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
+
+      - name: Verify SOUL.md generated
+        run: test -f data/SOUL.md && echo "✅ SOUL.md generated" || exit 1
+
+      - name: CLI commands help check
+        run: |
+          node src/cli/index.js setup --help
+          node src/cli/index.js feed --help
+          node src/cli/index.js test --help
+          node src/cli/index.js start --help
+          node src/cli/index.js arena --help
+          node src/cli/index.js ghost --help
+          node src/cli/index.js profile --help
+          node src/cli/index.js share --help
+          node src/cli/index.js review --help

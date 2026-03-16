@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0] — 2026-03-16
+
+### Added
+- **Documentation** — `docs/` folder with 3 guides: setup, personality tuning, safety
+- **GitHub Actions CI** — Smoke tests on Node 18/20/22 matrix (feed sample data, help checks)
+- **CLI Help Polish** — Colored `--help` output with quickstart examples and docs link
+- **Global Error Handler** — Friendly error messages with suggestions instead of raw stack traces
+
+### Changed
+- CLI bumped to v0.5.0
+- `package.json` — Added `files`, `homepage`, `bugs` fields for npm publish readiness
+- README — Badges, cleaner structure, "Why OpenSelf?" section
+
+### Preparing
+- Soft launch — targeting 20-30 early users for feedback
+- Content bomb — Blog post drafts and updated social media posts
+
+---
+
 ## [0.4.0] — 2026-02-26
 
 ### Added

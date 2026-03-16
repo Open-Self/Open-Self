@@ -5,6 +5,7 @@
  */
 
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { setupCommand } from './setup.js';
 import { feedCommand } from './feed.js';
 import { testCommand } from './test.js';
@@ -20,7 +21,21 @@ const program = new Command();
 program
     .name('openself')
     .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
-    .version('0.4.0');
+    .version('0.5.0')
+    .addHelpText('after', `
+${chalk.bold('Quick Start:')}
+  ${chalk.gray('$')} openself setup                              ${chalk.dim('# Configure API key')}
+  ${chalk.gray('$')} openself feed --whatsapp ./chat.txt --name "You"  ${chalk.dim('# Feed personality')}
+  ${chalk.gray('$')} openself test                               ${chalk.dim('# Clone Score test')}
+  ${chalk.gray('$')} openself start --telegram                   ${chalk.dim('# Go live')}
+
+${chalk.bold('Fun Stuff:')}
+  ${chalk.gray('$')} openself arena --topic "Cà phê hay trà sữa?"     ${chalk.dim('# Clone vs Clone')}
+  ${chalk.gray('$')} openself ghost on                           ${chalk.dim('# Auto-reply offline')}
+  ${chalk.gray('$')} openself share --web                        ${chalk.dim('# "Talk to My Clone"')}
+
+${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
+`);
 
 program
     .command('setup')
@@ -88,5 +103,30 @@ program
     .option('--file <path>', 'Profile file to import')
     .option('--output <dir>', 'Export output directory', '.')
     .action((action, options) => profileCommand(action, options));
+
+// Global error handler — friendly messages instead of raw stack traces
+process.on('uncaughtException', (err) => {
+    console.error('');
+    console.error(chalk.red('❌ Something went wrong:'));
+    console.error(chalk.white(`   ${err.message}`));
+    console.error('');
+
+    if (err.message.includes('ENOENT')) {
+        console.error(chalk.yellow('💡 File not found. Check the file path and try again.'));
+    } else if (err.message.includes('API') || err.message.includes('401') || err.message.includes('403')) {
+        console.error(chalk.yellow('💡 API error. Check your API key in .env or run: openself setup'));
+    } else if (err.message.includes('ECONNREFUSED')) {
+        console.error(chalk.yellow('💡 Connection refused. Is Ollama running? Try: ollama serve'));
+    } else {
+        console.error(chalk.yellow('💡 Try: openself setup   or   openself --help'));
+    }
+
+    console.error(chalk.dim(`\n   Full error: ${err.stack?.split('\n')[1]?.trim() || ''}`));
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+    throw reason instanceof Error ? reason : new Error(String(reason));
+});
 
 program.parse();

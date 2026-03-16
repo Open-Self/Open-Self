@@ -1,11 +1,26 @@
 # 🧑 OpenSelf
 
+[![npm version](https://img.shields.io/badge/npm-v0.5.0-blue)](https://www.npmjs.com/package/openself)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![CI](https://github.com/Open-Self/open-self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/open-self/actions)
+
 ### Your AI clone. Your messages. Your machine.
 
 OpenSelf turns your chat history into an AI clone that speaks exactly like you — on WhatsApp, Telegram, and Discord. Open source. Self-hosted. Bring your own API key.
 
 > OpenClaw is AI that does things *for* you.
 > OpenSelf is AI that *is* you.
+
+---
+
+## 💡 Why OpenSelf?
+
+**ChatGPT doesn't know your catchphrases.** It doesn't know you greet your best friend with "ê" and your mom with "dạ". It doesn't know you never write "Best regards" because you never have.
+
+OpenSelf learns from YOUR real messages — your vocabulary, humor, emoji habits, abbreviations, and tone — then runs 24/7 as your digital twin.
+
+*I replaced myself on WhatsApp for a week. 156 messages. Nobody noticed. [Read the story →](./posts/drafts/blog-replaced-myself.md)*
 
 ---
 
@@ -17,7 +32,7 @@ git clone https://github.com/Open-Self/open-self.git
 cd open-self && npm install
 
 # Feed your personality
-npx openself feed --whatsapp ./my-chat-export.txt
+npx openself feed --whatsapp ./my-chat-export.txt --name "You"
 
 # Test your clone
 npx openself test
@@ -30,16 +45,16 @@ npx openself start --whatsapp
 
 ## 🧠 How It Works
 
-1. **Export** your chat history (WhatsApp, Telegram, or write a bio)
-2. **Feed** it to OpenSelf → AI learns your vocabulary, style, humor, catchphrases
-3. **Start** → Your clone runs 24/7 on your messaging apps
-4. **Review** → Check what your clone said each morning
-
 ```
 You export chat history → Feed into OpenSelf → Clone learns personality
 → Clone runs 24/7 on messaging apps → Replies in YOUR voice
 → You review next morning "what did my clone say last night"
 ```
+
+1. **Export** your chat history (WhatsApp, Telegram, or write a bio)
+2. **Feed** it to OpenSelf → AI learns your vocabulary, style, humor, catchphrases
+3. **Start** → Your clone runs 24/7 on your messaging apps
+4. **Review** → Check what your clone said each morning
 
 ## 🎭 Features
 
@@ -58,6 +73,20 @@ You export chat history → Feed into OpenSelf → Clone learns personality
 | **Shareable Badge** | SVG badge for your README or profile |
 | **Profile Sharing** | Export/import personality for cross-clone debates |
 | **RAG Memory** | Clone references past conversations naturally |
+
+## 📋 CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `openself setup` | Interactive setup wizard |
+| `openself feed` | Feed chat history to train personality |
+| `openself test` | Clone Score test or interactive chat |
+| `openself start` | Start clone on messaging apps |
+| `openself share --web` | "Talk to My Clone" web page |
+| `openself review` | Review what your clone said |
+| `openself arena` | Clone vs Clone debate |
+| `openself ghost` | Ghost Mode — clone replies when offline |
+| `openself profile` | Export/import personality profiles |
 
 ## 📊 Clone Score
 
@@ -97,68 +126,31 @@ npx openself ghost       # Check status
 
 ## 🔧 Setup
 
-### 1. Install
+See the full [Setup Guide](./docs/setup-guide.md) for detailed instructions.
 
 ```bash
 git clone https://github.com/Open-Self/open-self.git
 cd open-self && npm install
+cp .env.example .env    # Edit with your API key
 ```
 
-### 2. Configure API Key
+**Feed your personality:**
 
 ```bash
-cp .env.example .env
-# Edit .env with your API key (Claude, GPT, DeepSeek, or Ollama)
-```
-
-### 3. Feed Your Personality
-
-**Option A: WhatsApp Export (easiest)**
-```bash
-# WhatsApp → Settings → Chats → Export Chat → Save .txt file
-npx openself feed --whatsapp ./chat-with-bestfriend.txt
-npx openself feed --whatsapp ./chat-with-mom.txt
-# More chats = better clone accuracy
-```
-
-**Option B: Telegram Export**
-```bash
-# Telegram Desktop → Settings → Advanced → Export Telegram Data (JSON)
-npx openself feed --telegram ./telegram-export/result.json
-```
-
-**Option C: Manual Personality Brief**
-```bash
+npx openself feed --whatsapp ./chat-export.txt --name "Your Name"
+npx openself feed --telegram ./telegram-export/result.json --name "Your Name"
 npx openself feed --manual ./my-personality.md
 ```
 
-### 4. Test & Go Live
+**Test & Go Live:**
 
 ```bash
 npx openself test                   # Clone Score test
 npx openself test --interactive     # Chat with your clone
-npx openself start --whatsapp       # QR code pairing — no API key needed!
+npx openself start --whatsapp       # QR code pairing
 npx openself start --telegram       # Telegram bot
 npx openself start --discord        # Discord bot
 ```
-
-### 5. SOUL.md
-
-After feeding, OpenSelf generates a `SOUL.md` file — your personality in readable markdown. You can edit it to fine-tune your clone. See [SOUL.md.example](./SOUL.md.example) for reference.
-
-## 📋 CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `openself setup` | Interactive setup wizard |
-| `openself feed` | Feed chat history to train personality |
-| `openself test` | Clone Score test or interactive chat |
-| `openself start` | Start clone on messaging apps |
-| `openself share --web` | "Talk to My Clone" web page |
-| `openself review` | Review what your clone said |
-| `openself arena` | Clone vs Clone debate |
-| `openself ghost` | Ghost Mode — clone replies when offline |
-| `openself profile` | Export/import personality profiles |
 
 ## 🏷️ Clone Score Badge
 
@@ -187,17 +179,22 @@ Add to your GitHub README or website:
 
 Average user cost: **$2-5/month** (cheaper than a coffee ☕)
 
+## 📖 Documentation
+
+- [Setup Guide](./docs/setup-guide.md) — Get started in 5 minutes
+- [Personality Tuning](./docs/personality-tuning.md) — Fine-tune SOUL.md
+- [Safety Guide](./docs/safety-guide.md) — Understand safety features
+- [SOUL.md.example](./SOUL.md.example) — Personality template
+- [CHANGELOG](./CHANGELOG.md) — Release history
+
 ## 🤝 Contributing
 
 PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-### Development
-
 ```bash
 git clone https://github.com/Open-Self/open-self.git
 cd open-self && npm install
-# Make changes...
-npx openself feed --whatsapp ./test-data/sample-whatsapp.txt
+npx openself feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
 npx openself test
 ```
 
