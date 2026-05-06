@@ -7,11 +7,11 @@ import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
 } from '@whiskeysockets/baileys';
+import qrcodeTerminal from 'qrcode-terminal';
 import { ClonePipeline } from '../brain/pipeline.js';
 import { GhostMode } from '../ghost/ghost.js';
 import { TimingEngine } from '../mimicry/timing.js';
 import { mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
 import chalk from 'chalk';
 
 export class WhatsAppGateway {
@@ -26,59 +26,69 @@ export class WhatsAppGateway {
     }
 
     /**
-     * Start WhatsApp connection with QR code pairing
+     * Start WhatsApp connection with QR code pairing.
+     * Public entrypoint — `_connect` does the actual socket setup so we
+     * can call it on reconnect without re-entering reconnect-handler logic.
      */
     async start() {
-        // Ensure session directory exists
         if (!existsSync(this.sessionDir)) {
             mkdirSync(this.sessionDir, { recursive: true });
         }
-
-        const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
-
-        this.sock = makeWASocket({
-            auth: state,
-            printQRInTerminal: true,
-            browser: ['OpenSelf', 'Chrome', '120.0'],
-            syncFullHistory: false,
-        });
-
-
-
-        // Handle credential updates (save session)
-        this.sock.ev.on('creds.update', saveCreds);
-
-        // Handle connection events
-        this.sock.ev.on('connection.update', (update) => {
-            this._handleConnectionUpdate(update, saveCreds);
-        });
-
-        // Handle incoming messages
-        this.sock.ev.on('messages.upsert', async ({ messages, type }) => {
-            if (type !== 'notify') return;
-
-            for (const msg of messages) {
-                await this._handleMessage(msg);
-            }
-        });
-
-        console.log(chalk.white('  📱 Scan the QR code above with WhatsApp on your phone'));
+        await this._connect();
         console.log(chalk.gray('  WhatsApp → Settings → Linked Devices → Link a Device'));
         console.log(chalk.gray('  Session will be saved for future reconnections'));
     }
 
     /**
+     * Create the baileys socket + bind handlers. Idempotent on reconnect:
+     * tears down any prior socket listeners before creating a new one to
+     * avoid the duplicate-handler reply storm when network flaps.
+     */
+    async _connect() {
+        if (this.sock) {
+            try { this.sock.ev.removeAllListeners(); } catch { /* noop */ }
+            try { this.sock.end(undefined); } catch { /* noop */ }
+            this.sock = null;
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
+
+        // baileys ^6.7 deprecated `printQRInTerminal`; render via qrcode-terminal
+        this.sock = makeWASocket({
+            auth: state,
+            browser: ['OpenSelf', 'Chrome', '120.0'],
+            syncFullHistory: false,
+        });
+
+        this.sock.ev.on('creds.update', saveCreds);
+
+        this.sock.ev.on('connection.update', (update) => {
+            this._handleConnectionUpdate(update);
+        });
+
+        this.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+            if (type !== 'notify') return;
+            for (const msg of messages) {
+                await this._handleMessage(msg);
+            }
+        });
+    }
+
+    /**
      * Handle connection status changes
      */
-    _handleConnectionUpdate(update, saveCreds) {
+    _handleConnectionUpdate(update) {
         const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            qrcodeTerminal.generate(qr, { small: true });
+            console.log(chalk.white('  📱 Scan the QR code above with WhatsApp on your phone'));
+        }
 
         if (connection === 'open') {
             console.log(chalk.green('\n🤖 WhatsApp connected!'));
             console.log(chalk.gray('   Listening for messages...'));
             console.log(chalk.gray('   Press Ctrl+C to stop'));
-
-            // Start ghost heartbeat — marks user as online
             this.ghost.startHeartbeat();
         }
 
@@ -89,9 +99,13 @@ export class WhatsAppGateway {
             if (shouldReconnect && !this._reconnecting) {
                 this._reconnecting = true;
                 console.log(chalk.yellow('\n⚠️  Disconnected. Reconnecting in 3s...'));
-                setTimeout(() => {
+                setTimeout(async () => {
                     this._reconnecting = false;
-                    this.start();
+                    try {
+                        await this._connect();
+                    } catch (err) {
+                        console.error(chalk.red(`Reconnect failed: ${err.message}`));
+                    }
                 }, 3000);
             } else if (!shouldReconnect) {
                 console.log(chalk.red('\n🛑 Logged out. Delete data/whatsapp-session/ and re-scan.'));

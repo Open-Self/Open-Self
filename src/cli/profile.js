@@ -6,7 +6,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 
 export async function profileCommand(action, options) {
     console.log('');
@@ -100,22 +100,38 @@ async function importProfile(options) {
             return;
         }
 
+        // Sanitize: imported soul flows directly into LLM system prompt,
+        // so it's a prompt-injection vector. Strip code fences (common
+        // hiding place for jailbreak instructions) and length-cap.
+        if (typeof profile.soul !== 'string') {
+            spinner.fail('Invalid profile: missing soul content');
+            return;
+        }
+        const MAX_SOUL_BYTES = 50_000;
+        if (profile.soul.length > MAX_SOUL_BYTES) {
+            spinner.fail(`Profile soul too large (${profile.soul.length} > ${MAX_SOUL_BYTES} chars)`);
+            return;
+        }
+        const cleanSoul = profile.soul.replace(/```[a-z0-9]*\n?|```/gi, '');
+
         // Save to data/profiles/<name>/SOUL.md
         const profilesDir = './data/profiles';
-        const safeName = (profile.name || 'imported').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const safeName = (profile.name || 'imported').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64) || 'imported';
         const targetDir = join(profilesDir, safeName);
 
         if (!existsSync(targetDir)) {
             mkdirSync(targetDir, { recursive: true });
         }
 
-        writeFileSync(join(targetDir, 'SOUL.md'), profile.soul, 'utf-8');
+        writeFileSync(join(targetDir, 'SOUL.md'), cleanSoul, 'utf-8');
 
         if (profile.config) {
             writeFileSync(join(targetDir, 'config.yml'), profile.config, 'utf-8');
         }
 
         spinner.succeed(`Imported ${chalk.cyan(profile.name)}'s profile`);
+        console.log(chalk.yellow('  ⚠️  Imported content will be loaded into LLM system prompt.'));
+        console.log(chalk.yellow('     Only import profiles from trusted sources.'));
 
         console.log('');
         console.log(chalk.white(`  📁 Saved to: ${chalk.cyan(targetDir)}`));

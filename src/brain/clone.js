@@ -5,10 +5,11 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { validateSoul } from '../config/soul-schema.js';
 
 export class CloneBrain {
     constructor(soulContent, config = {}) {
-        this.soul = parseSoulMd(soulContent);
+        this.soul = validateSoul(parseSoulMd(soulContent));
         this.config = config;
     }
 
@@ -124,7 +125,9 @@ function parseSoulMd(content) {
 export function loadSoul(dataDir = './data') {
     const soulPath = join(dataDir, 'SOUL.md');
     if (!existsSync(soulPath)) {
-        throw new Error(`SOUL.md not found at ${soulPath}. Run 'openself feed' first.`);
+        const err = new Error(`SOUL.md not found at ${soulPath}. Run 'openself feed' first.`);
+        err.code = 'NO_SOUL';
+        throw err;
     }
     return readFileSync(soulPath, 'utf-8');
 }

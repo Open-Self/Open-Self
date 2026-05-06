@@ -6,6 +6,10 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import updateNotifier from 'update-notifier';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
 import { setupCommand } from './setup.js';
 import { feedCommand } from './feed.js';
 import { testCommand } from './test.js';
@@ -15,13 +19,23 @@ import { shareCommand } from './share.js';
 import { arenaCommand } from './arena.js';
 import { ghostCommand } from './ghost.js';
 import { profileCommand } from './profile.js';
+import { wrapAction, handleError } from './utils/error-handler.js';
+
+// Notify users of new versions (cached; non-blocking; ignored in CI/sandbox)
+try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8'));
+    updateNotifier({ pkg, updateCheckInterval: 1000 * 60 * 60 * 24 }).notify({ isGlobal: true });
+} catch {
+    // Silent — notifier shouldn't break CLI in restricted environments
+}
 
 const program = new Command();
 
 program
     .name('openself')
     .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
-    .version('0.5.0')
+    .version('0.6.0')
     .addHelpText('after', `
 ${chalk.bold('Quick Start:')}
   ${chalk.gray('$')} openself setup                              ${chalk.dim('# Configure API key')}
@@ -40,7 +54,7 @@ ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 program
     .command('setup')
     .description('Interactive setup wizard — configure API key and preferences')
-    .action(setupCommand);
+    .action(wrapAction(setupCommand));
 
 program
     .command('feed')
@@ -49,7 +63,7 @@ program
     .option('--telegram <files...>', 'Telegram export JSON files')
     .option('--manual <files...>', 'Manual personality brief (markdown/text)')
     .option('--name <name>', 'Your name (for identifying your messages)')
-    .action(feedCommand);
+    .action(wrapAction(feedCommand));
 
 program
     .command('test')
@@ -57,7 +71,7 @@ program
     .option('--count <n>', 'Number of test conversations', '10')
     .option('--interactive', 'Live chat with your clone in the terminal')
     .option('--provider <name>', 'LLM provider (anthropic/openai/deepseek/ollama)')
-    .action(testCommand);
+    .action(wrapAction(testCommand));
 
 program
     .command('start')
@@ -65,19 +79,19 @@ program
     .option('--telegram', 'Connect to Telegram')
     .option('--whatsapp', 'Connect to WhatsApp')
     .option('--discord', 'Connect to Discord')
-    .action(startCommand);
+    .action(wrapAction(startCommand));
 
 program
     .command('share')
     .description('Share your clone — "Talk to My Clone" web page')
     .option('--web', 'Launch web chat page')
     .option('--port <port>', 'Server port', '3000')
-    .action(shareCommand);
+    .action(wrapAction(shareCommand));
 
 program
     .command('review')
     .description('Review what your clone said — daily report')
-    .action(reviewCommand);
+    .action(wrapAction(reviewCommand));
 
 program
     .command('arena')
@@ -88,13 +102,13 @@ program
     .option('--name2 <name>', 'Second clone name')
     .option('--provider <name>', 'LLM provider')
     .option('--export', 'Save transcript to file')
-    .action(arenaCommand);
+    .action(wrapAction(arenaCommand));
 
 program
     .command('ghost')
     .description('👻 Ghost Mode — clone replies when you are offline')
     .argument('[action]', 'on/off/status/ping', 'status')
-    .action((action, options) => ghostCommand([action], options));
+    .action(wrapAction((action, options) => ghostCommand([action], options)));
 
 program
     .command('profile')
@@ -102,31 +116,10 @@ program
     .argument('[action]', 'export/import/info', 'info')
     .option('--file <path>', 'Profile file to import')
     .option('--output <dir>', 'Export output directory', '.')
-    .action((action, options) => profileCommand(action, options));
+    .action(wrapAction((action, options) => profileCommand(action, options)));
 
-// Global error handler — friendly messages instead of raw stack traces
-process.on('uncaughtException', (err) => {
-    console.error('');
-    console.error(chalk.red('❌ Something went wrong:'));
-    console.error(chalk.white(`   ${err.message}`));
-    console.error('');
-
-    if (err.message.includes('ENOENT')) {
-        console.error(chalk.yellow('💡 File not found. Check the file path and try again.'));
-    } else if (err.message.includes('API') || err.message.includes('401') || err.message.includes('403')) {
-        console.error(chalk.yellow('💡 API error. Check your API key in .env or run: openself setup'));
-    } else if (err.message.includes('ECONNREFUSED')) {
-        console.error(chalk.yellow('💡 Connection refused. Is Ollama running? Try: ollama serve'));
-    } else {
-        console.error(chalk.yellow('💡 Try: openself setup   or   openself --help'));
-    }
-
-    console.error(chalk.dim(`\n   Full error: ${err.stack?.split('\n')[1]?.trim() || ''}`));
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-    throw reason instanceof Error ? reason : new Error(String(reason));
-});
+// Last-resort safety nets — `wrapAction` should catch most.
+process.on('uncaughtException', handleError);
+process.on('unhandledRejection', (reason) => handleError(reason instanceof Error ? reason : new Error(String(reason))));
 
 program.parse();
