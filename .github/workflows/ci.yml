@@ -7,10 +7,13 @@ on:
     branches: [main]
 
 jobs:
-  smoke-test:
-    runs-on: ubuntu-latest
+  test:
+    name: test (${{ matrix.os }} · node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [18, 20, 22]
 
     steps:
@@ -20,27 +23,45 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: CLI --help smoke test
-        run: node src/cli/index.js --help
+      - name: Lint
+        run: npm run lint
 
-      - name: Feed sample data
-        run: node src/cli/index.js feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
+      - name: Format check
+        run: npm run format:check
+        continue-on-error: true
 
-      - name: Verify SOUL.md generated
-        run: test -f data/SOUL.md && echo "✅ SOUL.md generated" || exit 1
+      - name: Unit tests
+        run: npm test
 
-      - name: CLI commands help check
+      - name: Coverage (Linux + Node 20 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+
+      - name: CLI smoke — feed + help
+        shell: bash
         run: |
-          node src/cli/index.js setup --help
-          node src/cli/index.js feed --help
-          node src/cli/index.js test --help
-          node src/cli/index.js start --help
-          node src/cli/index.js arena --help
-          node src/cli/index.js ghost --help
-          node src/cli/index.js profile --help
-          node src/cli/index.js share --help
-          node src/cli/index.js review --help
+          node src/cli/index.js --help
+          node src/cli/index.js feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
+          test -f data/SOUL.md
+          test -f data/personality.json
+
+      - name: Publint (Linux + Node 20 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        run: npx --yes publint --strict
+
+      - name: NPM pack dry-run (Linux + Node 20 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        run: npm pack --dry-run
