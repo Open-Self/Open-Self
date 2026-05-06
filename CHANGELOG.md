@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.6.0] — 2026-05-07
+
+### Fixed (P0)
+- **VN safety regex** (`src/safety/ai-detection.js`) — Vietnamese AI-reveal patterns previously had `\t` (tab) instead of `\b` (word boundary), so detection silently never fired. Patterns rewritten; trailing `\b` removed where it followed non-ASCII chars.
+- **Path traversal** in `/arena/:id` web route — IDs now whitelisted to `[a-zA-Z0-9_-]{1,64}`; rejected requests return 400. Arena content HTML-escaped before rendering.
+- **Badge SVG XSS** — `/badge/:name` HTML-escapes name and length-caps to 64.
+- **Personality pipeline data loss** — Numeric stats from extractor (responseTimeAvg, avgMessageLength, etc.) now persist to `data/personality.json` and are merged into mimicry/style modules at runtime. Previously the pipeline silently fell back to hard-coded defaults.
+
+### Fixed (P1)
+- **WhatsApp gateway**: removed deprecated `printQRInTerminal`, render via `qrcode-terminal`. Reconnect refactored into `_connect()` with explicit listener teardown — no more duplicate-reply storms when network flaps.
+- **Profile import sanitization** (`src/cli/profile.js`): code-fences stripped, 50 KB length cap, soul shape validated, user warning before LLM ingestion.
+- **Centralized CLI error handler** (`src/cli/utils/error-handler.js`) — structured exit codes: 0 ok, 1 generic, 2 config (NO_SOUL/MISSING_API_KEY), 3 network (ECONNREFUSED/auth).
+
+### Added
+- **Vitest test suite** — 284 tests across 26 files, 84.6% line / 87.5% function coverage. Mock helpers for Anthropic, OpenAI, Discord, grammy, baileys SDKs.
+- **ESLint v9 flat config** + **Prettier v3** (`eslint.config.js`, `.prettierrc.json`). Scripts: `lint`, `lint:fix`, `format`, `format:check`.
+- **Zod runtime validation** for SOUL.md (`src/config/soul-schema.js`) — catches malformed soul before LLM ingestion.
+- **`update-notifier`** banner on CLI start.
+- **CI matrix** Linux + Windows × Node 18/20/22 — runs lint, tests, coverage upload, publint, npm pack dry-run.
+- **Docs**: `codebase-summary.md`, `system-architecture.md`, `code-standards.md`, `project-roadmap.md`. Profile-import trust boundary section in safety-guide.
+
+### Changed (BREAKING)
+- `npm test` now runs vitest, not the CLI Clone Score test. Use `npm run test:clone` for the original behaviour.
+- Errors thrown by `loadSoul`/CLI now carry a `.code` property (`NO_SOUL`, `MISSING_API_KEY`, `INVALID_SOUL`, `ECONNREFUSED`).
+- `package.json`: added `exports`, `sideEffects: false`, `prepack`, `prepublishOnly`, `prepare` scripts; `data/` removed from `files` array (was leaking user runtime data into the tarball).
+
+### Deferred (v0.6.1)
+- Modularization of files >200 LOC (`personality/extractor.js` 328, `cli/test.js` 287, `gateway/whatsapp.js` 229) — coverage already locks behaviour, deferred to keep v0.6.0 surface minimal.
+
+---
+
 ## [0.5.0] — 2026-03-16
 
 ### Added

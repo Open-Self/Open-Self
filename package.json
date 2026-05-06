@@ -1,20 +1,40 @@
 {
   "name": "openself",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
   "type": "module",
+  "sideEffects": false,
   "bin": {
     "openself": "./src/cli/index.js"
   },
   "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "default": "./src/index.js"
+    },
+    "./cli": {
+      "default": "./src/cli/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "start": "node src/cli/index.js start",
-    "test": "node src/cli/index.js test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:clone": "node src/cli/index.js test",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write src/ tests/",
+    "format:check": "prettier --check src/ tests/",
     "feed": "node src/cli/index.js feed",
     "setup": "node src/cli/index.js setup",
     "arena": "node src/cli/index.js arena",
     "ghost": "node src/cli/index.js ghost",
-    "profile": "node src/cli/index.js profile"
+    "profile": "node src/cli/index.js profile",
+    "prepack": "npm run lint && npm test",
+    "prepublishOnly": "npm run lint && npm test && npx --yes publint --strict",
+    "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\""
   },
   "keywords": [
     "ai",
@@ -31,7 +51,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Open-Self/open-self.git"
+    "url": "git+https://github.com/Open-Self/open-self.git"
   },
   "homepage": "https://github.com/Open-Self/open-self#readme",
   "bugs": {
@@ -39,12 +59,15 @@
   },
   "files": [
     "src/",
-    "data/",
     "SOUL.md.example",
     "docs/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -61,7 +84,18 @@
     "openai": "^4.85.4",
     "ora": "^8.2.0",
     "qrcode-terminal": "^0.12.0",
+    "update-notifier": "^7.3.1",
     "vectra": "^0.9.0",
-    "yaml": "^2.7.0"
+    "yaml": "^2.7.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "vitest": "^2.1.9"
   }
 }

@@ -1,9 +1,10 @@
 # 🧑 OpenSelf
 
-[![npm version](https://img.shields.io/badge/npm-v0.5.0-blue)](https://www.npmjs.com/package/openself)
+[![npm version](https://img.shields.io/badge/npm-v0.6.0-blue)](https://www.npmjs.com/package/openself)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![CI](https://github.com/Open-Self/open-self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/open-self/actions)
+[![Tests](https://img.shields.io/badge/tests-vitest-purple)](./docs/code-standards.md)
 
 ### Your AI clone. Your messages. Your machine.
 
@@ -181,11 +182,57 @@ Average user cost: **$2-5/month** (cheaper than a coffee ☕)
 
 ## 📖 Documentation
 
+**Getting started:**
 - [Setup Guide](./docs/setup-guide.md) — Get started in 5 minutes
 - [Personality Tuning](./docs/personality-tuning.md) — Fine-tune SOUL.md
 - [Safety Guide](./docs/safety-guide.md) — Understand safety features
+
+**Reference & development:**
+- [Codebase Summary](./docs/codebase-summary.md) — Module map and data flow
+- [System Architecture](./docs/system-architecture.md) — Component design and security boundaries
+- [Code Standards](./docs/code-standards.md) — Development conventions and testing
+- [Project Roadmap](./docs/project-roadmap.md) — Release history and future plans
+
+**Resources:**
 - [SOUL.md.example](./SOUL.md.example) — Personality template
 - [CHANGELOG](./CHANGELOG.md) — Release history
+
+## 🧪 Testing
+
+```bash
+npm test              # Run tests with vitest
+npm run test:watch   # Watch mode for development
+npm run test:coverage # Generate coverage report
+npm run test:clone   # Run Clone Score test (the old 'npm test' behavior)
+```
+
+See [Code Standards](./docs/code-standards.md) for testing conventions.
+
+## 🛠 Development
+
+```bash
+npm run lint         # Check code with ESLint
+npm run lint:fix     # Auto-fix linting issues
+npm run format       # Format with Prettier
+npm run format:check # Check formatting
+```
+
+See [Code Standards](./docs/code-standards.md) for development guidelines and [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution process.
+
+## 🆘 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| **WhatsApp QR code doesn't render** | Terminal may not support Unicode. Try WSL, Git Bash, or `--qr-ascii` mode if available. On Windows, use PowerShell Core v7+. |
+| **Clone never replies** | Check: (1) API key in `.env` is correct, (2) `data/SOUL.md` exists, (3) provider env var matches (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.). Run `npx openself setup` to re-configure. |
+| **"Vietnamese AI-reveal not detected"** | Upgrade to v0.6.0+. Earlier versions had a regex bug (`\t` vs `\b`). Run `npm update openself`. |
+| **Personality stats not used by clone** | Run `npx openself feed` again to regenerate `data/personality.json`. Without it, mimicry uses defaults (standard delays, no custom emoji frequency). |
+| **"No SOUL.md found" error** | Run `npx openself feed --whatsapp ./chat.txt --name "Your Name"` to create one. You need at least one chat export. |
+| **Clone replies too fast / too slow** | Edit `data/personality.json` and adjust `responseTimeAvg` (milliseconds). Or re-feed with more diverse conversation examples. |
+| **"Unknown provider" error** | Set one of: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `OLLAMA_BASE_URL` in `.env`. See [Setup Guide](./docs/setup-guide.md). |
+| **Memory errors on large chat exports** | Break into multiple feed commands: `npx openself feed --whatsapp chat1.txt --name You && npx openself feed --whatsapp chat2.txt --name You`. RAG indexing is incremental. |
+
+See [Safety Guide](./docs/safety-guide.md) for safety features and [System Architecture](./docs/system-architecture.md) for how the clone works.
 
 ## 🤝 Contributing
 
@@ -195,7 +242,7 @@ PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 git clone https://github.com/Open-Self/open-self.git
 cd open-self && npm install
 npx openself feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
-npx openself test
+npm test
 ```
 
 ## 📜 License
