@@ -50,11 +50,15 @@ export function createWebServer(options = {}) {
 
     // Badge: SVG clone score badge
     app.get('/badge/:name', (req, res) => {
+        // Sanitize name: HTML-escape + length cap to prevent SVG XSS
+        const rawName = String(req.params.name || 'Clone').slice(0, 64);
+        const name = rawName.replace(/[<>&"']/g, c => (
+            { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
         try {
             const soul = readFileSync(join(dataDir, 'SOUL.md'), 'utf-8');
             const scoreMatch = soul.match(/Clone Score:\s*(\d+)/);
             const score = scoreMatch ? parseInt(scoreMatch[1]) : 75;
-            const name = req.params.name || 'Clone';
             const dark = req.query.dark === 'true';
 
             const svg = generateBadge(name, score, { dark });
@@ -62,7 +66,7 @@ export function createWebServer(options = {}) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.send(svg);
         } catch {
-            const svg = generateBadge(req.params.name || 'Clone', 0);
+            const svg = generateBadge(name, 0);
             res.setHeader('Content-Type', 'image/svg+xml');
             res.send(svg);
         }
@@ -70,16 +74,28 @@ export function createWebServer(options = {}) {
 
     // Arena: View debate transcript
     app.get('/arena/:id', (req, res) => {
+        // Whitelist id (alnum + dash/underscore, length-cap) to block path traversal
+        const id = req.params.id;
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
+            return res.status(400).send('Invalid arena id');
+        }
         try {
-            const filepath = join(dataDir, `arena-${req.params.id}.md`);
+            const filepath = join(dataDir, `arena-${id}.md`);
             if (existsSync(filepath)) {
-                const content = readFileSync(filepath, 'utf-8');
+                const raw = readFileSync(filepath, 'utf-8');
+                // HTML-escape arena content before injecting into HTML
+                const escaped = raw.replace(/[<>&"']/g, c => (
+                    { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]
+                ));
+                const rendered = escaped
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 res.setHeader('Content-Type', 'text/html');
                 res.send(`<!DOCTYPE html>
 <html><head><title>Clone Arena</title>
 <style>body{font-family:system-ui;max-width:700px;margin:2rem auto;padding:0 1rem;background:#0f172a;color:#e2e8f0}
 h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
-<body>${content.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</body></html>`);
+<body>${rendered}</body></html>`);
             } else {
                 res.status(404).send('Arena debate not found');
             }
@@ -130,7 +146,7 @@ h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
         if (!pipeline) {
             try {
                 pipeline = new ClonePipeline({ dataDir });
-            } catch (err) {
+            } catch {
                 return res.status(500).json({ error: 'Clone not configured' });
             }
         }
@@ -148,7 +164,7 @@ h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
             } else {
                 res.json({ replies: ['Hmm, để t check lại nha'] });
             }
-        } catch (err) {
+        } catch {
             res.status(500).json({ error: 'Clone error' });
         }
     });

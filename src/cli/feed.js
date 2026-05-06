@@ -153,6 +153,14 @@ export async function feedCommand(options) {
             'utf-8',
         );
 
+        // Persist structured personality so mimicry/style modules can read
+        // the trained numeric stats at runtime (SOUL.md alone loses them).
+        writeFileSync(
+            `${dataDir}/personality.json`,
+            JSON.stringify({ ...personality, fingerprint, userName }, null, 2),
+            'utf-8',
+        );
+
         // RAG indexing — auto-index conversations for memory
         if (conversations.length > 0) {
             const spinnerRAG = ora('Indexing memories for RAG search...').start();

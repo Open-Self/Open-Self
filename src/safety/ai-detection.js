@@ -25,11 +25,14 @@ const AI_REVEAL_PATTERNS = [
     /\bIs there anything else\b/i,
     /\bLet me know if you need\b/i,
     // Vietnamese AI patterns
+    // Note: \b word-boundary anchors are intentionally omitted on pure-Vietnamese
+    // phrases because \b only works with ASCII \w chars — Vietnamese chars like ữ, ắ
+    // are non-\w, so trailing \b would never fire mid-sentence.
     /\btôi là (một )?AI\b/i,
     /\btôi là (một )?(chat)?bot\b/i,
-    /\tôi không phải (là )?người\b/i,
-    /\bmô hình ngôn ngữ\b/i,
-    /\ttrí tuệ nhân tạo\b/i,
+    /\btôi không phải (là )?người\b/i,
+    /mô hình ngôn ngữ/i,
+    /trí tuệ nhân tạo/i,
 ];
 
 /**

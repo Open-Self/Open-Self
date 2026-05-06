@@ -14,6 +14,7 @@ import { HumanMimicry } from '../mimicry/humanlike.js';
 import { StyleProcessor } from '../mimicry/style.js';
 import { cleanAIReveal } from '../safety/ai-detection.js';
 import { loadConfig } from '../config/loader.js';
+import { loadPersonality, mergePersonality } from '../config/personality-loader.js';
 
 export class ClonePipeline {
     constructor(options = {}) {
@@ -32,13 +33,18 @@ export class ClonePipeline {
         this.chatMemory = new ChatMemory(embedding, this.dataDir);
         this.conversationMemory = new ConversationMemory(this.dataDir);
 
+        // Merge SOUL.md (string fields) with personality.json (numeric stats)
+        // so HumanMimicry/StyleProcessor see the trained stats, not defaults.
+        const personalityJson = loadPersonality(this.dataDir);
+        const personality = mergePersonality(this.brain.soul, personalityJson);
+
         // Safety
-        this.guard = new SafetyGuard(this.brain.soul);
+        this.guard = new SafetyGuard(personality);
         this.reviewQueue = new ReviewQueue(this.dataDir);
 
         // Mimicry
-        this.mimicry = new HumanMimicry(this.brain.soul);
-        this.style = new StyleProcessor(this.brain.soul);
+        this.mimicry = new HumanMimicry(personality);
+        this.style = new StyleProcessor(personality);
     }
 
     /**
