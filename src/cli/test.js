@@ -187,7 +187,7 @@ function truncate(str, len) {
 /**
  * Interactive mode — chat with your clone in the terminal
  */
-async function interactiveMode(options) {
+async function interactiveMode(_options) {
     console.log('');
     console.log(chalk.bold.cyan('💬 OpenSelf — Interactive Clone Chat'));
     console.log(chalk.gray('━'.repeat(40)));

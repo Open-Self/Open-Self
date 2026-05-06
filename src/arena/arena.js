@@ -3,7 +3,7 @@
  * The viral "Clone vs Clone" feature
  */
 
-import { CloneBrain, loadSoul } from '../brain/clone.js';
+import { CloneBrain } from '../brain/clone.js';
 import { createProvider, autoDetectProvider } from '../brain/router.js';
 import { loadConfig } from '../config/loader.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';

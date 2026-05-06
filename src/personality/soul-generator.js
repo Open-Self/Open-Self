@@ -4,7 +4,7 @@
  */
 
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { join } from 'path';
 
 export function generateSoulMd(personality, fingerprint, userInfo = {}) {
     const name = userInfo.name || 'User';

@@ -4,7 +4,7 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { CloneArena } from '../arena/arena.js';
 
 // Default sparring partner SOUL.md
@@ -75,7 +75,7 @@ export async function arenaCommand(options) {
 
     try {
         const result = await arena.runDebate(clone1, clone2, topic, {
-            onMessage: (speaker, text, idx) => {
+            onMessage: (speaker, text, _idx) => {
                 messageCount++;
                 if (messageCount === 1) spinner.stop();
 

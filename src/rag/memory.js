@@ -5,7 +5,7 @@
 
 import { LocalIndex } from 'vectra';
 import { join } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 
 export class ChatMemory {
     constructor(embedding, dataDir = './data') {
@@ -71,7 +71,7 @@ export class ChatMemory {
                         },
                     });
                     indexed++;
-                } catch (err) {
+                } catch {
                     // Skip failed embeddings silently
                 }
             }

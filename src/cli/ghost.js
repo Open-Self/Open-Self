@@ -5,7 +5,7 @@
 import chalk from 'chalk';
 import { GhostMode } from '../ghost/ghost.js';
 
-export async function ghostCommand(args, options) {
+export async function ghostCommand(args, _options) {
     const ghost = new GhostMode('./data');
     const action = args[0] || 'status';
 

@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { ReviewQueue } from '../safety/review-queue.js';
 import { soulExists } from '../config/soul.js';
 
