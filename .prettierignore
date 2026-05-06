@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+data/
+*.md
+package-lock.json
+release-manifest.json
+plans/
+docs/
+posts/
+tests/.tmp/
