@@ -29,8 +29,7 @@ describe('getReplyDelay', () => {
     it('close friends get faster replies (lower bound)', () => {
         const m = new HumanMimicry({ ...PERSONALITY, responseTimeAvg: 120000 });
         const closeDelay = m.getReplyDelay('hi', { closeness: 'close' });
-        const normalDelay = m.getReplyDelay('hi', {});
-        // Not guaranteed due to random, but both must be in valid range
+        // Not guaranteed due to random, but must be in valid range
         expect(closeDelay).toBeGreaterThanOrEqual(5000);
         expect(closeDelay).toBeLessThanOrEqual(300000);
     });

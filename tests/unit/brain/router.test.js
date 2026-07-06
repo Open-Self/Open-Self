@@ -1,7 +1,7 @@
 /**
  * LLM Provider Router — autoDetect, createProvider, env fallbacks
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createProvider, autoDetectProvider, PROVIDERS } from '../../../src/brain/router.js';
 
 // Save and restore env per test
