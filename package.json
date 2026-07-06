@@ -71,6 +71,14 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "overrides": {
+    "discord.js": {
+      "undici": "^6.27.0"
+    },
+    "@discordjs/rest": {
+      "undici": "^6.27.0"
+    }
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
