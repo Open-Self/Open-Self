@@ -30,9 +30,7 @@ function getUniqueWordRatio(texts) {
         }
     }
 
-    return allWords.length > 0
-        ? Math.round((uniqueWords.size / allWords.length) * 100) / 100
-        : 0;
+    return allWords.length > 0 ? Math.round((uniqueWords.size / allWords.length) * 100) / 100 : 0;
 }
 
 function getAvgWordLength(texts) {
@@ -47,11 +45,15 @@ function getAvgWordLength(texts) {
     }
 
     if (wordLengths.length === 0) return 0;
-    return Math.round(wordLengths.reduce((a, b) => a + b, 0) / wordLengths.length * 10) / 10;
+    return Math.round((wordLengths.reduce((a, b) => a + b, 0) / wordLengths.length) * 10) / 10;
 }
 
 function analyzePunctuation(texts) {
-    let dots = 0, commas = 0, exclamations = 0, questions = 0, ellipsis = 0;
+    let dots = 0,
+        commas = 0,
+        exclamations = 0,
+        questions = 0,
+        ellipsis = 0;
 
     for (const text of texts) {
         dots += (text.match(/\./g) || []).length;
@@ -65,7 +67,9 @@ function analyzePunctuation(texts) {
 }
 
 function analyzeCapitalization(texts) {
-    let allCaps = 0, noCaps = 0, normalCaps = 0;
+    let allCaps = 0,
+        noCaps = 0,
+        normalCaps = 0;
 
     for (const text of texts) {
         if (text === text.toUpperCase() && /[A-Z]/.test(text)) allCaps++;

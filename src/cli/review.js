@@ -32,7 +32,8 @@ export async function reviewCommand() {
 
         if (nameMatch) console.log(chalk.white(`  Name: ${chalk.cyan(nameMatch[1])}`));
         if (langMatch) console.log(chalk.white(`  Language: ${chalk.cyan(langMatch[1])}`));
-        if (totalMatch) console.log(chalk.white(`  Messages analyzed: ${chalk.cyan(totalMatch[1])}`));
+        if (totalMatch)
+            console.log(chalk.white(`  Messages analyzed: ${chalk.cyan(totalMatch[1])}`));
     } catch {
         console.log(chalk.gray('  Could not read SOUL.md'));
     }
@@ -61,7 +62,9 @@ export async function reviewCommand() {
             console.log(chalk.white(`  From: ${chalk.cyan(item.contact || 'Unknown')}`));
             console.log(chalk.gray(`  Message: "${item.message || ''}"`));
             console.log(chalk.gray(`  Clone reply: "${item.reply || ''}"`));
-            console.log(chalk.gray(`  Issue: ${item.issues?.map(i => i.type).join(', ') || 'unknown'}`));
+            console.log(
+                chalk.gray(`  Issue: ${item.issues?.map((i) => i.type).join(', ') || 'unknown'}`),
+            );
         }
     }
 

@@ -24,7 +24,7 @@ export function parseTelegram(filePath) {
             text = msg.text;
         } else if (Array.isArray(msg.text)) {
             text = msg.text
-                .map(part => (typeof part === 'string' ? part : part.text || ''))
+                .map((part) => (typeof part === 'string' ? part : part.text || ''))
                 .join('');
         }
 

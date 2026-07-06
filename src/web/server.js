@@ -52,9 +52,10 @@ export function createWebServer(options = {}) {
     app.get('/badge/:name', (req, res) => {
         // Sanitize name: HTML-escape + length cap to prevent SVG XSS
         const rawName = String(req.params.name || 'Clone').slice(0, 64);
-        const name = rawName.replace(/[<>&"']/g, c => (
-            { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]
-        ));
+        const name = rawName.replace(
+            /[<>&"']/g,
+            (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c],
+        );
         try {
             const soul = readFileSync(join(dataDir, 'SOUL.md'), 'utf-8');
             const scoreMatch = soul.match(/Clone Score:\s*(\d+)/);
@@ -84,9 +85,13 @@ export function createWebServer(options = {}) {
             if (existsSync(filepath)) {
                 const raw = readFileSync(filepath, 'utf-8');
                 // HTML-escape arena content before injecting into HTML
-                const escaped = raw.replace(/[<>&"']/g, c => (
-                    { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]
-                ));
+                const escaped = raw.replace(
+                    /[<>&"']/g,
+                    (c) =>
+                        ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[
+                            c
+                        ],
+                );
                 const rendered = escaped
                     .replace(/\n/g, '<br>')
                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -107,8 +112,10 @@ h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
     // Arena: List all debates
     app.get('/arena', (req, res) => {
         try {
-            const files = readdirSync(dataDir).filter(f => f.startsWith('arena-') && f.endsWith('.md'));
-            const debates = files.map(f => ({
+            const files = readdirSync(dataDir).filter(
+                (f) => f.startsWith('arena-') && f.endsWith('.md'),
+            );
+            const debates = files.map((f) => ({
                 id: f.replace('arena-', '').replace('.md', ''),
                 url: `/arena/${f.replace('arena-', '').replace('.md', '')}`,
             }));
@@ -135,7 +142,7 @@ h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
         const ip = req.ip || 'unknown';
         const now = Date.now();
         const hits = rateLimit.get(ip) || [];
-        const recent = hits.filter(t => now - t < RATE_WINDOW);
+        const recent = hits.filter((t) => now - t < RATE_WINDOW);
         if (recent.length >= RATE_LIMIT) {
             return res.status(429).json({ error: 'Too many messages. Please wait.' });
         }

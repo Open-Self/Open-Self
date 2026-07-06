@@ -70,7 +70,9 @@ export async function testCommand(options) {
 
     for (let i = 0; i < testCount; i++) {
         const conv = conversations[i];
-        const spinner = ora(`Test ${i + 1}/${testCount}: "${truncate(conv.theirMessage, 40)}"`).start();
+        const spinner = ora(
+            `Test ${i + 1}/${testCount}: "${truncate(conv.theirMessage, 40)}"`,
+        ).start();
 
         try {
             const cloneReply = await brain.generateReply(
@@ -87,12 +89,17 @@ export async function testCommand(options) {
 
             spinner.succeed(
                 `${emoji} ${scoreColor(`${score}%`)} ` +
-                chalk.gray(`Q: "${truncate(conv.theirMessage, 30)}"`)
+                    chalk.gray(`Q: "${truncate(conv.theirMessage, 30)}"`),
             );
             console.log(chalk.gray(`      Real: "${truncate(conv.yourReply, 50)}"`));
             console.log(chalk.gray(`      Clone: "${truncate(cloneReply, 50)}"`));
 
-            results.push({ question: conv.theirMessage, real: conv.yourReply, clone: cloneReply, score });
+            results.push({
+                question: conv.theirMessage,
+                real: conv.yourReply,
+                clone: cloneReply,
+                score,
+            });
         } catch (err) {
             spinner.fail(`Failed: ${err.message}`);
             results.push({ question: conv.theirMessage, error: err.message, score: 0 });
@@ -106,7 +113,11 @@ export async function testCommand(options) {
     console.log('');
     console.log(chalk.gray('═'.repeat(40)));
     console.log('');
-    console.log(chalk.bold.white(`  📊 Overall Clone Score: ${getScoreColor(avgScore)(`${avgScore}%`)} (Grade: ${chalk.bold(grade)})`));
+    console.log(
+        chalk.bold.white(
+            `  📊 Overall Clone Score: ${getScoreColor(avgScore)(`${avgScore}%`)} (Grade: ${chalk.bold(grade)})`,
+        ),
+    );
     console.log(chalk.white(`  Your clone is ${chalk.bold.cyan(`${avgScore}%`)} you.`));
     console.log('');
 
@@ -135,7 +146,9 @@ function calculateSimilarity(real, clone) {
     let score = 0;
 
     // 1. Length similarity (30 points)
-    const lenRatio = Math.min(realLower.length, cloneLower.length) / Math.max(realLower.length, cloneLower.length);
+    const lenRatio =
+        Math.min(realLower.length, cloneLower.length) /
+        Math.max(realLower.length, cloneLower.length);
     score += lenRatio * 30;
 
     // 2. Word overlap (40 points)

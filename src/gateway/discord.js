@@ -12,7 +12,9 @@ export class DiscordGateway {
     constructor(config = {}) {
         const token = config.token || process.env.DISCORD_BOT_TOKEN;
         if (!token) {
-            throw new Error('DISCORD_BOT_TOKEN is required. Create a bot at https://discord.com/developers');
+            throw new Error(
+                'DISCORD_BOT_TOKEN is required. Create a bot at https://discord.com/developers',
+            );
         }
 
         this.token = token;
@@ -72,7 +74,11 @@ export class DiscordGateway {
             isGroup: !isDM,
         };
 
-        console.log(chalk.cyan(`📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`));
+        console.log(
+            chalk.cyan(
+                `📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`,
+            ),
+        );
 
         try {
             const result = await this.pipeline.processMessage({ text, isGroup: !isDM }, contact);
@@ -85,7 +91,11 @@ export class DiscordGateway {
 
                 for (const reply of result.replies) {
                     await message.reply(reply);
-                    console.log(chalk.green(`   → "${reply.slice(0, 60)}${reply.length > 60 ? '...' : ''}"`));
+                    console.log(
+                        chalk.green(
+                            `   → "${reply.slice(0, 60)}${reply.length > 60 ? '...' : ''}"`,
+                        ),
+                    );
                 }
                 this.stats.replied++;
             } else if (result.action === 'ignore') {
@@ -99,6 +109,10 @@ export class DiscordGateway {
     stop() {
         this.client.destroy();
         console.log(chalk.yellow('\n🛑 Discord bot stopped'));
-        console.log(chalk.white(`   ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored`));
+        console.log(
+            chalk.white(
+                `   ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored`,
+            ),
+        );
     }
 }

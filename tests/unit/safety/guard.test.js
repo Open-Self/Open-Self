@@ -10,7 +10,7 @@ describe('SafetyGuard.checkReply', () => {
         const result = guard.checkReply("I'm an AI assistant", {}, {});
         expect(result.safe).toBe(false);
         expect(result.action).toBe('block');
-        expect(result.issues.some(i => i.type === 'ai_reveal')).toBe(true);
+        expect(result.issues.some((i) => i.type === 'ai_reveal')).toBe(true);
     });
 
     it('queues reply containing sensitive info from neverShare', () => {
@@ -18,7 +18,7 @@ describe('SafetyGuard.checkReply', () => {
         const result = guard.checkReply('my passwords are 1234', {}, {});
         expect(result.safe).toBe(false);
         expect(result.action).toBe('queue_for_review');
-        expect(result.issues.some(i => i.type === 'sensitive_info')).toBe(true);
+        expect(result.issues.some((i) => i.type === 'sensitive_info')).toBe(true);
     });
 
     it('deflects when incoming message contains avoided topic', () => {
@@ -26,7 +26,11 @@ describe('SafetyGuard.checkReply', () => {
             avoidTopics: 'politics',
             deflectMessage: 'Thôi ko bàn cái này',
         });
-        const result = guard.checkReply('sure thing', { text: 'what do you think about politics?' }, {});
+        const result = guard.checkReply(
+            'sure thing',
+            { text: 'what do you think about politics?' },
+            {},
+        );
         expect(result.safe).toBe(false);
         expect(result.action).toBe('deflect');
         expect(result.deflectMessage).toBe('Thôi ko bàn cái này');
@@ -43,7 +47,7 @@ describe('SafetyGuard.checkReply', () => {
         const result = guard.checkReply('hey', { text: 'hi' }, { name: 'Unknown', known: false });
         // Low severity unknown_contact should not block
         expect(result.safe).toBe(true);
-        expect(result.issues.some(i => i.type === 'unknown_contact')).toBe(true);
+        expect(result.issues.some((i) => i.type === 'unknown_contact')).toBe(true);
     });
 
     it('defaults neverShare to built-in topics if not set', () => {

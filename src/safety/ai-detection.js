@@ -39,7 +39,7 @@ const AI_REVEAL_PATTERNS = [
  * Check if a reply contains AI self-reveal patterns
  */
 export function detectAIReveal(text) {
-    return AI_REVEAL_PATTERNS.some(pattern => pattern.test(text));
+    return AI_REVEAL_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**

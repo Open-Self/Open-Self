@@ -19,8 +19,8 @@ export async function ghostCommand(args, _options) {
         case 'enable':
             ghost.enable();
             console.log(chalk.green('  ✅ Ghost Mode enabled'));
-            console.log(chalk.gray('  Your clone will reply when you\'re offline.'));
-            console.log(chalk.gray('  Run `openself ghost off` when you\'re back.'));
+            console.log(chalk.gray("  Your clone will reply when you're offline."));
+            console.log(chalk.gray("  Run `openself ghost off` when you're back."));
             break;
 
         case 'off':
@@ -32,7 +32,7 @@ export async function ghostCommand(args, _options) {
 
         case 'ping':
             ghost.ping();
-            console.log(chalk.cyan('  📡 Heartbeat sent — you\'re marked as online.'));
+            console.log(chalk.cyan("  📡 Heartbeat sent — you're marked as online."));
             break;
 
         case 'status':
@@ -41,8 +41,16 @@ export async function ghostCommand(args, _options) {
             const emoji = status.ghostMode ? '👻' : status.online ? '🟢' : '⚪';
 
             console.log(chalk.white(`  ${emoji} Status: ${chalk.bold(status.status)}`));
-            console.log(chalk.white(`  👻 Ghost Mode: ${status.ghostMode ? chalk.green('ON') : chalk.gray('OFF')}`));
-            console.log(chalk.white(`  🟢 Online: ${status.online ? chalk.green('Yes') : chalk.gray('No')}`));
+            console.log(
+                chalk.white(
+                    `  👻 Ghost Mode: ${status.ghostMode ? chalk.green('ON') : chalk.gray('OFF')}`,
+                ),
+            );
+            console.log(
+                chalk.white(
+                    `  🟢 Online: ${status.online ? chalk.green('Yes') : chalk.gray('No')}`,
+                ),
+            );
             console.log(chalk.white(`  ⏱️  Last seen: ${chalk.cyan(status.lastSeen)}`));
 
             if (status.ghostMode && status.isUserOffline) {

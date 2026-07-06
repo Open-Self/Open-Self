@@ -2,18 +2,22 @@
  * Personality Extractor — Analyze chat messages to extract personality traits
  */
 
-// Common emoji regex (combining marks + ZWJ are intentional for emoji counting)
-// eslint-disable-next-line no-misleading-character-class
-const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+// Common emoji regex. Combining marks (FE00–FE0F, 20E3) and the ZWJ (200D) are
+// intentional inside the character class so emoji sequences are counted as parts.
+// Block-disable survives Prettier wrapping the long literal onto its own line.
+/* eslint-disable no-misleading-character-class */
+const EMOJI_REGEX =
+    /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+/* eslint-enable no-misleading-character-class */
 
 export function extractPersonality(yourMessages, conversations = []) {
-    const texts = yourMessages.map(m => m.text);
+    const texts = yourMessages.map((m) => m.text);
 
     return {
         // Basic stats
         totalMessages: texts.length,
-        avgMessageLength: average(texts.map(t => t.length)),
-        avgWordCount: average(texts.map(t => t.split(/\s+/).length)),
+        avgMessageLength: average(texts.map((t) => t.length)),
+        avgWordCount: average(texts.map((t) => t.split(/\s+/).length)),
 
         // Emoji analysis
         emojiFrequency: countEmojis(texts) / Math.max(texts.length, 1),
@@ -31,9 +35,10 @@ export function extractPersonality(yourMessages, conversations = []) {
         humorPatterns: detectHumor(texts),
 
         // Response patterns
-        responseTimeAvg: conversations.length > 0
-            ? average(conversations.filter(c => c.replyDelay > 0).map(c => c.replyDelay))
-            : 60000, // default 1 min
+        responseTimeAvg:
+            conversations.length > 0
+                ? average(conversations.filter((c) => c.replyDelay > 0).map((c) => c.replyDelay))
+                : 60000, // default 1 min
 
         // Vietnamese-specific
         pronounUsage: detectVietnamesePronouns(texts),
@@ -81,18 +86,105 @@ function getTopEmojis(texts, n) {
 
 export function getTopWords(texts, n) {
     const stopWords = new Set([
-        'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-        'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for',
-        'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
-        'before', 'after', 'and', 'but', 'or', 'nor', 'not', 'so', 'yet',
-        'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'him', 'his',
-        'she', 'her', 'it', 'its', 'they', 'them', 'their', 'this', 'that',
-        'these', 'those', 'if', 'then', 'than', 'when', 'what', 'which',
+        'the',
+        'a',
+        'an',
+        'is',
+        'are',
+        'was',
+        'were',
+        'be',
+        'been',
+        'being',
+        'have',
+        'has',
+        'had',
+        'do',
+        'does',
+        'did',
+        'will',
+        'would',
+        'could',
+        'should',
+        'may',
+        'might',
+        'can',
+        'shall',
+        'to',
+        'of',
+        'in',
+        'for',
+        'on',
+        'with',
+        'at',
+        'by',
+        'from',
+        'as',
+        'into',
+        'through',
+        'during',
+        'before',
+        'after',
+        'and',
+        'but',
+        'or',
+        'nor',
+        'not',
+        'so',
+        'yet',
+        'i',
+        'me',
+        'my',
+        'we',
+        'our',
+        'you',
+        'your',
+        'he',
+        'him',
+        'his',
+        'she',
+        'her',
+        'it',
+        'its',
+        'they',
+        'them',
+        'their',
+        'this',
+        'that',
+        'these',
+        'those',
+        'if',
+        'then',
+        'than',
+        'when',
+        'what',
+        'which',
         // Vietnamese stop words
-        'là', 'và', 'của', 'có', 'được', 'cho', 'với', 'từ', 'trong',
-        'các', 'này', 'đó', 'để', 'về', 'cũng', 'như', 'nhưng', 'hay',
-        'thì', 'sẽ', 'đã', 'rồi', 'mà', 'vì', 'nếu',
+        'là',
+        'và',
+        'của',
+        'có',
+        'được',
+        'cho',
+        'với',
+        'từ',
+        'trong',
+        'các',
+        'này',
+        'đó',
+        'để',
+        'về',
+        'cũng',
+        'như',
+        'nhưng',
+        'hay',
+        'thì',
+        'sẽ',
+        'đã',
+        'rồi',
+        'mà',
+        'vì',
+        'nếu',
     ]);
 
     const counts = {};
@@ -164,7 +256,7 @@ function detectGreetingPatterns(texts) {
     for (const text of texts) {
         const lower = text.toLowerCase().trim();
         for (const [style, patterns] of Object.entries(greetings)) {
-            if (patterns.some(p => lower.startsWith(p))) {
+            if (patterns.some((p) => lower.startsWith(p))) {
                 detected.push(style);
                 break;
             }
@@ -183,8 +275,23 @@ function detectGreetingPatterns(texts) {
 
 function detectSlang(texts) {
     const slangPatterns = [
-        'vl', 'vcl', 'vkl', 'dm', 'đm', 'lol', 'lmao', 'bruh', 'bro',
-        'ez', 'gg', 'wp', 'noob', 'ngl', 'tbh', 'fr', 'lowkey',
+        'vl',
+        'vcl',
+        'vkl',
+        'dm',
+        'đm',
+        'lol',
+        'lmao',
+        'bruh',
+        'bro',
+        'ez',
+        'gg',
+        'wp',
+        'noob',
+        'ngl',
+        'tbh',
+        'fr',
+        'lowkey',
     ];
 
     let slangCount = 0;
@@ -209,8 +316,8 @@ function detectFormalityLevel(texts) {
 
     for (const text of texts) {
         const lower = text.toLowerCase();
-        if (formalPatterns.some(p => lower.includes(p))) formalCount++;
-        if (informalPatterns.some(p => lower.includes(p))) informalCount++;
+        if (formalPatterns.some((p) => lower.includes(p))) formalCount++;
+        if (informalPatterns.some((p) => lower.includes(p))) informalCount++;
     }
 
     if (formalCount > informalCount * 2) return 'formal';
@@ -225,7 +332,7 @@ function detectHumor(texts) {
     const laughPatterns = ['😂', '🤣', 'haha', 'hihi', 'lol', 'lmao', '=))', ':))'];
     let laughCount = 0;
     for (const text of texts) {
-        if (laughPatterns.some(p => text.toLowerCase().includes(p))) {
+        if (laughPatterns.some((p) => text.toLowerCase().includes(p))) {
             laughCount++;
         }
     }
@@ -235,7 +342,7 @@ function detectHumor(texts) {
     const sarcasmPatterns = ['🙄', 'sure...', 'totally', 'right...', 'okay then'];
     let sarcasmCount = 0;
     for (const text of texts) {
-        if (sarcasmPatterns.some(p => text.toLowerCase().includes(p))) {
+        if (sarcasmPatterns.some((p) => text.toLowerCase().includes(p))) {
             sarcasmCount++;
         }
     }
@@ -246,8 +353,13 @@ function detectHumor(texts) {
 
 function detectVietnamesePronouns(texts) {
     const pronouns = {
-        'tao/mày': 0, 'tớ/cậu': 0, 'mình/bạn': 0,
-        'anh/em': 0, 'chị/em': 0, 't/m': 0, 'con': 0,
+        'tao/mày': 0,
+        'tớ/cậu': 0,
+        'mình/bạn': 0,
+        'anh/em': 0,
+        'chị/em': 0,
+        't/m': 0,
+        con: 0,
     };
 
     for (const text of texts) {
@@ -271,7 +383,8 @@ function detectVietnamesePronouns(texts) {
 }
 
 function checkDiacriticUsage(texts) {
-    const vietnameseWithDiacritics = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
+    const vietnameseWithDiacritics =
+        /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
 
     let withCount = 0;
     for (const text of texts) {
@@ -283,10 +396,28 @@ function checkDiacriticUsage(texts) {
 
 export function detectAbbreviations(texts) {
     const commonAbbrs = {
-        'k': 0, 'ko': 0, 'dc': 0, 'nc': 0, 'ntn': 0, 'bn': 0,
-        'gì': 0, 'đc': 0, 'mk': 0, 'r': 0, 'cx': 0, 'vs': 0,
-        'oke': 0, 'ok': 0, 'tks': 0, 'thankiu': 0, 'thx': 0,
-        'btw': 0, 'omg': 0, 'wtf': 0, 'idk': 0, 'imo': 0,
+        k: 0,
+        ko: 0,
+        dc: 0,
+        nc: 0,
+        ntn: 0,
+        bn: 0,
+        gì: 0,
+        đc: 0,
+        mk: 0,
+        r: 0,
+        cx: 0,
+        vs: 0,
+        oke: 0,
+        ok: 0,
+        tks: 0,
+        thankiu: 0,
+        thx: 0,
+        btw: 0,
+        omg: 0,
+        wtf: 0,
+        idk: 0,
+        imo: 0,
     };
 
     for (const text of texts) {

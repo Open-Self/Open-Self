@@ -24,9 +24,8 @@ export class ClonePipeline {
         // Core components
         const soulContent = loadSoul(this.dataDir);
         this.brain = new CloneBrain(soulContent, this.config);
-        this.provider = options.provider || createProvider(
-            this.config.llm?.provider || autoDetectProvider()
-        );
+        this.provider =
+            options.provider || createProvider(this.config.llm?.provider || autoDetectProvider());
 
         // Memory
         const embedding = createEmbedding();
@@ -63,7 +62,9 @@ export class ClonePipeline {
         let ragContext = '';
         try {
             const memories = await this.chatMemory.findRelevant(
-                message.text || message, contactName, 5
+                message.text || message,
+                contactName,
+                5,
             );
             ragContext = this.chatMemory.formatContext(memories);
         } catch {
@@ -78,7 +79,7 @@ export class ClonePipeline {
             message.text || message,
             contact,
             this.provider,
-            { recentHistory, ragContext }
+            { recentHistory, ragContext },
         );
 
         // 5. Clean AI reveals
@@ -120,7 +121,7 @@ export class ClonePipeline {
         this.conversationMemory.addExchange(
             contactName,
             message.text || message,
-            replies.join(' ')
+            replies.join(' '),
         );
 
         return {

@@ -32,14 +32,14 @@ export class ReviewQueue {
      * Get all pending items
      */
     getPending() {
-        return this.queue.filter(item => item.status === 'pending');
+        return this.queue.filter((item) => item.status === 'pending');
     }
 
     /**
      * Approve an item (mark as sent)
      */
     approve(id) {
-        const item = this.queue.find(i => i.id === id);
+        const item = this.queue.find((i) => i.id === id);
         if (item) {
             item.status = 'approved';
             item.reviewedAt = new Date().toISOString();
@@ -52,7 +52,7 @@ export class ReviewQueue {
      * Reject an item
      */
     reject(id, editedReply) {
-        const item = this.queue.find(i => i.id === id);
+        const item = this.queue.find((i) => i.id === id);
         if (item) {
             item.status = 'rejected';
             item.editedReply = editedReply;
@@ -66,9 +66,9 @@ export class ReviewQueue {
      * Get summary stats
      */
     getStats() {
-        const pending = this.queue.filter(i => i.status === 'pending').length;
-        const approved = this.queue.filter(i => i.status === 'approved').length;
-        const rejected = this.queue.filter(i => i.status === 'rejected').length;
+        const pending = this.queue.filter((i) => i.status === 'pending').length;
+        const approved = this.queue.filter((i) => i.status === 'approved').length;
+        const rejected = this.queue.filter((i) => i.status === 'rejected').length;
         return { pending, approved, rejected, total: this.queue.length };
     }
 

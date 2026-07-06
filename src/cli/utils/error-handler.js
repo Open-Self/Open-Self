@@ -24,7 +24,10 @@ export function handleError(err) {
         console.error(chalk.dim('  Run: openself feed --whatsapp <chat-export.txt>'));
         process.exit(2);
     }
-    if (code === 'MISSING_API_KEY' || /api key/i.test(msg) && /missing|not set|invalid/i.test(msg)) {
+    if (
+        code === 'MISSING_API_KEY' ||
+        (/api key/i.test(msg) && /missing|not set|invalid/i.test(msg))
+    ) {
         console.error(chalk.dim('  Run: openself setup'));
         process.exit(2);
     }
@@ -37,7 +40,9 @@ export function handleError(err) {
         process.exit(2);
     }
     if (/401|403|unauthor/i.test(msg)) {
-        console.error(chalk.dim('  Authentication failed. Check API key in .env or run: openself setup'));
+        console.error(
+            chalk.dim('  Authentication failed. Check API key in .env or run: openself setup'),
+        );
         process.exit(3);
     }
 

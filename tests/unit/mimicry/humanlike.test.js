@@ -105,7 +105,7 @@ describe('splitMessage', () => {
     it('returns array with truthy strings only after ||| split', () => {
         const m = new HumanMimicry(PERSONALITY);
         const result = m.splitMessage('msg one|||   |||msg two');
-        expect(result.every(s => s.trim().length > 0)).toBe(true);
+        expect(result.every((s) => s.trim().length > 0)).toBe(true);
     });
 
     it('returns single-element array for message between 80–149 chars', () => {
@@ -116,12 +116,13 @@ describe('splitMessage', () => {
 
     it('splits long messages at sentence boundaries', () => {
         const m = new HumanMimicry(PERSONALITY);
-        const long = 'First sentence here. Second sentence follows. Third one. Fourth sentence is here. Fifth sentence done.';
+        const long =
+            'First sentence here. Second sentence follows. Third one. Fourth sentence is here. Fifth sentence done.';
         const parts = m.splitMessage(long);
         expect(Array.isArray(parts)).toBe(true);
         expect(parts.length).toBeGreaterThanOrEqual(1);
         // All parts non-empty
-        expect(parts.every(p => p.length > 0)).toBe(true);
+        expect(parts.every((p) => p.length > 0)).toBe(true);
     });
 });
 
@@ -130,7 +131,7 @@ describe('processReply', () => {
         const m = new HumanMimicry({ ...PERSONALITY, typoRate: 0 });
         const result = m.processReply('hello world');
         expect(Array.isArray(result)).toBe(true);
-        expect(result.every(s => typeof s === 'string')).toBe(true);
+        expect(result.every((s) => typeof s === 'string')).toBe(true);
     });
 
     it('trims leading/trailing whitespace', () => {

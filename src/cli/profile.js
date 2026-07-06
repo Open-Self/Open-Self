@@ -109,14 +109,20 @@ async function importProfile(options) {
         }
         const MAX_SOUL_BYTES = 50_000;
         if (profile.soul.length > MAX_SOUL_BYTES) {
-            spinner.fail(`Profile soul too large (${profile.soul.length} > ${MAX_SOUL_BYTES} chars)`);
+            spinner.fail(
+                `Profile soul too large (${profile.soul.length} > ${MAX_SOUL_BYTES} chars)`,
+            );
             return;
         }
         const cleanSoul = profile.soul.replace(/```[a-z0-9]*\n?|```/gi, '');
 
         // Save to data/profiles/<name>/SOUL.md
         const profilesDir = './data/profiles';
-        const safeName = (profile.name || 'imported').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64) || 'imported';
+        const safeName =
+            (profile.name || 'imported')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .slice(0, 64) || 'imported';
         const targetDir = join(profilesDir, safeName);
 
         if (!existsSync(targetDir)) {
@@ -174,8 +180,8 @@ async function showProfileInfo() {
     if (existsSync(profilesDir)) {
         const { readdirSync } = await import('fs');
         const profiles = readdirSync(profilesDir, { withFileTypes: true })
-            .filter(d => d.isDirectory())
-            .map(d => d.name);
+            .filter((d) => d.isDirectory())
+            .map((d) => d.name);
 
         if (profiles.length > 0) {
             console.log('');
@@ -186,6 +192,8 @@ async function showProfileInfo() {
     console.log('');
     console.log(chalk.gray('  Commands:'));
     console.log(chalk.yellow('    openself profile export  ') + chalk.gray('— Bundle for sharing'));
-    console.log(chalk.yellow('    openself profile import  ') + chalk.gray('— Import a friend\'s profile'));
+    console.log(
+        chalk.yellow('    openself profile import  ') + chalk.gray("— Import a friend's profile"),
+    );
     console.log('');
 }

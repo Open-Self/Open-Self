@@ -22,9 +22,8 @@ export class HumanMimicry {
         const variation = baseDelay * (0.6 + Math.random() * 0.8);
 
         // Close friends → faster replies
-        const relationshipFactor = contact.closeness === 'close' ? 0.5
-            : contact.closeness === 'family' ? 0.7
-                : 1;
+        const relationshipFactor =
+            contact.closeness === 'close' ? 0.5 : contact.closeness === 'family' ? 0.7 : 1;
 
         const delay = (readTime + variation) * relationshipFactor;
 
@@ -91,7 +90,10 @@ export class HumanMimicry {
 
         // Model may have already split with |||
         if (reply.includes('|||')) {
-            return reply.split('|||').map(s => s.trim()).filter(Boolean);
+            return reply
+                .split('|||')
+                .map((s) => s.trim())
+                .filter(Boolean);
         }
 
         // Don't split short messages

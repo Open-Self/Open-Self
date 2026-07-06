@@ -15,7 +15,7 @@ describe('LocalEmbedding', () => {
     it('all vector values are finite numbers', async () => {
         const emb = new LocalEmbedding();
         const vector = await emb.embed('some text here');
-        expect(vector.every(v => Number.isFinite(v))).toBe(true);
+        expect(vector.every((v) => Number.isFinite(v))).toBe(true);
     });
 
     it('normalized vector has unit length (approx 1.0)', async () => {
@@ -45,7 +45,7 @@ describe('LocalEmbedding', () => {
         const texts = ['first text', 'second text', 'third text'];
         const vectors = await emb.embedBatch(texts);
         expect(vectors.length).toBe(3);
-        expect(vectors.every(v => v.length === 128)).toBe(true);
+        expect(vectors.every((v) => v.length === 128)).toBe(true);
     });
 
     it('buildVocabulary improves IDF weighting without throwing', () => {

@@ -18,9 +18,7 @@ export class AnthropicProvider {
             model: this.model,
             max_tokens: this.maxTokens,
             system: systemPrompt,
-            messages: [
-                { role: 'user', content: userMessage },
-            ],
+            messages: [{ role: 'user', content: userMessage }],
         });
 
         return response.content[0]?.text || '';

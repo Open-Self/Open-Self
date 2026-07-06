@@ -11,7 +11,11 @@ const TMP_DIR = join(tmpdir(), `openself-soul-test-${Date.now()}`);
 mkdirSync(TMP_DIR, { recursive: true });
 
 afterAll(() => {
-    try { rmSync(TMP_DIR, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+        rmSync(TMP_DIR, { recursive: true, force: true });
+    } catch {
+        /* ok */
+    }
 });
 
 describe('soulExists', () => {
@@ -73,7 +77,7 @@ describe('parseSoul', () => {
 
     it('identity section contains Name key', () => {
         const sections = parseSoul(SAMPLE);
-        const nameItem = sections.identity.find(i => i.key === 'Name');
+        const nameItem = sections.identity.find((i) => i.key === 'Name');
         expect(nameItem).toBeDefined();
         expect(nameItem.value).toBe('TestUser');
     });

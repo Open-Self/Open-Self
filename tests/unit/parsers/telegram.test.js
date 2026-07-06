@@ -80,7 +80,12 @@ describe('parseTelegram', () => {
                 list: [
                     {
                         messages: [
-                            { type: 'message', from: 'Alice', date: '2024-01-12T09:00:00', text: 'nested' },
+                            {
+                                type: 'message',
+                                from: 'Alice',
+                                date: '2024-01-12T09:00:00',
+                                text: 'nested',
+                            },
                         ],
                     },
                 ],

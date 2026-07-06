@@ -45,9 +45,7 @@ export class ConversationMemory {
         if (!session || session.length === 0) return '';
 
         const recent = session.slice(-maxExchanges);
-        return recent
-            .map(ex => `${contact}: ${ex.them}\nYou: ${ex.clone}`)
-            .join('\n\n');
+        return recent.map((ex) => `${contact}: ${ex.them}\nYou: ${ex.clone}`).join('\n\n');
     }
 
     /**
@@ -88,7 +86,8 @@ export class ConversationMemory {
             if (existsSync(this.memoryFile)) {
                 content = readFileSync(this.memoryFile, 'utf-8');
             } else {
-                content = '# OpenSelf — Conversation Memory\n\nAuto-generated log of clone conversations.\n';
+                content =
+                    '# OpenSelf — Conversation Memory\n\nAuto-generated log of clone conversations.\n';
             }
             writeFileSync(this.memoryFile, content + entry, 'utf-8');
         } catch {
@@ -105,7 +104,7 @@ export class ConversationMemory {
         try {
             const content = readFileSync(this.memoryFile, 'utf-8');
             const lines = content.split('\n');
-            const exchanges = lines.filter(l => l.startsWith('## ')).length;
+            const exchanges = lines.filter((l) => l.startsWith('## ')).length;
             return {
                 file: this.memoryFile,
                 totalExchanges: exchanges,

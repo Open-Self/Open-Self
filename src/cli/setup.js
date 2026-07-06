@@ -28,7 +28,8 @@ export async function setupCommand() {
             type: 'input',
             name: 'apiKey',
             message: (answers) => {
-                if (answers.provider === 'ollama') return 'Ollama base URL (default: http://localhost:11434):';
+                if (answers.provider === 'ollama')
+                    return 'Ollama base URL (default: http://localhost:11434):';
                 return `${answers.provider.charAt(0).toUpperCase() + answers.provider.slice(1)} API key:`;
             },
             validate: (input, answers) => {
@@ -40,8 +41,8 @@ export async function setupCommand() {
         {
             type: 'input',
             name: 'name',
-            message: 'What\'s your name? (used to identify your messages in chat exports)',
-            validate: (input) => input.trim() ? true : 'Name is required',
+            message: "What's your name? (used to identify your messages in chat exports)",
+            validate: (input) => (input.trim() ? true : 'Name is required'),
         },
     ]);
 
@@ -50,12 +51,14 @@ export async function setupCommand() {
     const envPath = '.env';
 
     if (existsSync(envPath)) {
-        const { overwrite } = await inquirer.prompt([{
-            type: 'confirm',
-            name: 'overwrite',
-            message: '.env file already exists. Overwrite?',
-            default: false,
-        }]);
+        const { overwrite } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'overwrite',
+                message: '.env file already exists. Overwrite?',
+                default: false,
+            },
+        ]);
         if (!overwrite) {
             console.log(chalk.yellow('\n⚠️  Skipped .env file'));
         } else {
@@ -74,7 +77,11 @@ export async function setupCommand() {
     console.log(chalk.cyan('  1. Export your WhatsApp chat history'));
     console.log(chalk.cyan('     WhatsApp → Settings → Chats → Export Chat'));
     console.log(chalk.cyan('  2. Feed it to OpenSelf:'));
-    console.log(chalk.yellow(`     npx openself feed --whatsapp ./chat-export.txt --name "${answers.name}"`));
+    console.log(
+        chalk.yellow(
+            `     npx openself feed --whatsapp ./chat-export.txt --name "${answers.name}"`,
+        ),
+    );
     console.log(chalk.cyan('  3. Test your clone:'));
     console.log(chalk.yellow('     npx openself test'));
     console.log('');

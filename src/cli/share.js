@@ -24,17 +24,26 @@ export async function shareCommand(options) {
         app.listen(port, () => {
             console.log(chalk.bold.green('  ✅ Clone is live!'));
             console.log('');
-            console.log(chalk.white('  🌐 Chat page: ') + chalk.cyan.underline(`http://localhost:${port}`));
-            console.log(chalk.white('  🔌 API:       ') + chalk.cyan.underline(`http://localhost:${port}/api/chat`));
+            console.log(
+                chalk.white('  🌐 Chat page: ') + chalk.cyan.underline(`http://localhost:${port}`),
+            );
+            console.log(
+                chalk.white('  🔌 API:       ') +
+                    chalk.cyan.underline(`http://localhost:${port}/api/chat`),
+            );
             console.log('');
-            console.log(chalk.gray('  Share this link with friends so they can chat with your clone.'));
+            console.log(
+                chalk.gray('  Share this link with friends so they can chat with your clone.'),
+            );
             console.log(chalk.gray('  Press Ctrl+C to stop.'));
             console.log('');
         });
     } else {
         console.log(chalk.white('  Share your clone with others:'));
         console.log('');
-        console.log(chalk.cyan('  npx openself share --web') + chalk.gray(' — Launch web chat page'));
+        console.log(
+            chalk.cyan('  npx openself share --web') + chalk.gray(' — Launch web chat page'),
+        );
         console.log('');
     }
 }

@@ -9,7 +9,9 @@ describe('handleError exit codes', () => {
     let exitSpy;
 
     beforeEach(() => {
-        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit called'); });
+        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+            throw new Error('process.exit called');
+        });
         vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
@@ -78,7 +80,9 @@ describe('wrapAction', () => {
     let exitSpy;
 
     beforeEach(() => {
-        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit called'); });
+        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+            throw new Error('process.exit called');
+        });
         vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 

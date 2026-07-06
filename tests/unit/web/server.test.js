@@ -21,8 +21,9 @@ function validateArenaId(id) {
 // ─── Badge name sanitizer (mirrors server.js lines 55-57) ────────────────────
 function sanitizeBadgeName(raw) {
     const capped = String(raw || 'Clone').slice(0, 64);
-    return capped.replace(/[<>&"']/g, c =>
-        ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])
+    return capped.replace(
+        /[<>&"']/g,
+        (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c],
     );
 }
 

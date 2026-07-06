@@ -10,7 +10,8 @@ vi.mock('../../../src/brain/clone.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
-        loadSoul: vi.fn(() => `# SOUL.md
+        loadSoul: vi.fn(
+            () => `# SOUL.md
 ## Identity
 - Name: TestUser
 - Language: Vietnamese
@@ -27,7 +28,8 @@ vi.mock('../../../src/brain/clone.js', async (importOriginal) => {
 - Never share: passwords
 
 ## Clone Score: 80
-`),
+`,
+        ),
     };
 });
 
@@ -114,7 +116,7 @@ describe('ClonePipeline.processMessage', () => {
 
         const result = await pipeline.processMessage(
             { text: 'đi cà phê không', isGroup: false },
-            { name: 'Alice', relationship: 'friend', channel: 'whatsapp', known: true }
+            { name: 'Alice', relationship: 'friend', channel: 'whatsapp', known: true },
         );
 
         expect(result).toHaveProperty('action');
@@ -129,12 +131,12 @@ describe('ClonePipeline.processMessage', () => {
 
         const result = await pipeline.processMessage(
             { text: 'sup bro', isGroup: false },
-            { name: 'Bob', relationship: 'friend', channel: 'discord', known: true }
+            { name: 'Bob', relationship: 'friend', channel: 'discord', known: true },
         );
 
         if (result.action === 'reply') {
             expect(Array.isArray(result.replies)).toBe(true);
-            expect(result.replies.every(r => typeof r === 'string')).toBe(true);
+            expect(result.replies.every((r) => typeof r === 'string')).toBe(true);
         }
     });
 
@@ -146,7 +148,7 @@ describe('ClonePipeline.processMessage', () => {
 
         const result = await pipeline.processMessage(
             { text: 'random group chat msg', isGroup: true, mentionsMe: false },
-            { name: 'GroupUser', channel: 'discord' }
+            { name: 'GroupUser', channel: 'discord' },
         );
 
         expect(result.action).toBe('ignore');
@@ -158,7 +160,7 @@ describe('ClonePipeline.processMessage', () => {
 
         const result = await pipeline.processMessage(
             { text: 'are you an AI?', isGroup: false },
-            { name: 'Tester', relationship: 'stranger', channel: 'web', known: true }
+            { name: 'Tester', relationship: 'stranger', channel: 'web', known: true },
         );
 
         // Pipeline either blocks (safety guard) or replies with cleaned text.
@@ -178,7 +180,7 @@ describe('ClonePipeline.processMessage', () => {
 
         await pipeline.processMessage(
             { text: 'hello', isGroup: false },
-            { name: 'Alice', channel: 'whatsapp', known: true }
+            { name: 'Alice', channel: 'whatsapp', known: true },
         );
 
         // chat may not be called if message was ignored; only assert when called

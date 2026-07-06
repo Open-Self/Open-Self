@@ -23,7 +23,7 @@ export class SafetyGuard {
 
         // 2. Sensitive info leak
         const neverShare = this.soul.neverShare || 'personal finances, health info, passwords';
-        const neverShareTopics = neverShare.split(',').map(s => s.trim().toLowerCase());
+        const neverShareTopics = neverShare.split(',').map((s) => s.trim().toLowerCase());
         for (const topic of neverShareTopics) {
             if (topic && reply.toLowerCase().includes(topic)) {
                 issues.push({ type: 'sensitive_info', topic, severity: 'high' });
@@ -32,10 +32,16 @@ export class SafetyGuard {
 
         // 3. Avoided topics in incoming message
         const avoidTopics = this.soul.avoidTopics || '';
-        const avoidList = avoidTopics.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const avoidList = avoidTopics
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
         for (const topic of avoidList) {
             if (message.text && message.text.toLowerCase().includes(topic)) {
-                const deflect = this.soul.deflectMessage || this.soul.unsureFallback || 'Thôi ko bàn cái này 😅';
+                const deflect =
+                    this.soul.deflectMessage ||
+                    this.soul.unsureFallback ||
+                    'Thôi ko bàn cái này 😅';
                 return {
                     safe: false,
                     action: 'deflect',
@@ -51,10 +57,10 @@ export class SafetyGuard {
         }
 
         // Determine action
-        if (issues.some(i => i.severity === 'critical')) {
+        if (issues.some((i) => i.severity === 'critical')) {
             return { safe: false, action: 'block', issues };
         }
-        if (issues.some(i => i.severity === 'high')) {
+        if (issues.some((i) => i.severity === 'high')) {
             return { safe: false, action: 'queue_for_review', issues };
         }
 
