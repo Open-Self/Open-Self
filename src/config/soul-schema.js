@@ -28,7 +28,9 @@ export const SoulSchema = z
 export function validateSoul(parsed) {
     const result = SoulSchema.safeParse(parsed);
     if (!result.success) {
-        const err = new Error(`Invalid SOUL.md: ${result.error.issues.map((i) => i.message).join('; ')}`);
+        const err = new Error(
+            `Invalid SOUL.md: ${result.error.issues.map((i) => i.message).join('; ')}`,
+        );
         err.code = 'INVALID_SOUL';
         throw err;
     }

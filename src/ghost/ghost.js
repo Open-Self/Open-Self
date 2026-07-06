@@ -77,7 +77,7 @@ export class GhostMode {
             online: hb.online || false,
             lastSeen: hb.lastSeen || 'never',
             isUserOffline: this.isUserOffline(),
-            status: hb.ghostMode ? 'ghost' : (hb.online ? 'online' : 'offline'),
+            status: hb.ghostMode ? 'ghost' : hb.online ? 'online' : 'offline',
         };
     }
 
@@ -110,7 +110,9 @@ export class GhostMode {
             if (existsSync(this.heartbeatPath)) {
                 return JSON.parse(readFileSync(this.heartbeatPath, 'utf-8'));
             }
-        } catch { /* corrupted */ }
+        } catch {
+            /* corrupted */
+        }
         return null;
     }
 

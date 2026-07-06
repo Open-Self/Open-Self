@@ -1,0 +1,13 @@
+# Normalize line endings to LF in the repository and working tree on every
+# platform. Prettier is configured with endOfLine "lf", so without this a
+# Windows checkout (core.autocrlf=true) yields CRLF files that fail
+# `format:check`. Forcing LF keeps formatting deterministic across CI runners.
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf

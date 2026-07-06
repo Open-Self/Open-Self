@@ -28,7 +28,7 @@ export class ChatMemory {
 
         this.index = new LocalIndex(this.indexDir);
 
-        if (!await this.index.isIndexCreated()) {
+        if (!(await this.index.isIndexCreated())) {
             await this.index.createIndex();
         }
 
@@ -46,8 +46,8 @@ export class ChatMemory {
 
         // Build vocabulary for local embeddings
         if (this.embedding.buildVocabulary) {
-            const allTexts = conversations.map(c =>
-                `${c.contact || 'Someone'}: ${c.theirMessage}\nYou: ${c.yourReply}`
+            const allTexts = conversations.map(
+                (c) => `${c.contact || 'Someone'}: ${c.theirMessage}\nYou: ${c.yourReply}`,
             );
             this.embedding.buildVocabulary(allTexts);
         }
@@ -90,7 +90,7 @@ export class ChatMemory {
         const results = await this.index.queryItems(vector, topK * 2); // Fetch extra for filtering
 
         // Score and rank results
-        const scored = results.map(r => {
+        const scored = results.map((r) => {
             let score = r.score;
 
             // Boost conversations with the same contact (+20%)
@@ -104,7 +104,7 @@ export class ChatMemory {
         // Sort by adjusted score and take top K
         scored.sort((a, b) => b.adjustedScore - a.adjustedScore);
 
-        return scored.slice(0, topK).map(r => ({
+        return scored.slice(0, topK).map((r) => ({
             text: r.item.metadata.text,
             contact: r.item.metadata.contact,
             score: r.adjustedScore,
@@ -119,9 +119,7 @@ export class ChatMemory {
     formatContext(memories) {
         if (!memories || memories.length === 0) return '';
 
-        return memories
-            .map((m, i) => `[Memory ${i + 1}] ${m.text}`)
-            .join('\n\n');
+        return memories.map((m, i) => `[Memory ${i + 1}] ${m.text}`).join('\n\n');
     }
 
     /**

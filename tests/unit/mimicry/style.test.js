@@ -53,7 +53,8 @@ describe('adjustLength', () => {
     it('returns original if no good cut point found', () => {
         const s = new StyleProcessor({ avgMessageLength: 10 });
         // No period → no cut point
-        const text = 'no period in this very very long message that just keeps going forever without a stop';
+        const text =
+            'no period in this very very long message that just keeps going forever without a stop';
         const result = s.adjustLength(text);
         expect(typeof result).toBe('string');
         expect(result.length).toBeGreaterThan(0);

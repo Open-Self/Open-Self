@@ -33,10 +33,12 @@ export class OpenAIEmbedding {
             input: texts,
             dimensions: this.dimensions,
         });
-        return response.data.map(d => d.embedding);
+        return response.data.map((d) => d.embedding);
     }
 
-    get name() { return 'openai'; }
+    get name() {
+        return 'openai';
+    }
 }
 
 /**
@@ -101,18 +103,19 @@ export class LocalEmbedding {
 
         // Normalize
         const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0)) || 1;
-        return vector.map(v => v / norm);
+        return vector.map((v) => v / norm);
     }
 
     async embedBatch(texts) {
-        return Promise.all(texts.map(t => this.embed(t)));
+        return Promise.all(texts.map((t) => this.embed(t)));
     }
 
     _tokenize(text) {
-        return text.toLowerCase()
+        return text
+            .toLowerCase()
             .replace(/[^\p{L}\p{N}\s]/gu, ' ')
             .split(/\s+/)
-            .filter(w => w.length > 1);
+            .filter((w) => w.length > 1);
     }
 
     _hashWord(word) {
@@ -123,7 +126,9 @@ export class LocalEmbedding {
         return Math.abs(hash);
     }
 
-    get name() { return 'local'; }
+    get name() {
+        return 'local';
+    }
 }
 
 /**

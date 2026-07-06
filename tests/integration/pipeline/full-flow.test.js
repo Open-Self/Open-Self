@@ -3,14 +3,15 @@
  * Uses real CloneBrain, SafetyGuard, HumanMimicry, StyleProcessor
  * Mocks: LLM provider, loadSoul (file I/O), loadConfig, loadPersonality
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock file I/O dependencies to avoid needing real ./data directory
 vi.mock('../../../src/brain/clone.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
-        loadSoul: vi.fn(() => `# SOUL.md
+        loadSoul: vi.fn(
+            () => `# SOUL.md
 ## Identity
 - Name: TestUser
 - Language: Vietnamese
@@ -27,7 +28,8 @@ vi.mock('../../../src/brain/clone.js', async (importOriginal) => {
 - Never share: passwords
 
 ## Clone Score: 80
-`),
+`,
+        ),
     };
 });
 
@@ -95,13 +97,26 @@ function makeMockProvider(reply = 'oke bro đi thôi') {
 }
 
 describe('ClonePipeline.processMessage', () => {
+    // Per-test Math.random spy holder. Restored individually in afterEach so the
+    // hoisted vi.mock() module implementations survive between tests — a blanket
+    // vi.restoreAllMocks() would wipe them, leaving new ClonePipeline() with
+    // empty-object mocks (getRecentContext undefined).
+    let randomSpy;
+
+    afterEach(() => {
+        randomSpy?.mockRestore();
+        randomSpy = undefined;
+        // Clear call history only; keep module mock implementations intact.
+        vi.clearAllMocks();
+    });
+
     it('returns { action, replies, delay } shape for normal message', async () => {
         const provider = makeMockProvider('oke bro đi thôi');
         const pipeline = new ClonePipeline({ provider, dataDir: './data' });
 
         const result = await pipeline.processMessage(
             { text: 'đi cà phê không', isGroup: false },
-            { name: 'Alice', relationship: 'friend', channel: 'whatsapp', known: true }
+            { name: 'Alice', relationship: 'friend', channel: 'whatsapp', known: true },
         );
 
         expect(result).toHaveProperty('action');
@@ -116,38 +131,36 @@ describe('ClonePipeline.processMessage', () => {
 
         const result = await pipeline.processMessage(
             { text: 'sup bro', isGroup: false },
-            { name: 'Bob', relationship: 'friend', channel: 'discord', known: true }
+            { name: 'Bob', relationship: 'friend', channel: 'discord', known: true },
         );
 
         if (result.action === 'reply') {
             expect(Array.isArray(result.replies)).toBe(true);
-            expect(result.replies.every(r => typeof r === 'string')).toBe(true);
+            expect(result.replies.every((r) => typeof r === 'string')).toBe(true);
         }
     });
 
     it('returns action=ignore for group messages not mentioning clone', async () => {
         const provider = makeMockProvider('whatever');
-        // Spy Math.random to always return 0 (< 0.7 → ignore)
-        vi.spyOn(Math, 'random').mockReturnValue(0);
+        // Spy Math.random to always return 0 (< 0.7 → ignore); restored in afterEach
+        randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
         const pipeline = new ClonePipeline({ provider, dataDir: './data' });
 
         const result = await pipeline.processMessage(
             { text: 'random group chat msg', isGroup: true, mentionsMe: false },
-            { name: 'GroupUser', channel: 'discord' }
+            { name: 'GroupUser', channel: 'discord' },
         );
 
         expect(result.action).toBe('ignore');
-        vi.restoreAllMocks();
     });
 
     it('blocks or cleans reply containing AI self-reveal', async () => {
-        vi.restoreAllMocks(); // ensure no Math.random spy from prior test leaks
         const provider = makeMockProvider("I'm an AI language model, sorry");
         const pipeline = new ClonePipeline({ provider, dataDir: './data' });
 
         const result = await pipeline.processMessage(
             { text: 'are you an AI?', isGroup: false },
-            { name: 'Tester', relationship: 'stranger', channel: 'web', known: true }
+            { name: 'Tester', relationship: 'stranger', channel: 'web', known: true },
         );
 
         // Pipeline either blocks (safety guard) or replies with cleaned text.
@@ -167,7 +180,7 @@ describe('ClonePipeline.processMessage', () => {
 
         await pipeline.processMessage(
             { text: 'hello', isGroup: false },
-            { name: 'Alice', channel: 'whatsapp', known: true }
+            { name: 'Alice', channel: 'whatsapp', known: true },
         );
 
         // chat may not be called if message was ignored; only assert when called

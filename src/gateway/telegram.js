@@ -78,7 +78,11 @@ export class TelegramGateway {
             }
         }
 
-        console.log(chalk.cyan(`📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`));
+        console.log(
+            chalk.cyan(
+                `📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`,
+            ),
+        );
 
         try {
             // Process through pipeline
@@ -118,7 +122,11 @@ export class TelegramGateway {
 
                     // Send
                     await ctx.reply(result.replies[i]);
-                    console.log(chalk.green(`   → "${result.replies[i].slice(0, 60)}${result.replies[i].length > 60 ? '...' : ''}"`));
+                    console.log(
+                        chalk.green(
+                            `   → "${result.replies[i].slice(0, 60)}${result.replies[i].length > 60 ? '...' : ''}"`,
+                        ),
+                    );
 
                     // Inter-message delay
                     if (i < result.replies.length - 1) {
@@ -139,7 +147,11 @@ export class TelegramGateway {
     stop() {
         this.bot.stop();
         console.log(chalk.yellow('\n🛑 Telegram bot stopped'));
-        console.log(chalk.white(`   Messages: ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored, ${this.stats.queued} queued`));
+        console.log(
+            chalk.white(
+                `   Messages: ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored, ${this.stats.queued} queued`,
+            ),
+        );
     }
 
     getStats() {

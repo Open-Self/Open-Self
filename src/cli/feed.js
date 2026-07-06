@@ -60,7 +60,9 @@ export async function feedCommand(options) {
                 const personality = parseGeneric(file);
                 spinner.succeed(`Read personality brief from ${file}`);
                 // Manual briefs get saved directly
-                console.log(chalk.gray(`  Sections: ${Object.keys(personality.sections).join(', ')}`));
+                console.log(
+                    chalk.gray(`  Sections: ${Object.keys(personality.sections).join(', ')}`),
+                );
             } catch (err) {
                 spinner.fail(`Failed to read ${file}: ${err.message}`);
             }
@@ -82,12 +84,14 @@ export async function feedCommand(options) {
             console.log(chalk.gray(`  • ${sender.name} (${sender.count} messages)`));
         }
 
-        const { selectedName } = await inquirer.prompt([{
-            type: 'list',
-            name: 'selectedName',
-            message: 'Which one is YOU?',
-            choices: detected.allSenders.slice(0, 10).map(s => s.name),
-        }]);
+        const { selectedName } = await inquirer.prompt([
+            {
+                type: 'list',
+                name: 'selectedName',
+                message: 'Which one is YOU?',
+                choices: detected.allSenders.slice(0, 10).map((s) => s.name),
+            },
+        ]);
         userName = selectedName;
     }
 
@@ -99,14 +103,18 @@ export async function feedCommand(options) {
         // Build contact map
         for (const msg of others) {
             if (!contactMap[msg.sender]) {
-                contactMap[msg.sender] = { name: msg.sender, messageCount: 0, relationship: 'Contact' };
+                contactMap[msg.sender] = {
+                    name: msg.sender,
+                    messageCount: 0,
+                    relationship: 'Contact',
+                };
             }
             contactMap[msg.sender].messageCount++;
         }
 
         // Extract personality
         const personality = extractPersonality(yours, conversations);
-        const fingerprint = createFingerprint(yours.map(m => m.text));
+        const fingerprint = createFingerprint(yours.map((m) => m.text));
 
         spinnerAnalyze.succeed('Personality analysis complete');
 
@@ -114,22 +122,42 @@ export async function feedCommand(options) {
         console.log('');
         console.log(chalk.bold.white('📊 Personality Summary'));
         console.log(chalk.gray('━'.repeat(40)));
-        console.log(chalk.white(`  📝 Total messages analyzed: ${chalk.cyan(personality.totalMessages)}`));
-        console.log(chalk.white(`  📏 Avg message length: ${chalk.cyan(personality.avgMessageLength)} chars`));
-        console.log(chalk.white(`  😀 Emoji frequency: ${chalk.cyan(Math.round(personality.emojiFrequency * 100) + '%')}`));
+        console.log(
+            chalk.white(`  📝 Total messages analyzed: ${chalk.cyan(personality.totalMessages)}`),
+        );
+        console.log(
+            chalk.white(
+                `  📏 Avg message length: ${chalk.cyan(personality.avgMessageLength)} chars`,
+            ),
+        );
+        console.log(
+            chalk.white(
+                `  😀 Emoji frequency: ${chalk.cyan(Math.round(personality.emojiFrequency * 100) + '%')}`,
+            ),
+        );
         console.log(chalk.white(`  🗣️  Formality: ${chalk.cyan(personality.formality)}`));
         console.log(chalk.white(`  🌍 Language: ${chalk.cyan(personality.primaryLanguage)}`));
         console.log(chalk.white(`  😂 Humor: ${chalk.cyan(personality.humorPatterns.join(', '))}`));
         console.log(chalk.white(`  👋 Greeting style: ${chalk.cyan(personality.greetingStyle)}`));
 
         if (personality.catchphrases.length > 0) {
-            console.log(chalk.white(`  💬 Catchphrases: ${chalk.cyan(personality.catchphrases.slice(0, 5).join(', '))}`));
+            console.log(
+                chalk.white(
+                    `  💬 Catchphrases: ${chalk.cyan(personality.catchphrases.slice(0, 5).join(', '))}`,
+                ),
+            );
         }
         if (personality.abbreviations.length > 0) {
-            console.log(chalk.white(`  ✂️  Abbreviations: ${chalk.cyan(personality.abbreviations.slice(0, 5).join(', '))}`));
+            console.log(
+                chalk.white(
+                    `  ✂️  Abbreviations: ${chalk.cyan(personality.abbreviations.slice(0, 5).join(', '))}`,
+                ),
+            );
         }
         if (personality.pronounUsage.length > 0) {
-            console.log(chalk.white(`  🇻🇳 Pronouns: ${chalk.cyan(personality.pronounUsage.join(', '))}`));
+            console.log(
+                chalk.white(`  🇻🇳 Pronouns: ${chalk.cyan(personality.pronounUsage.join(', '))}`),
+            );
         }
 
         // Generate SOUL.md
@@ -170,7 +198,7 @@ export async function feedCommand(options) {
                 const indexed = await memory.indexHistory(conversations);
                 const stats = await memory.getStats();
                 spinnerRAG.succeed(
-                    `Indexed ${chalk.cyan(indexed)} memories for RAG search (${chalk.gray(stats.totalMemories + ' total')})`
+                    `Indexed ${chalk.cyan(indexed)} memories for RAG search (${chalk.gray(stats.totalMemories + ' total')})`,
                 );
             } catch (err) {
                 spinnerRAG.warn(`RAG indexing skipped: ${err.message}`);
@@ -181,9 +209,18 @@ export async function feedCommand(options) {
         console.log(chalk.bold.green('🎉 Personality fed successfully!'));
         console.log('');
         console.log(chalk.white('Next:'));
-        console.log(chalk.yellow('  npx openself test       ') + chalk.gray('— Test how well your clone mimics you'));
-        console.log(chalk.yellow('  npx openself arena      ') + chalk.gray('— Watch your clone debate a rival'));
-        console.log(chalk.yellow('  cat data/SOUL.md        ') + chalk.gray('— Review/edit your personality profile'));
+        console.log(
+            chalk.yellow('  npx openself test       ') +
+                chalk.gray('— Test how well your clone mimics you'),
+        );
+        console.log(
+            chalk.yellow('  npx openself arena      ') +
+                chalk.gray('— Watch your clone debate a rival'),
+        );
+        console.log(
+            chalk.yellow('  cat data/SOUL.md        ') +
+                chalk.gray('— Review/edit your personality profile'),
+        );
         console.log('');
     }
 }

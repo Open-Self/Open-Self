@@ -98,7 +98,11 @@ export async function arenaCommand(options) {
 
         console.log(chalk.gray('═'.repeat(40)));
         console.log('');
-        console.log(chalk.bold.magenta(`  🏟️  Arena complete! ${result.transcript.length} messages exchanged.`));
+        console.log(
+            chalk.bold.magenta(
+                `  🏟️  Arena complete! ${result.transcript.length} messages exchanged.`,
+            ),
+        );
 
         if (!options.export) {
             console.log(chalk.gray(`  💡 Add --export to save the transcript`));

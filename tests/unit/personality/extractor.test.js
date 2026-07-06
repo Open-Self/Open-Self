@@ -11,18 +11,30 @@ import {
     detectAbbreviations,
 } from '../../../src/personality/extractor.js';
 
-const makeMsg = text => ({ text });
+const makeMsg = (text) => ({ text });
 
 describe('extractPersonality', () => {
     it('returns all required top-level keys', () => {
         const msgs = [makeMsg('hello'), makeMsg('hi')];
         const p = extractPersonality(msgs);
         const keys = [
-            'totalMessages', 'avgMessageLength', 'avgWordCount',
-            'emojiFrequency', 'topEmojis', 'topWords', 'topPhrases',
-            'catchphrases', 'greetingStyle', 'usesSlang', 'formality',
-            'humorPatterns', 'responseTimeAvg', 'pronounUsage',
-            'toneDiacritics', 'abbreviations', 'primaryLanguage',
+            'totalMessages',
+            'avgMessageLength',
+            'avgWordCount',
+            'emojiFrequency',
+            'topEmojis',
+            'topWords',
+            'topPhrases',
+            'catchphrases',
+            'greetingStyle',
+            'usesSlang',
+            'formality',
+            'humorPatterns',
+            'responseTimeAvg',
+            'pronounUsage',
+            'toneDiacritics',
+            'abbreviations',
+            'primaryLanguage',
         ];
         for (const key of keys) {
             expect(p, `missing key: ${key}`).toHaveProperty(key);
@@ -135,7 +147,7 @@ describe('getTopWords', () => {
     it('filters stop words (English)', () => {
         const texts = ['the cat is on the mat', 'the dog'];
         const words = getTopWords(texts, 10);
-        const wordList = words.map(w => w.word);
+        const wordList = words.map((w) => w.word);
         expect(wordList).not.toContain('the');
         expect(wordList).not.toContain('is');
     });
@@ -151,7 +163,7 @@ describe('getTopPhrases', () => {
     it('returns bigrams with count ≥ 2', () => {
         const texts = ['hello world', 'hello world again', 'foo bar'];
         const phrases = getTopPhrases(texts, 10);
-        const phraseTexts = phrases.map(p => p.phrase);
+        const phraseTexts = phrases.map((p) => p.phrase);
         expect(phraseTexts).toContain('hello world');
     });
 

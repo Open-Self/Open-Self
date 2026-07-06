@@ -36,7 +36,9 @@ program
     .name('openself')
     .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
     .version('0.6.0')
-    .addHelpText('after', `
+    .addHelpText(
+        'after',
+        `
 ${chalk.bold('Quick Start:')}
   ${chalk.gray('$')} openself setup                              ${chalk.dim('# Configure API key')}
   ${chalk.gray('$')} openself feed --whatsapp ./chat.txt --name "You"  ${chalk.dim('# Feed personality')}
@@ -49,7 +51,8 @@ ${chalk.bold('Fun Stuff:')}
   ${chalk.gray('$')} openself share --web                        ${chalk.dim('# "Talk to My Clone"')}
 
 ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
-`);
+`,
+    );
 
 program
     .command('setup')
@@ -120,6 +123,8 @@ program
 
 // Last-resort safety nets — `wrapAction` should catch most.
 process.on('uncaughtException', handleError);
-process.on('unhandledRejection', (reason) => handleError(reason instanceof Error ? reason : new Error(String(reason))));
+process.on('unhandledRejection', (reason) =>
+    handleError(reason instanceof Error ? reason : new Error(String(reason))),
+);
 
 program.parse();

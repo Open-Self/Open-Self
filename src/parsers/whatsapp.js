@@ -49,15 +49,15 @@ export function parseWhatsAppContent(content) {
     }
 
     // Filter out media-only messages
-    return messages.filter(m => !m.text.includes('<Media omitted>'));
+    return messages.filter((m) => !m.text.includes('<Media omitted>'));
 }
 
 /**
  * Split messages by sender: YOUR messages vs OTHERS
  */
 export function splitBySender(messages, yourName) {
-    const yours = messages.filter(m => m.sender === yourName);
-    const others = messages.filter(m => m.sender !== yourName);
+    const yours = messages.filter((m) => m.sender === yourName);
+    const others = messages.filter((m) => m.sender !== yourName);
     const conversations = groupIntoConversations(messages, yourName);
 
     return { yours, others, conversations };
@@ -112,5 +112,5 @@ export function detectUserName(messages) {
 function calculateDelay(time1, time2) {
     const [h1, m1] = time1.split(':').map(Number);
     const [h2, m2] = time2.split(':').map(Number);
-    return ((h2 * 60 + m2) - (h1 * 60 + m1)) * 60 * 1000; // ms
+    return (h2 * 60 + m2 - (h1 * 60 + m1)) * 60 * 1000; // ms
 }

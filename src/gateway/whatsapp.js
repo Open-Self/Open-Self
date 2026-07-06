@@ -3,10 +3,7 @@
  * Clone live on WhatsApp via Baileys (multi-device)
  */
 
-import makeWASocket, {
-    useMultiFileAuthState,
-    DisconnectReason,
-} from '@whiskeysockets/baileys';
+import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import { ClonePipeline } from '../brain/pipeline.js';
 import { GhostMode } from '../ghost/ghost.js';
@@ -46,8 +43,16 @@ export class WhatsAppGateway {
      */
     async _connect() {
         if (this.sock) {
-            try { this.sock.ev.removeAllListeners(); } catch { /* noop */ }
-            try { this.sock.end(undefined); } catch { /* noop */ }
+            try {
+                this.sock.ev.removeAllListeners();
+            } catch {
+                /* noop */
+            }
+            try {
+                this.sock.end(undefined);
+            } catch {
+                /* noop */
+            }
             this.sock = null;
         }
 
@@ -108,7 +113,9 @@ export class WhatsAppGateway {
                     }
                 }, 3000);
             } else if (!shouldReconnect) {
-                console.log(chalk.red('\n🛑 Logged out. Delete data/whatsapp-session/ and re-scan.'));
+                console.log(
+                    chalk.red('\n🛑 Logged out. Delete data/whatsapp-session/ and re-scan.'),
+                );
                 this.ghost.stopHeartbeat();
             }
         }
@@ -123,10 +130,11 @@ export class WhatsAppGateway {
         if (msg.key.fromMe) return;
         if (msg.key.remoteJid === 'status@broadcast') return;
 
-        const text = msg.message.conversation
-            || msg.message.extendedTextMessage?.text
-            || msg.message.imageMessage?.caption
-            || '';
+        const text =
+            msg.message.conversation ||
+            msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            '';
 
         if (!text.trim()) return;
 
@@ -138,9 +146,10 @@ export class WhatsAppGateway {
         // Group chat: only reply if @mentioned or quoted
         if (isGroup) {
             const mentionedMe = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.some(
-                jid => jid === this.sock.user?.id
+                (jid) => jid === this.sock.user?.id,
             );
-            const quotedMe = msg.message.extendedTextMessage?.contextInfo?.participant === this.sock.user?.id;
+            const quotedMe =
+                msg.message.extendedTextMessage?.contextInfo?.participant === this.sock.user?.id;
 
             if (!mentionedMe && !quotedMe) {
                 this.stats.ignored++;
@@ -162,13 +171,14 @@ export class WhatsAppGateway {
             channel: 'WhatsApp',
         };
 
-        console.log(chalk.cyan(`📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`));
+        console.log(
+            chalk.cyan(
+                `📨 ${contact.name}: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`,
+            ),
+        );
 
         try {
-            const result = await this.pipeline.processMessage(
-                { text, isGroup },
-                contact,
-            );
+            const result = await this.pipeline.processMessage({ text, isGroup }, contact);
 
             if (result.action === 'ignore') {
                 this.stats.ignored++;
@@ -195,7 +205,9 @@ export class WhatsAppGateway {
                 // Send read receipt
                 try {
                     await this.sock.readMessages([msg.key]);
-                } catch { /* non-critical */ }
+                } catch {
+                    /* non-critical */
+                }
 
                 for (let i = 0; i < result.replies.length; i++) {
                     // Typing indicator
@@ -210,7 +222,11 @@ export class WhatsAppGateway {
                         text: result.replies[i],
                     });
 
-                    console.log(chalk.green(`   → "${result.replies[i].slice(0, 60)}${result.replies[i].length > 60 ? '...' : ''}"`));
+                    console.log(
+                        chalk.green(
+                            `   → "${result.replies[i].slice(0, 60)}${result.replies[i].length > 60 ? '...' : ''}"`,
+                        ),
+                    );
 
                     // Inter-message delay
                     if (i < result.replies.length - 1) {
@@ -234,7 +250,11 @@ export class WhatsAppGateway {
             this.sock.end(undefined);
         }
         console.log(chalk.yellow('\n🛑 WhatsApp bot stopped'));
-        console.log(chalk.white(`   ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored, ${this.stats.queued} queued`));
+        console.log(
+            chalk.white(
+                `   ${this.stats.received} received, ${this.stats.replied} replied, ${this.stats.ignored} ignored, ${this.stats.queued} queued`,
+            ),
+        );
     }
 
     getStats() {

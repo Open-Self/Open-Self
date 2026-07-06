@@ -18,14 +18,14 @@ describe('parseWhatsAppContent', () => {
         const messages = parseWhatsAppContent(TINY_FIXTURE);
         expect(messages.length).toBeGreaterThan(0);
         // System message "Messages and calls are end-to-end encrypted" is skipped
-        const senders = messages.map(m => m.sender);
+        const senders = messages.map((m) => m.sender);
         expect(senders).not.toContain(undefined);
     });
 
     it('skips system messages (end-to-end encrypted notice)', () => {
         const messages = parseWhatsAppContent(TINY_FIXTURE);
-        const hasSystemMsg = messages.some(m =>
-            m.text && m.text.toLowerCase().includes('end-to-end encrypted')
+        const hasSystemMsg = messages.some(
+            (m) => m.text && m.text.toLowerCase().includes('end-to-end encrypted'),
         );
         expect(hasSystemMsg).toBe(false);
     });
@@ -41,9 +41,10 @@ describe('parseWhatsAppContent', () => {
     });
 
     it('handles multiline message continuation', () => {
-        const content = '12/01/2024, 09:15 - Harvey: line one\ncontinuation here\n12/01/2024, 09:16 - Bob: reply';
+        const content =
+            '12/01/2024, 09:15 - Harvey: line one\ncontinuation here\n12/01/2024, 09:16 - Bob: reply';
         const messages = parseWhatsAppContent(content);
-        const harveyMsg = messages.find(m => m.sender === 'Harvey');
+        const harveyMsg = messages.find((m) => m.sender === 'Harvey');
         expect(harveyMsg.text).toContain('line one');
         expect(harveyMsg.text).toContain('continuation here');
     });
@@ -51,7 +52,7 @@ describe('parseWhatsAppContent', () => {
     it('filters out <Media omitted> messages', () => {
         const content = '12/01/2024, 09:15 - Harvey: <Media omitted>\n12/01/2024, 09:16 - Bob: ok';
         const messages = parseWhatsAppContent(content);
-        const mediaMsg = messages.find(m => m.text.includes('<Media omitted>'));
+        const mediaMsg = messages.find((m) => m.text.includes('<Media omitted>'));
         expect(mediaMsg).toBeUndefined();
     });
 
@@ -61,7 +62,7 @@ describe('parseWhatsAppContent', () => {
 
     it('parses sender names correctly from fixture', () => {
         const messages = parseWhatsAppContent(TINY_FIXTURE);
-        const senders = new Set(messages.map(m => m.sender));
+        const senders = new Set(messages.map((m) => m.sender));
         expect(senders.has('Harvey')).toBe(true);
         expect(senders.has('Bob')).toBe(true);
     });
@@ -79,8 +80,8 @@ describe('splitBySender', () => {
     it('splits messages into yours and others', () => {
         const messages = parseWhatsAppContent(TINY_FIXTURE);
         const { yours, others } = splitBySender(messages, 'Harvey');
-        expect(yours.every(m => m.sender === 'Harvey')).toBe(true);
-        expect(others.every(m => m.sender !== 'Harvey')).toBe(true);
+        expect(yours.every((m) => m.sender === 'Harvey')).toBe(true);
+        expect(others.every((m) => m.sender !== 'Harvey')).toBe(true);
     });
 });
 

@@ -53,10 +53,4 @@ function detectFormat(filePath) {
     return 'whatsapp'; // Default fallback
 }
 
-export {
-    parseWhatsApp,
-    parseTelegram,
-    parseGeneric,
-    splitBySender,
-    detectUserName,
-};
+export { parseWhatsApp, parseTelegram, parseGeneric, splitBySender, detectUserName };

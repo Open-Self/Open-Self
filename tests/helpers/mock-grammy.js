@@ -9,8 +9,14 @@ import { vi } from 'vitest';
 export function createGrammyMock() {
     const handlers = new Map();
     const bot = {
-        on: vi.fn((event, handler) => { handlers.set(event, handler); return bot; }),
-        command: vi.fn((cmd, handler) => { handlers.set(`cmd:${cmd}`, handler); return bot; }),
+        on: vi.fn((event, handler) => {
+            handlers.set(event, handler);
+            return bot;
+        }),
+        command: vi.fn((cmd, handler) => {
+            handlers.set(`cmd:${cmd}`, handler);
+            return bot;
+        }),
         start: vi.fn().mockResolvedValue(undefined),
         stop: vi.fn().mockResolvedValue(undefined),
         api: {

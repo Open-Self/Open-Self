@@ -1,6 +1,6 @@
 # Codebase Summary
 
-OpenSelf is a Node.js ESM CLI application (Node ≥18) that transforms chat history into an AI personality clone. This document maps the source structure, data flow, and public API surface.
+OpenSelf is a Node.js ESM CLI application (Node ≥20) that transforms chat history into an AI personality clone. This document maps the source structure, data flow, and public API surface.
 
 ## Project Type & Entry Points
 

@@ -46,7 +46,7 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 
 **UX improvements:**
 - 3 documentation guides (setup, personality tuning, safety)
-- GitHub Actions CI (Node 18/20/22 smoke tests)
+- GitHub Actions CI (Node 20/22 smoke tests)
 - Colored CLI help with quickstart examples
 - Global error handler with friendly messages
 - `files` field in package.json for npm publish prep
@@ -81,7 +81,7 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 - All 9 P1 bugs fixed
 - Coverage ≥50% on core modules
 - ESLint + Prettier clean
-- CI matrix: Linux + Windows × Node 18/20/22
+- CI matrix: Linux + Windows × Node 20/22 (Node 18 dropped — baileys requires ≥20)
 - 4 new docs created (7 total in `./docs/`)
 
 ## In Progress

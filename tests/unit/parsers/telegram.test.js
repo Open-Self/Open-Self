@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { parseTelegram } from '../../../src/parsers/telegram.js';
-import { writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -80,7 +80,12 @@ describe('parseTelegram', () => {
                 list: [
                     {
                         messages: [
-                            { type: 'message', from: 'Alice', date: '2024-01-12T09:00:00', text: 'nested' },
+                            {
+                                type: 'message',
+                                from: 'Alice',
+                                date: '2024-01-12T09:00:00',
+                                text: 'nested',
+                            },
                         ],
                     },
                 ],

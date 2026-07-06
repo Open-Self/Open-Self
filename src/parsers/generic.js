@@ -11,7 +11,7 @@ export function parseGeneric(filePath) {
 }
 
 export function parseGenericContent(content) {
-    const lines = content.split('\n').filter(l => l.trim());
+    const lines = content.split('\n').filter((l) => l.trim());
 
     return {
         type: 'manual',

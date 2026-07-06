@@ -12,13 +12,32 @@ const TMP_DIR = join(tmpdir(), `openself-memory-test-${Date.now()}`);
 mkdirSync(TMP_DIR, { recursive: true });
 
 afterAll(() => {
-    try { rmSync(TMP_DIR, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+        rmSync(TMP_DIR, { recursive: true, force: true });
+    } catch {
+        /* ok */
+    }
 });
 
 const SAMPLE_CONVOS = [
-    { contact: 'Alice', theirMessage: 'what is your favourite food', yourReply: 'pizza of course', date: '01/01/2024' },
-    { contact: 'Bob', theirMessage: 'do you like coffee', yourReply: 'yes every morning', date: '02/01/2024' },
-    { contact: 'Alice', theirMessage: 'seen any good movies', yourReply: 'watched dune last week', date: '03/01/2024' },
+    {
+        contact: 'Alice',
+        theirMessage: 'what is your favourite food',
+        yourReply: 'pizza of course',
+        date: '01/01/2024',
+    },
+    {
+        contact: 'Bob',
+        theirMessage: 'do you like coffee',
+        yourReply: 'yes every morning',
+        date: '02/01/2024',
+    },
+    {
+        contact: 'Alice',
+        theirMessage: 'seen any good movies',
+        yourReply: 'watched dune last week',
+        date: '03/01/2024',
+    },
 ];
 
 describe('ChatMemory.init', () => {
@@ -102,9 +121,7 @@ describe('ChatMemory.formatContext', () => {
     it('formats memories with [Memory N] prefix', () => {
         const emb = new LocalEmbedding();
         const mem = new ChatMemory(emb, TMP_DIR);
-        const memories = [
-            { text: 'Alice: what food\nYou: pizza', contact: 'Alice', score: 0.9 },
-        ];
+        const memories = [{ text: 'Alice: what food\nYou: pizza', contact: 'Alice', score: 0.9 }];
         const ctx = mem.formatContext(memories);
         expect(ctx).toContain('[Memory 1]');
         expect(ctx).toContain('pizza');

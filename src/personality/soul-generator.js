@@ -28,7 +28,10 @@ export function generateSoulMd(personality, fingerprint, userInfo = {}) {
 
     // Top emojis
     if (personality.topEmojis && personality.topEmojis.length > 0) {
-        content += `- Top emojis: ${personality.topEmojis.slice(0, 5).map(e => e.emoji).join(' ')}\n`;
+        content += `- Top emojis: ${personality.topEmojis
+            .slice(0, 5)
+            .map((e) => e.emoji)
+            .join(' ')}\n`;
     }
 
     // Vocabulary Fingerprint
@@ -40,7 +43,10 @@ export function generateSoulMd(personality, fingerprint, userInfo = {}) {
         content += `- Catchphrases: "${personality.catchphrases.slice(0, 10).join('", "')}"\n`;
     }
 
-    const topWordsStr = personality.topWords.slice(0, 15).map(w => w.word).join(', ');
+    const topWordsStr = personality.topWords
+        .slice(0, 15)
+        .map((w) => w.word)
+        .join(', ');
     if (topWordsStr) {
         content += `- Top words: ${topWordsStr}\n`;
     }
@@ -72,7 +78,7 @@ export function generateSoulMd(personality, fingerprint, userInfo = {}) {
 ## Boundaries
 - Never share: Personal finances, health info, passwords, private addresses
 - Deflect topics: Deep politics, religion (say "ko bàn mấy cái này")
-- When unsure: Say "${personality.primaryLanguage === 'Vietnamese' ? 'để t hỏi lại' : "let me check on that"}" (don't make up answers)
+- When unsure: Say "${personality.primaryLanguage === 'Vietnamese' ? 'để t hỏi lại' : 'let me check on that'}" (don't make up answers)
 - Sensitive mode: If someone seems upset, switch to caring tone
 `;
 

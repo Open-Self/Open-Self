@@ -38,7 +38,6 @@ export async function startCommand(options) {
         process.on('SIGTERM', () => gateway.stop());
 
         await gateway.start();
-
     } else if (options.discord) {
         const config = loadConfig();
 
@@ -64,7 +63,6 @@ export async function startCommand(options) {
         process.on('SIGTERM', () => gateway.stop());
 
         await gateway.start();
-
     } else if (options.whatsapp) {
         const config = loadConfig();
 
@@ -78,7 +76,6 @@ export async function startCommand(options) {
         process.on('SIGTERM', () => gateway.stop());
 
         await gateway.start();
-
     } else {
         console.log(chalk.white('Choose a platform to connect:'));
         console.log('');
@@ -88,9 +85,10 @@ export async function startCommand(options) {
         console.log(chalk.green('  ✅ Discord') + chalk.gray(' — Bot token required'));
         console.log(chalk.yellow('     npx openself start --discord'));
         console.log('');
-        console.log(chalk.green('  ✅ WhatsApp') + chalk.gray(' — QR code pairing (no API key needed!)'));
+        console.log(
+            chalk.green('  ✅ WhatsApp') + chalk.gray(' — QR code pairing (no API key needed!)'),
+        );
         console.log(chalk.yellow('     npx openself start --whatsapp'));
     }
     console.log('');
 }
-

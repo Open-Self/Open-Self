@@ -24,7 +24,7 @@ export function createProvider(providerName, config = {}) {
     const ProviderClass = PROVIDERS[name];
     if (!ProviderClass) {
         throw new Error(
-            `Unknown LLM provider: "${name}". Available: ${Object.keys(PROVIDERS).join(', ')}`
+            `Unknown LLM provider: "${name}". Available: ${Object.keys(PROVIDERS).join(', ')}`,
         );
     }
 

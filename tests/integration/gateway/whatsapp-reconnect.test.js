@@ -1,9 +1,10 @@
 /**
- * WhatsApp reconnect regression — Phase-02 fix
- * Each call to _connect() must remove all prior listeners before rebinding.
+ * WhatsApp reconnect regression.
+ * Each call to _connect() must remove all prior listeners before rebinding,
+ * otherwise listeners accumulate across reconnects and messages fan out N times.
  * Verifies that after N reconnect cycles, messages.upsert listener count = 1.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock heavy dependencies before importing gateway
 vi.mock('@whiskeysockets/baileys', () => {
@@ -55,7 +56,6 @@ vi.mock('fs', async (importOriginal) => {
     };
 });
 
-import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
 import { WhatsAppGateway } from '../../../src/gateway/whatsapp.js';
 
 describe('WhatsAppGateway reconnect — listener count regression', () => {

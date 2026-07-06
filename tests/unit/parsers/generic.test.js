@@ -35,14 +35,14 @@ describe('parseGenericContent', () => {
         const content = 'Style:\nlowercase always\nno punctuation';
         const result = parseGenericContent(content);
         // Colon-style "Style:" is matched as a section header
-        expect(Object.keys(result.sections).some(k => k.includes('style'))).toBe(true);
+        expect(Object.keys(result.sections).some((k) => k.includes('style'))).toBe(true);
     });
 
     it('filters blank lines (does not add empty strings)', () => {
         const content = '## Voice\n\nsome trait\n\nanother trait';
         const result = parseGenericContent(content);
         const lines = result.sections['voice'] || [];
-        const hasEmpty = lines.some(l => l.trim() === '');
+        const hasEmpty = lines.some((l) => l.trim() === '');
         expect(hasEmpty).toBe(false);
     });
 

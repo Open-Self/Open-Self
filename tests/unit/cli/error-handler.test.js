@@ -7,11 +7,12 @@ import { handleError, wrapAction } from '../../../src/cli/utils/error-handler.js
 
 describe('handleError exit codes', () => {
     let exitSpy;
-    let consoleErrorSpy;
 
     beforeEach(() => {
-        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit called'); });
-        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+            throw new Error('process.exit called');
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -77,11 +78,12 @@ describe('handleError exit codes', () => {
 
 describe('wrapAction', () => {
     let exitSpy;
-    let consoleErrorSpy;
 
     beforeEach(() => {
-        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit called'); });
-        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+            throw new Error('process.exit called');
+        });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
