@@ -5,10 +5,10 @@ export default defineConfig({
         environment: 'node',
         globals: true,
         include: ['tests/**/*.test.js'],
-        // Sequential by default — many tests touch ./data and ./tests/fixtures
-        // through file IO; parallel forks would race on disk.
-        pool: 'forks',
-        poolOptions: { forks: { singleFork: true } },
+        // Run test files sequentially (not in parallel) — many tests touch ./data
+        // and ./tests/fixtures via file IO and would race on disk under
+        // parallelism. Per-file isolation is kept (isolate defaults to true).
+        fileParallelism: false,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

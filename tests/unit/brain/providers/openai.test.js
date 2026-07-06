@@ -4,14 +4,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('openai', () => {
-    const create = vi.fn().mockResolvedValue({
+    // Base implementations via vi.fn(impl) so they survive vi.clearAllMocks()
+    // between tests (Vitest 4 no longer preserves mockImplementation-set impls
+    // on factory mocks across clears; base impls are never touched by mockClear).
+    const create = vi.fn(async () => ({
         choices: [{ message: { content: 'mocked openai reply', role: 'assistant' } }],
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-    });
-    const OpenAI = vi.fn().mockImplementation(() => ({
-        chat: { completions: { create } },
-        embeddings: { create: vi.fn() },
     }));
+    // Regular function (not arrow) so it is constructable via `new` under Vitest 4.
+    const OpenAI = vi.fn(function () {
+        return {
+            chat: { completions: { create } },
+            embeddings: { create: vi.fn() },
+        };
+    });
     OpenAI.__create = create;
     return { default: OpenAI };
 });

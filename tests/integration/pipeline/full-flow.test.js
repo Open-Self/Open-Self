@@ -55,26 +55,34 @@ vi.mock('../../../src/config/personality-loader.js', () => ({
     mergePersonality: vi.fn((soul, json) => ({ ...soul, ...json })),
 }));
 
+// Constructor mocks use regular functions (not arrows) so `new X()` works under
+// Vitest 4, which invokes the mock implementation with real construct semantics.
 vi.mock('../../../src/rag/memory.js', () => ({
-    ChatMemory: vi.fn().mockImplementation(() => ({
-        findRelevant: vi.fn().mockResolvedValue([]),
-        formatContext: vi.fn(() => ''),
-        indexHistory: vi.fn().mockResolvedValue(0),
-    })),
+    ChatMemory: vi.fn(function () {
+        return {
+            findRelevant: vi.fn(async () => []),
+            formatContext: vi.fn(() => ''),
+            indexHistory: vi.fn(async () => 0),
+        };
+    }),
 }));
 
 vi.mock('../../../src/memory/conversation.js', () => ({
-    ConversationMemory: vi.fn().mockImplementation(() => ({
-        getRecentContext: vi.fn(() => ''),
-        addExchange: vi.fn(),
-    })),
+    ConversationMemory: vi.fn(function () {
+        return {
+            getRecentContext: vi.fn(() => ''),
+            addExchange: vi.fn(),
+        };
+    }),
 }));
 
 vi.mock('../../../src/safety/review-queue.js', () => ({
-    ReviewQueue: vi.fn().mockImplementation(() => ({
-        add: vi.fn(),
-        getPending: vi.fn(() => []),
-    })),
+    ReviewQueue: vi.fn(function () {
+        return {
+            add: vi.fn(),
+            getPending: vi.fn(() => []),
+        };
+    }),
 }));
 
 vi.mock('../../../src/rag/embeddings.js', () => ({

@@ -31,17 +31,23 @@ vi.mock('@whiskeysockets/baileys', () => {
     };
 });
 
+// Constructor mocks use regular functions (not arrows) so `new X()` works under
+// Vitest 4, which invokes the mock implementation with real construct semantics.
 vi.mock('../../../src/brain/pipeline.js', () => ({
-    ClonePipeline: vi.fn().mockImplementation(() => ({
-        processMessage: vi.fn().mockResolvedValue({ action: 'reply', replies: ['ok'], delay: 0 }),
-    })),
+    ClonePipeline: vi.fn(function () {
+        return {
+            processMessage: vi.fn(async () => ({ action: 'reply', replies: ['ok'], delay: 0 })),
+        };
+    }),
 }));
 
 vi.mock('../../../src/ghost/ghost.js', () => ({
-    GhostMode: vi.fn().mockImplementation(() => ({
-        startHeartbeat: vi.fn(),
-        stopHeartbeat: vi.fn(),
-    })),
+    GhostMode: vi.fn(function () {
+        return {
+            startHeartbeat: vi.fn(),
+            stopHeartbeat: vi.fn(),
+        };
+    }),
 }));
 
 vi.mock('qrcode-terminal', () => ({ default: { generate: vi.fn() } }));
