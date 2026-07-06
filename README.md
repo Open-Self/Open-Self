@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/badge/npm-v0.6.0-blue)](https://www.npmjs.com/package/openself)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![CI](https://github.com/Open-Self/open-self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/open-self/actions)
 [![Tests](https://img.shields.io/badge/tests-vitest-purple)](./docs/code-standards.md)
 
