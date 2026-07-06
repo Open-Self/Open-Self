@@ -43,8 +43,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# package manager
-package-lock.json
+# package manager — commit package-lock.json (npm ci + reproducible builds).
+# Ignore alternate lockfiles so the repo stays single-lockfile on npm.
 yarn.lock
 pnpm-lock.yaml
 
