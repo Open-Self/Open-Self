@@ -5,12 +5,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // vi.mock must be at top level (hoisted)
 vi.mock('@anthropic-ai/sdk', () => {
-    const create = vi.fn().mockResolvedValue({
+    const create = vi.fn(async () => ({
         content: [{ type: 'text', text: 'mocked anthropic reply' }],
         stop_reason: 'end_turn',
         usage: { input_tokens: 10, output_tokens: 5 },
+    }));
+    // Regular function (not arrow) so it is constructable via `new` under Vitest 4.
+    const Anthropic = vi.fn(function () {
+        return { messages: { create } };
     });
-    const Anthropic = vi.fn().mockImplementation(() => ({ messages: { create } }));
     Anthropic.__create = create;
     return { default: Anthropic };
 });

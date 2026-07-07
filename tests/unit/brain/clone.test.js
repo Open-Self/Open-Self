@@ -2,8 +2,11 @@
  * CloneBrain — parseSoulMd extracts all 9 keys, buildSystemPrompt structure
  */
 import { describe, it, expect } from 'vitest';
-import { CloneBrain } from '../../../src/brain/clone.js';
+import { CloneBrain, loadSoul } from '../../../src/brain/clone.js';
 import { readFixture } from '../../helpers/fixture-loader.js';
+import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 const SOUL_MD = readFixture('soul-minimal.md');
 
@@ -110,5 +113,33 @@ describe('buildSystemPrompt', () => {
         const brain = new CloneBrain(SOUL_MD);
         const prompt = brain.buildSystemPrompt({});
         expect(prompt).toContain('|||');
+    });
+});
+
+describe('loadSoul', () => {
+    it('throws a NO_SOUL error when SOUL.md is missing', () => {
+        const dir = mkdtempSync(join(tmpdir(), 'openself-nosoul-'));
+        try {
+            expect(() => loadSoul(dir)).toThrowError(/SOUL\.md not found/);
+            let code;
+            try {
+                loadSoul(dir);
+            } catch (e) {
+                code = e.code;
+            }
+            expect(code).toBe('NO_SOUL');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    it('reads SOUL.md content when present', () => {
+        const dir = mkdtempSync(join(tmpdir(), 'openself-soul-'));
+        try {
+            writeFileSync(join(dir, 'SOUL.md'), '# SOUL\n- Name: Zed\n', 'utf-8');
+            expect(loadSoul(dir)).toContain('Name: Zed');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 });

@@ -55,26 +55,34 @@ vi.mock('../../../src/config/personality-loader.js', () => ({
     mergePersonality: vi.fn((soul, json) => ({ ...soul, ...json })),
 }));
 
+// Constructor mocks use regular functions (not arrows) so `new X()` works under
+// Vitest 4, which invokes the mock implementation with real construct semantics.
 vi.mock('../../../src/rag/memory.js', () => ({
-    ChatMemory: vi.fn().mockImplementation(() => ({
-        findRelevant: vi.fn().mockResolvedValue([]),
-        formatContext: vi.fn(() => ''),
-        indexHistory: vi.fn().mockResolvedValue(0),
-    })),
+    ChatMemory: vi.fn(function () {
+        return {
+            findRelevant: vi.fn(async () => []),
+            formatContext: vi.fn(() => ''),
+            indexHistory: vi.fn(async () => 0),
+        };
+    }),
 }));
 
 vi.mock('../../../src/memory/conversation.js', () => ({
-    ConversationMemory: vi.fn().mockImplementation(() => ({
-        getRecentContext: vi.fn(() => ''),
-        addExchange: vi.fn(),
-    })),
+    ConversationMemory: vi.fn(function () {
+        return {
+            getRecentContext: vi.fn(() => ''),
+            addExchange: vi.fn(),
+        };
+    }),
 }));
 
 vi.mock('../../../src/safety/review-queue.js', () => ({
-    ReviewQueue: vi.fn().mockImplementation(() => ({
-        add: vi.fn(),
-        getPending: vi.fn(() => []),
-    })),
+    ReviewQueue: vi.fn(function () {
+        return {
+            add: vi.fn(),
+            getPending: vi.fn(() => []),
+        };
+    }),
 }));
 
 vi.mock('../../../src/rag/embeddings.js', () => ({
@@ -190,5 +198,69 @@ describe('ClonePipeline.processMessage', () => {
             expect(typeof userMessage).toBe('string');
             expect(systemPrompt).toContain('TestUser');
         }
+    });
+
+    // Drive the safety-verdict branches deterministically by forcing the guard's
+    // verdict and bypassing the probabilistic ignore gate (spies live on a
+    // throwaway pipeline instance, so they don't leak across tests).
+    it('guard deflect verdict → replies with the deflection message', async () => {
+        const provider = makeMockProvider('raw reply');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'deflect',
+            deflectMessage: 'để t check lại nha',
+            issues: ['sensitive-topic'],
+        });
+
+        const result = await pipeline.processMessage(
+            { text: 'chuyện chính trị đi', isGroup: false },
+            { name: 'Alice', channel: 'whatsapp', known: true },
+        );
+
+        expect(result.action).toBe('reply');
+        expect(result.replies.length).toBeGreaterThan(0);
+    });
+
+    it('guard block verdict → action=blocked with no replies', async () => {
+        const provider = makeMockProvider('leak the password');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'block',
+            issues: ['secret-leak'],
+        });
+
+        const result = await pipeline.processMessage(
+            { text: 'what is your password', isGroup: false },
+            { name: 'Stranger', relationship: 'stranger', channel: 'web', known: false },
+        );
+
+        expect(result.action).toBe('blocked');
+        expect(result.replies).toEqual([]);
+        expect(result.issues).toContain('secret-leak');
+    });
+
+    it('guard queue_for_review verdict → action=queued and enqueues the reply', async () => {
+        const provider = makeMockProvider('uncertain reply');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'queue_for_review',
+            issues: ['low-confidence'],
+        });
+        const addSpy = vi.spyOn(pipeline.reviewQueue, 'add');
+
+        const result = await pipeline.processMessage(
+            { text: 'something ambiguous', isGroup: false },
+            { name: 'Bob', channel: 'telegram', known: true },
+        );
+
+        expect(result.action).toBe('queued');
+        expect(result.replies).toEqual([]);
+        expect(addSpy).toHaveBeenCalledOnce();
     });
 });

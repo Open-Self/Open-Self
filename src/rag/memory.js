@@ -87,7 +87,10 @@ export class ChatMemory {
         await this.init();
 
         const vector = await this.embedding.embed(message);
-        const results = await this.index.queryItems(vector, topK * 2); // Fetch extra for filtering
+        // vectra's queryItems is (vector, query, topK, ...): the query string feeds
+        // the optional BM25 keyword component; pass the message so topK stays the
+        // third arg. Omitting it silently returns no results (topK lands undefined).
+        const results = await this.index.queryItems(vector, message, topK * 2); // Fetch extra for filtering
 
         // Score and rank results
         const scored = results.map((r) => {

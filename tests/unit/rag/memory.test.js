@@ -83,7 +83,7 @@ describe('ChatMemory.indexHistory', () => {
 });
 
 describe('ChatMemory.findRelevant', () => {
-    it('returns array after indexing', async () => {
+    it('retrieves indexed conversations (not an empty result set)', async () => {
         const dir = join(TMP_DIR, 'find-test');
         mkdirSync(dir, { recursive: true });
         const emb = new LocalEmbedding();
@@ -91,6 +91,9 @@ describe('ChatMemory.findRelevant', () => {
         await mem.indexHistory(SAMPLE_CONVOS);
         const results = await mem.findRelevant('food pizza', 'Alice', 3);
         expect(Array.isArray(results)).toBe(true);
+        // Must actually return memories — a silently-empty result set means the
+        // underlying vector query was called with the wrong argument order.
+        expect(results.length).toBeGreaterThan(0);
     });
 
     it('results have expected shape fields', async () => {
@@ -100,13 +103,12 @@ describe('ChatMemory.findRelevant', () => {
         const mem = new ChatMemory(emb, dir);
         await mem.indexHistory(SAMPLE_CONVOS);
         const results = await mem.findRelevant('coffee morning', 'Bob', 2);
-        if (results.length > 0) {
-            expect(results[0]).toHaveProperty('text');
-            expect(results[0]).toHaveProperty('contact');
-            expect(results[0]).toHaveProperty('score');
-            expect(results[0]).toHaveProperty('theirMessage');
-            expect(results[0]).toHaveProperty('yourReply');
-        }
+        expect(results.length).toBeGreaterThan(0);
+        expect(results[0]).toHaveProperty('text');
+        expect(results[0]).toHaveProperty('contact');
+        expect(results[0]).toHaveProperty('score');
+        expect(results[0]).toHaveProperty('theirMessage');
+        expect(results[0]).toHaveProperty('yourReply');
     });
 });
 

@@ -4,14 +4,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('openai', () => {
-    const create = vi.fn().mockResolvedValue({
+    const create = vi.fn(async () => ({
         choices: [{ message: { content: 'mocked deepseek reply', role: 'assistant' } }],
         usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-    });
-    const OpenAI = vi.fn().mockImplementation(() => ({
-        chat: { completions: { create } },
-        embeddings: { create: vi.fn() },
     }));
+    // Regular function (not arrow) so it is constructable via `new` under Vitest 4.
+    const OpenAI = vi.fn(function () {
+        return {
+            chat: { completions: { create } },
+            embeddings: { create: vi.fn() },
+        };
+    });
     return { default: OpenAI };
 });
 

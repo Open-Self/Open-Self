@@ -153,3 +153,25 @@ describe('getTypingDuration', () => {
         expect(m.getTypingDuration('hello')).toBeGreaterThan(0);
     });
 });
+
+describe('addTypos', () => {
+    it('returns the reply unchanged when typoRate is below the 0.01 threshold', () => {
+        // Truthy but < 0.01 — note `typoRate || 0.02` treats an explicit 0 as unset.
+        const m = new HumanMimicry({ typoRate: 0.005 });
+        expect(m.addTypos('hello world')).toBe('hello world');
+    });
+
+    it('returns the reply unchanged when the random roll misses (> 0.1)', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.9);
+        const m = new HumanMimicry({ typoRate: 0.5 });
+        expect(m.addTypos('hello world')).toBe('hello world');
+    });
+
+    it('applies a length-preserving adjacent-char swap when the roll hits (<= 0.1)', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0); // < 0.1 → typo path, pos deterministic
+        const m = new HumanMimicry({ typoRate: 0.5 });
+        const out = m.addTypos('abcdef');
+        expect(out).toHaveLength('abcdef'.length);
+        expect(out).not.toBe('abcdef');
+    });
+});
