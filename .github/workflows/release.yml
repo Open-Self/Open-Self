@@ -27,6 +27,12 @@ jobs:
         run: npm ci
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret not set — skipping publish."
+            echo "Add the secret to enable tag-triggered releases, or publish manually."
+            exit 0
+          fi
+          npm publish --provenance --access public
