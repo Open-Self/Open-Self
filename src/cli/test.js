@@ -12,6 +12,7 @@ import { CloneBrain, loadSoul } from '../brain/clone.js';
 import { createProvider, autoDetectProvider } from '../brain/router.js';
 import { ClonePipeline } from '../brain/pipeline.js';
 import { loadConfig } from '../config/loader.js';
+import { isFormal } from '../lang/languages.js';
 
 export async function testCommand(options) {
     if (options.interactive) {
@@ -166,9 +167,9 @@ function calculateSimilarity(real, clone) {
     const cloneHasEmoji = /[\u{1F600}-\u{1F9FF}]/u.test(clone);
     if (realHasEmoji === cloneHasEmoji) score += 15;
 
-    // 4. Tone match (15 points)
-    const realFormal = /ạ|dạ|vâng/i.test(real);
-    const cloneFormal = /ạ|dạ|vâng/i.test(clone);
+    // 4. Tone match (15 points) — formal register across any supported language
+    const realFormal = isFormal(real);
+    const cloneFormal = isFormal(clone);
     if (realFormal === cloneFormal) score += 15;
 
     return Math.min(Math.round(score), 100);

@@ -15,6 +15,7 @@
 - `npm audit`: **14 vulnerabilities (2 critical, 5 high) → 0.** Every dependency bumped to latest; the last undici advisories cleared via a scoped `overrides` pin instead of downgrading discord.js.
 
 ### Added
+- **Multi-language engine** — language detection now covers English, Vietnamese, Spanish, French, German and Portuguese (was a binary VN/EN check), with all language data (detection, stop words, formality, AI self-reveal patterns, SOUL fallbacks) centralized in a single registry (`src/lang/`). User-facing UI/examples standardized to English; the clone still speaks whatever language your own messages are in.
 - All dependencies upgraded to current majors: ESLint 10, Vitest 4, zod 4, express 5, openai 6, `@anthropic-ai/sdk` 0.110, commander 15, inquirer 14, vectra 0.15; baileys pinned to latest stable 6.7.x.
 - **Dependabot** (weekly, grouped) + a non-blocking `npm audit` CI step.
 - Test suite grown to **324 tests**; coverage thresholds raised to lines 80 / functions 85 / branches 72, with previously-excluded core modules (ConversationMemory, GhostMode, ReviewQueue, loadConfig, generateSoulMd) now covered.
