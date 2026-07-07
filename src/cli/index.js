@@ -46,7 +46,7 @@ ${chalk.bold('Quick Start:')}
   ${chalk.gray('$')} openself start --telegram                   ${chalk.dim('# Go live')}
 
 ${chalk.bold('Fun Stuff:')}
-  ${chalk.gray('$')} openself arena --topic "Cà phê hay trà sữa?"     ${chalk.dim('# Clone vs Clone')}
+  ${chalk.gray('$')} openself arena --topic "Coffee or bubble tea?"     ${chalk.dim('# Clone vs Clone')}
   ${chalk.gray('$')} openself ghost on                           ${chalk.dim('# Auto-reply offline')}
   ${chalk.gray('$')} openself share --web                        ${chalk.dim('# "Talk to My Clone"')}
 
@@ -99,7 +99,7 @@ program
 program
     .command('arena')
     .description('🏟️ Clone Arena — two clones debate each other')
-    .option('--topic <topic>', 'Debate topic', 'Cà phê hay trà sữa?')
+    .option('--topic <topic>', 'Debate topic', 'Coffee or bubble tea?')
     .option('--rounds <n>', 'Number of exchange rounds', '5')
     .option('--soul2 <path>', 'Second clone SOUL.md path')
     .option('--name2 <name>', 'Second clone name')
