@@ -9,7 +9,7 @@ export class AnthropicProvider {
         this.client = new Anthropic({
             apiKey: config.apiKey || process.env.ANTHROPIC_API_KEY,
         });
-        this.model = config.model || process.env.LLM_MODEL || 'claude-sonnet-4-20250514';
+        this.model = config.model || process.env.LLM_MODEL || 'claude-sonnet-5';
         this.maxTokens = config.maxTokens || 500;
     }
 

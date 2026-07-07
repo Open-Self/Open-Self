@@ -7,13 +7,13 @@ import { readFileSync, existsSync } from 'fs';
 import { parse as parseYaml } from 'yaml';
 import dotenv from 'dotenv';
 
-// Load .env file
-dotenv.config();
+// Load .env file (quiet: suppress dotenv's promotional stdout tips)
+dotenv.config({ quiet: true });
 
 const DEFAULT_CONFIG = {
     llm: {
         provider: 'anthropic',
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-5',
         maxTokens: 500,
     },
     clone: {
