@@ -199,4 +199,68 @@ describe('ClonePipeline.processMessage', () => {
             expect(systemPrompt).toContain('TestUser');
         }
     });
+
+    // Drive the safety-verdict branches deterministically by forcing the guard's
+    // verdict and bypassing the probabilistic ignore gate (spies live on a
+    // throwaway pipeline instance, so they don't leak across tests).
+    it('guard deflect verdict → replies with the deflection message', async () => {
+        const provider = makeMockProvider('raw reply');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'deflect',
+            deflectMessage: 'để t check lại nha',
+            issues: ['sensitive-topic'],
+        });
+
+        const result = await pipeline.processMessage(
+            { text: 'chuyện chính trị đi', isGroup: false },
+            { name: 'Alice', channel: 'whatsapp', known: true },
+        );
+
+        expect(result.action).toBe('reply');
+        expect(result.replies.length).toBeGreaterThan(0);
+    });
+
+    it('guard block verdict → action=blocked with no replies', async () => {
+        const provider = makeMockProvider('leak the password');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'block',
+            issues: ['secret-leak'],
+        });
+
+        const result = await pipeline.processMessage(
+            { text: 'what is your password', isGroup: false },
+            { name: 'Stranger', relationship: 'stranger', channel: 'web', known: false },
+        );
+
+        expect(result.action).toBe('blocked');
+        expect(result.replies).toEqual([]);
+        expect(result.issues).toContain('secret-leak');
+    });
+
+    it('guard queue_for_review verdict → action=queued and enqueues the reply', async () => {
+        const provider = makeMockProvider('uncertain reply');
+        const pipeline = new ClonePipeline({ provider, dataDir: './data' });
+        vi.spyOn(pipeline.mimicry, 'shouldIgnore').mockReturnValue(false);
+        vi.spyOn(pipeline.guard, 'checkReply').mockReturnValue({
+            safe: false,
+            action: 'queue_for_review',
+            issues: ['low-confidence'],
+        });
+        const addSpy = vi.spyOn(pipeline.reviewQueue, 'add');
+
+        const result = await pipeline.processMessage(
+            { text: 'something ambiguous', isGroup: false },
+            { name: 'Bob', channel: 'telegram', known: true },
+        );
+
+        expect(result.action).toBe('queued');
+        expect(result.replies).toEqual([]);
+        expect(addSpy).toHaveBeenCalledOnce();
+    });
 });
