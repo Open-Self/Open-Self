@@ -66,6 +66,7 @@ You export chat history → Feed into OpenSelf → Clone learns personality
 | **Safety First** | Boundaries, topic avoidance, review queue |
 | **SOUL.md** | Your personality in a file — editable and transparent |
 | **Multi-channel** | WhatsApp, Telegram, Discord — all ready |
+| **Multi-language** | Auto-detects English, Vietnamese, Spanish, French, German, Portuguese — clones your voice in it |
 | **Clone Arena** | Two clones debate each other on any topic |
 | **Ghost Mode** | Clone auto-replies when you're offline |
 | **BYOK** | Claude, GPT, DeepSeek, or Ollama (free, local) |
