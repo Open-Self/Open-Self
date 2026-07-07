@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0] — 2026-07-07
+
+### Changed (BREAKING)
+- **Requires Node.js ≥ 20.** Node 18 dropped from support and the CI matrix — `@whiskeysockets/baileys` hard-fails its install engine check on Node < 20, so the previous `>=18` claim never actually installed.
+- **Default LLM model** updated from the end-of-life `claude-sonnet-4-20250514` to `claude-sonnet-5` (provider, config loader, `.env.example`). Fresh clones on defaults previously failed even with a valid key.
+
+### Fixed
+- **CI was never green.** `package-lock.json` was git-ignored so `npm ci` failed at install on every runner; two integration tests failed from a mock-teardown bug; 81 files were unformatted behind a non-blocking format step. Lockfile committed, tests stabilized, formatting enforced with LF normalization.
+- **RAG retrieval silently returned nothing** after the vectra 0.15 upgrade — `queryItems` gained a `query` argument, shifting `topK` out of position. Fixed and guarded with a non-empty-result test.
+- **dotenv** no longer prints its promotional banner into every command (`{ quiet: true }`).
+
+### Security
+- `npm audit`: **14 vulnerabilities (2 critical, 5 high) → 0.** Every dependency bumped to latest; the last undici advisories cleared via a scoped `overrides` pin instead of downgrading discord.js.
+
+### Added
+- All dependencies upgraded to current majors: ESLint 10, Vitest 4, zod 4, express 5, openai 6, `@anthropic-ai/sdk` 0.110, commander 15, inquirer 14, vectra 0.15; baileys pinned to latest stable 6.7.x.
+- **Dependabot** (weekly, grouped) + a non-blocking `npm audit` CI step.
+- Test suite grown to **324 tests**; coverage thresholds raised to lines 80 / functions 85 / branches 72, with previously-excluded core modules (ConversationMemory, GhostMode, ReviewQueue, loadConfig, generateSoulMd) now covered.
+- End-to-end verification pass over all credential-free CLI commands.
+
 ## [0.6.0] — 2026-05-07
 
 ### Fixed (P0)

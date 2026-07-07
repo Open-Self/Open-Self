@@ -1,10 +1,10 @@
 # 🧑 OpenSelf
 
-[![npm version](https://img.shields.io/badge/npm-v0.6.0-blue)](https://www.npmjs.com/package/openself)
+[![npm version](https://img.shields.io/npm/v/openself?color=blue)](https://www.npmjs.com/package/openself)
+[![npm downloads](https://img.shields.io/npm/dm/openself)](https://www.npmjs.com/package/openself)
+[![CI](https://github.com/Open-Self/Open-Self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
-[![CI](https://github.com/Open-Self/open-self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/open-self/actions)
-[![Tests](https://img.shields.io/badge/tests-vitest-purple)](./docs/code-standards.md)
 
 ### Your AI clone. Your messages. Your machine.
 
@@ -29,7 +29,7 @@ OpenSelf learns from YOUR real messages — your vocabulary, humor, emoji habits
 
 ```bash
 # Install
-git clone https://github.com/Open-Self/open-self.git
+git clone https://github.com/Open-Self/Open-Self.git
 cd open-self && npm install
 
 # Feed your personality
@@ -130,7 +130,7 @@ npx openself ghost       # Check status
 See the full [Setup Guide](./docs/setup-guide.md) for detailed instructions.
 
 ```bash
-git clone https://github.com/Open-Self/open-self.git
+git clone https://github.com/Open-Self/Open-Self.git
 cd open-self && npm install
 cp .env.example .env    # Edit with your API key
 ```
@@ -239,7 +239,7 @@ See [Safety Guide](./docs/safety-guide.md) for safety features and [System Archi
 PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ```bash
-git clone https://github.com/Open-Self/open-self.git
+git clone https://github.com/Open-Self/Open-Self.git
 cd open-self && npm install
 npx openself feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
 npm test
