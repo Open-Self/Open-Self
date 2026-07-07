@@ -32,24 +32,16 @@ export default defineConfig({
                 'src/gateway/telegram.js',
                 'src/gateway/discord.js',
                 'src/gateway/router.js',
-                // Arena, ghost, conversation memory — phase-05+ coverage
+                // Arena orchestrator — LLM-driven debate loop, exercised via CLI
                 'src/arena/arena.js',
-                'src/ghost/ghost.js',
-                'src/memory/conversation.js',
-                // Soul generator — phase-05+ coverage
-                'src/personality/soul-generator.js',
-                // Review queue — requires FS, low priority
-                'src/safety/review-queue.js',
-                // Config loader — requires YAML file on disk
-                'src/config/loader.js',
-                // Web server — requires supertest (not installed); security logic tested inline
+                // Web server — HTTP integration needs supertest; boot smoke-tested separately
                 'src/web/server.js',
                 'src/**/*.test.js',
             ],
             thresholds: {
-                lines: 60,
-                functions: 70,
-                branches: 70,
+                lines: 80,
+                functions: 85,
+                branches: 72,
             },
         },
     },
