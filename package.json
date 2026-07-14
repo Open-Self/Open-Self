@@ -80,7 +80,7 @@
     }
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
+    "@anthropic-ai/sdk": "^0.111.0",
     "@whiskeysockets/baileys": "^6.7.23",
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
