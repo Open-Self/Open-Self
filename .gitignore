@@ -2,6 +2,11 @@
 
 # OpenSelf user data (private)
 data/
+.openself/
+context.db
+context.db-shm
+context.db-wal
+vault-key.dpapi
 .claude
 .opencode
 CLAUDE.md

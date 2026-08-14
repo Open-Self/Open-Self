@@ -44,9 +44,40 @@ describe('captureCommand', () => {
         expect(console.log).toHaveBeenCalledOnce();
     });
 
+    it('runs a one-shot calendar export capture', async () => {
+        const calendar = join(tempDir, 'calendar.ics');
+        writeFileSync(
+            calendar,
+            [
+                'BEGIN:VCALENDAR',
+                'BEGIN:VEVENT',
+                'UID:cli-calendar-1',
+                'DTSTART:20260820T090000Z',
+                'SUMMARY:CLI calendar capture',
+                'END:VEVENT',
+                'END:VCALENDAR',
+            ].join('\r\n'),
+        );
+
+        await captureCommand('calendar', calendar, { dataDir, scope: 'calendar/work' });
+
+        const store = new ContextStore({ dataDir });
+        expect(store.list({ scope: 'calendar/work' })[0]).toMatchObject({
+            summary: 'CLI calendar capture',
+            source: { kind: 'calendar' },
+        });
+        store.close();
+    });
+
     it('rejects unknown sources before opening a vault', async () => {
-        await expect(captureCommand('calendar', projectDir, { dataDir })).rejects.toThrow(
-            'Currently available: project',
+        await expect(captureCommand('cloud', projectDir, { dataDir })).rejects.toThrow(
+            'Available: project, calendar, email, browser',
+        );
+    });
+
+    it('requires an export path for structured sources', async () => {
+        await expect(captureCommand('email', undefined, { dataDir })).rejects.toThrow(
+            'local export path is required',
         );
     });
 

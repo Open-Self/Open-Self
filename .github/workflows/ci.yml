@@ -45,6 +45,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
         run: npm run test:coverage
 
+      - name: Context retrieval and privacy evaluations (Linux + Node 20 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        run: npm run eval:context
+
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
         uses: actions/upload-artifact@v4

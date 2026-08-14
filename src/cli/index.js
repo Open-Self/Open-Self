@@ -23,6 +23,7 @@ import { memoryCommand } from './memory.js';
 import { mcpCommand } from './mcp.js';
 import { dashboardCommand } from './dashboard.js';
 import { captureCommand } from './capture.js';
+import { vaultCommand } from './vault.js';
 import { wrapAction, handleError } from './utils/error-handler.js';
 
 // Notify users of new versions (cached; non-blocking; ignored in CI/sandbox)
@@ -106,8 +107,8 @@ program
 program
     .command('capture')
     .description('Capture continuously changing context from a local source')
-    .argument('<source>', 'Capture source (currently: project)')
-    .argument('[path]', 'Project folder', '.')
+    .argument('<source>', 'project/calendar/email/browser')
+    .argument('[path]', 'Project folder or local export path')
     .option('--watch', 'Keep scanning for changes')
     .option('--interval <seconds>', 'Watch polling interval', '5')
     .option('--name <name>', 'Project name used to derive the default scope')
@@ -116,9 +117,17 @@ program
     .option('--extensions <csv>', 'Allowed file extensions, such as md,js,ts')
     .option('--ignore <csv>', 'Additional directory names to ignore')
     .option('--max-file-bytes <bytes>', 'Maximum file size', '256000')
+    .option('--limit <number>', 'Maximum structured records per scan', '1000')
     .option('--dry-run', 'Report changes without writing memories or connector state')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction((source, path, options) => captureCommand(source, path, options)));
+
+program
+    .command('vault')
+    .description('Configure OS-bound Context Vault payload encryption')
+    .argument('[action]', 'init/status', 'status')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction((action, options) => vaultCommand(action, options)));
 
 program
     .command('setup')

@@ -28,6 +28,7 @@ export default defineConfig({
                 'src/cli/share.js',
                 'src/cli/start.js',
                 'src/cli/test.js',
+                'src/cli/vault.js',
                 // App entrypoint + static assets
                 'src/index.js',
                 'src/web/index.html',

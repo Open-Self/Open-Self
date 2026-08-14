@@ -19,15 +19,15 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 - MCP stdio server for remember, search, bounded context, and forget
 - Existing personality clone and messaging commands remain available
 
-**Next milestones:**
+**Completed milestones:**
 
 1. ✅ Import Markdown/text, WhatsApp, and Telegram with provenance and deduplication
 2. ✅ Local FTS5/vector rank fusion and potential conflict detection
 3. ✅ Authenticated localhost dashboard with edit, merge, version history, and conflict review
-4. **Partial:** Continuous capture connectors: project-folder scan/watch complete; calendar, email,
-   and browser connectors pending
-5. Encryption at rest and OS keychain integration
-6. Recall, temporal correctness, privacy leakage, and provenance eval suites
+4. **Complete:** Continuous local capture for project folders, ICS calendars, EML/MBOX email, and
+   browser bookmark/history exports
+5. **Complete:** AES-256-GCM payload encryption, blind lexical indexes, and OS-bound key protection
+6. **Complete:** Recall/MRR, temporal correctness, sensitivity leakage, and provenance eval suites
 
 ## Released Versions
 
@@ -136,18 +136,18 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 
 **Not committed:** TypeScript adds complexity; migration is gradual and optional.
 
-### v0.8.0 — Voice Cloning & Vault (Speculative)
+### Post-v0.8 Voice and Multi-profile Work (Speculative)
 
-**Goal:** Extend to voice and multi-clone management.
+**Goal:** Evaluate optional voice and multi-profile workflows without weakening the local-first
+Context Vault.
 
 **Planned features:**
 - Voice cloning via TTS (text-to-speech) integration
 - Multi-clone profile vault (manage 3+ personalities locally)
-- Profile versioning (git-like history)
-- Web dashboard for vault management
 - Export profiles with voice models
 
-**Not committed:** Voice APIs are expensive; UI dashboard requires significant effort.
+**Not committed:** Voice APIs are expensive and can introduce biometric privacy risk. Context memory
+versioning and the authenticated local dashboard are already delivered in v0.8.
 
 ### v0.9.0 — Semantic Release & Auto-Publish (Speculative)
 
@@ -339,16 +339,19 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 ## FAQs
 
 **Q: When will OpenSelf publish to npm?**
-A: After v0.6.0 is complete and tested. Planned for early May 2026.
+A: Package metadata and validation are publish-ready; registry releases remain an explicit
+maintainer-controlled operation.
 
 **Q: Will OpenSelf support TypeScript?**
 A: JSDoc + Zod provide type safety for v0.x. Gradual migration to TypeScript planned for v0.7+, not required.
 
 **Q: Can I run OpenSelf in the cloud?**
-A: Yes, but data stays local. Deploy to a VPS and open port 3000 for web access. Not recommended for shared hosting (security risk).
+A: The core can run on a private host, but the Context Vault dashboard intentionally binds to
+localhost and is not a remotely exposed multi-user service.
 
 **Q: Will there be a web dashboard?**
-A: Possible in v0.8+. Currently, management via CLI + local files only.
+A: Yes. v0.8 includes an authenticated localhost dashboard for search, edit, merge, conflict review,
+forgetting, and version history.
 
 **Q: Can I contribute a new messaging platform?**
 A: Yes! Create a gateway class extending the base pattern. See [CONTRIBUTING.md](../CONTRIBUTING.md).

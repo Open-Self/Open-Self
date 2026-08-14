@@ -3,6 +3,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { normalizeMemory } from './schema.js';
 import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
+import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
+import { loadConfiguredVaultKey } from './vault-key-manager.js';
 
 const SELECT_COLUMNS = `
     memories.id, memories.type, memories.content, memories.summary,
@@ -18,18 +20,33 @@ export class ContextStore {
         const dataDir = options.dataDir || './data';
         this.vectorEncoder = options.vectorEncoder || new LocalVectorEncoder();
         this.dbPath = options.dbPath || join(dataDir, 'context.db');
+        const vaultDirectory =
+            options.dataDir || (this.dbPath === ':memory:' ? null : dirname(this.dbPath));
+        const encryptionKey =
+            options.encryptionKey ||
+            process.env.OPENSELF_VAULT_KEY ||
+            (vaultDirectory ? loadConfiguredVaultKey(vaultDirectory) : null);
+        this.codec = encryptionKey ? new VaultCodec(encryptionKey) : new PlaintextCodec();
+        this.encryptionEnabled = this.codec.enabled;
         if (this.dbPath !== ':memory:' && !existsSync(dirname(this.dbPath))) {
             mkdirSync(dirname(this.dbPath), { recursive: true });
         }
 
         this.db = new Database(this.dbPath);
-        this.db.pragma('journal_mode = WAL');
-        this.db.pragma('foreign_keys = ON');
-        this.db.pragma('busy_timeout = 5000');
-        this._migrate();
-        this._prepare();
-        this._backfillVectors();
-        this._backfillVersions();
+        try {
+            this.db.pragma('journal_mode = WAL');
+            this.db.pragma('foreign_keys = ON');
+            this.db.pragma('busy_timeout = 5000');
+            this._migrate();
+            this._assertEncryptionMode();
+            this._prepare();
+            this._migrateEncryption();
+            this._backfillVectors();
+            this._backfillVersions();
+        } catch (error) {
+            this.db.close();
+            throw error;
+        }
     }
 
     _migrate() {
@@ -98,7 +115,23 @@ export class ContextStore {
 
             CREATE INDEX IF NOT EXISTS idx_memory_versions_memory_id
                 ON memory_versions(memory_id, version DESC);
+
+            CREATE TABLE IF NOT EXISTS vault_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         `);
+    }
+
+    _assertEncryptionMode() {
+        const marker = this.db
+            .prepare("SELECT value FROM vault_metadata WHERE key = 'payload_encryption'")
+            .get()?.value;
+        if (marker === 'aes-256-gcm-v1' && !this.codec.enabled) {
+            throw new Error(
+                'This Context Vault is encrypted, but its OS-bound key is not configured or available',
+            );
+        }
     }
 
     _prepare() {
@@ -165,13 +198,8 @@ export class ContextStore {
         };
 
         this._writeMemory = (memory) => {
-            this.statements.insert.run(toRow(memory));
-            this.statements.insertFts.run(
-                memory.id,
-                memory.content,
-                memory.summary,
-                memory.tags.join(' '),
-            );
+            this.statements.insert.run(toRow(memory, this.codec));
+            this._writeFts(memory);
             this._writeVector(memory);
             this._recordVersion(memory, 'created');
         };
@@ -193,15 +221,10 @@ export class ContextStore {
         });
 
         this._updateTransaction = this.db.transaction((memory, changeKind) => {
-            const result = this.statements.update.run(toRow(memory));
+            const result = this.statements.update.run(toRow(memory, this.codec));
             if (result.changes === 0) return null;
             this.statements.deleteFts.run(memory.id);
-            this.statements.insertFts.run(
-                memory.id,
-                memory.content,
-                memory.summary,
-                memory.tags.join(' '),
-            );
+            this._writeFts(memory);
             this._writeVector(memory);
             this._recordVersion(memory, changeKind);
             return memory;
@@ -242,12 +265,81 @@ export class ContextStore {
         });
     }
 
+    _migrateEncryption() {
+        if (!this.codec.enabled) return;
+        const marker = this.db
+            .prepare("SELECT value FROM vault_metadata WHERE key = 'payload_encryption'")
+            .get()?.value;
+        if (marker === 'aes-256-gcm-v1') {
+            const sample = this.db.prepare('SELECT content FROM memories LIMIT 1').get();
+            if (sample) this.codec.decode(sample.content, 'content');
+            return;
+        }
+
+        const plaintextCodec = new PlaintextCodec();
+        const memories = this.db.prepare(`SELECT ${SELECT_COLUMNS} FROM memories`).all();
+        const vectors = this.db.prepare('SELECT memory_id, vector FROM memory_vectors').all();
+        const versions = this.db.prepare('SELECT id, snapshot FROM memory_versions').all();
+        const migrateMemory = this.db.prepare(`
+            UPDATE memories SET
+                type = @type, content = @content, summary = @summary,
+                source_kind = @sourceKind, source_locator = @sourceLocator,
+                source_title = @sourceTitle, scope = @scope,
+                sensitivity = @sensitivity, confidence = @confidence,
+                valid_from = @validFrom, valid_to = @validTo,
+                occurred_at = @occurredAt, tags = @tags,
+                updated_at = @updatedAt
+            WHERE id = @id
+        `);
+        const updateVector = this.db.prepare(
+            'UPDATE memory_vectors SET vector = ? WHERE memory_id = ?',
+        );
+        const updateVersion = this.db.prepare(
+            'UPDATE memory_versions SET snapshot = ? WHERE id = ?',
+        );
+        const setMarker = this.db.prepare(
+            "INSERT OR REPLACE INTO vault_metadata (key, value) VALUES ('payload_encryption', 'aes-256-gcm-v1')",
+        );
+
+        this.db.transaction(() => {
+            this.db.prepare('DELETE FROM memory_fts').run();
+            for (const row of memories) {
+                const sourceCodec = this.codec.isEncrypted(row.content)
+                    ? this.codec
+                    : plaintextCodec;
+                const memory = fromRow(row, sourceCodec);
+                migrateMemory.run(toRow(memory, this.codec));
+                if (memory.status === 'active') this._writeFts(memory);
+            }
+            for (const row of vectors) {
+                if (!this.codec.isEncrypted(row.vector)) {
+                    updateVector.run(this.codec.encode(row.vector, 'vector'), row.memory_id);
+                }
+            }
+            for (const row of versions) {
+                if (!this.codec.isEncrypted(row.snapshot)) {
+                    updateVersion.run(this.codec.encode(row.snapshot, 'version'), row.id);
+                }
+            }
+            setMarker.run();
+        })();
+    }
+
+    _writeFts(memory) {
+        this.statements.insertFts.run(
+            memory.id,
+            this.codec.indexText(memory.content),
+            this.codec.indexText(memory.summary),
+            this.codec.indexText(memory.tags.join(' ')),
+        );
+    }
+
     _writeVector(memory) {
         const text = `${memory.content}\n${memory.summary}\n${memory.tags.join(' ')}`;
         const vector = this.vectorEncoder.encode(text);
         this.statements.insertVector.run(
             memory.id,
-            JSON.stringify(vector),
+            this.codec.encode(JSON.stringify(vector), 'vector'),
             this.vectorEncoder.model,
             memory.updatedAt,
         );
@@ -264,7 +356,7 @@ export class ContextStore {
             .all(this.vectorEncoder.model);
         if (!rows.length) return;
         this.db.transaction((items) => {
-            for (const row of items) this._writeVector(fromRow(row));
+            for (const row of items) this._writeVector(fromRow(row, this.codec));
         })(rows);
     }
 
@@ -279,7 +371,7 @@ export class ContextStore {
             .all();
         if (!rows.length) return;
         this.db.transaction((items) => {
-            for (const row of items) this._recordVersion(fromRow(row), 'baseline');
+            for (const row of items) this._recordVersion(fromRow(row, this.codec), 'baseline');
         })(rows);
     }
 
@@ -289,7 +381,7 @@ export class ContextStore {
             memory.id,
             version,
             changeKind,
-            JSON.stringify(memory),
+            this.codec.encode(JSON.stringify(memory), 'version'),
             memory.updatedAt,
         );
     }
@@ -335,7 +427,7 @@ export class ContextStore {
             version: row.version,
             changeKind: row.change_kind,
             changedAt: row.changed_at,
-            snapshot: JSON.parse(row.snapshot),
+            snapshot: JSON.parse(this.codec.decode(row.snapshot, 'version')),
         }));
     }
 
@@ -348,12 +440,12 @@ export class ContextStore {
     get(id, options = {}) {
         const row = this.statements.get.get(id);
         if (!row || (!options.includeForgotten && row.status !== 'active')) return null;
-        return fromRow(row);
+        return fromRow(row, this.codec);
     }
 
     search(query, options = {}) {
         const limit = clamp(options.limit ?? 10, 1, 100);
-        const ftsQuery = toFtsQuery(query);
+        const ftsQuery = this.codec.indexQuery(query);
         if (!ftsQuery) return this.list({ ...options, limit });
 
         const retrieval = options.retrieval || 'hybrid';
@@ -397,7 +489,7 @@ export class ContextStore {
             .all({ ...params, query: ftsQuery });
 
         return rows.map((row) => ({
-            ...fromRow(row),
+            ...fromRow(row, this.codec),
             lexicalScore: 1 / (1 + Math.abs(row.rank)),
         }));
     }
@@ -429,10 +521,10 @@ export class ContextStore {
 
         return rows
             .map((row) => {
-                const storedVector = parseStoredVector(row.vector);
+                const storedVector = parseStoredVector(this.codec.decode(row.vector, 'vector'));
                 if (!storedVector) return null;
                 return {
-                    ...fromRow(row),
+                    ...fromRow(row, this.codec),
                     vectorScore: cosineSimilarity(queryVector, storedVector),
                 };
             })
@@ -500,7 +592,7 @@ export class ContextStore {
                  LIMIT @limit OFFSET @offset`,
             )
             .all(params);
-        return rows.map(fromRow);
+        return rows.map((row) => fromRow(row, this.codec));
     }
 
     buildContext(query, options = {}) {
@@ -541,6 +633,7 @@ export class ContextStore {
             forgotten: Number(row.forgotten || 0),
             vectors: Number(row.vectors || 0),
             vectorModel: this.vectorEncoder.model,
+            encrypted: this.encryptionEnabled,
             byType: Object.fromEntries(byType.map((item) => [item.type, item.count])),
             dbPath: this.dbPath,
         };
@@ -551,38 +644,38 @@ export class ContextStore {
     }
 }
 
-function toRow(memory) {
+function toRow(memory, codec) {
     return {
         id: memory.id,
         type: memory.type,
-        content: memory.content,
-        summary: memory.summary,
-        sourceKind: memory.source.kind,
-        sourceLocator: memory.source.locator,
-        sourceTitle: memory.source.title,
+        content: codec.encode(memory.content, 'content'),
+        summary: codec.encode(memory.summary, 'summary'),
+        sourceKind: codec.encode(memory.source.kind, 'source-kind'),
+        sourceLocator: codec.encode(memory.source.locator, 'source-locator'),
+        sourceTitle: codec.encode(memory.source.title, 'source-title'),
         scope: memory.scope,
         sensitivity: memory.sensitivity,
         confidence: memory.confidence,
         validFrom: memory.validFrom ?? null,
         validTo: memory.validTo ?? null,
         occurredAt: memory.occurredAt ?? null,
-        tags: JSON.stringify(memory.tags),
+        tags: codec.encode(JSON.stringify(memory.tags), 'tags'),
         status: memory.status,
         createdAt: memory.createdAt,
         updatedAt: memory.updatedAt,
     };
 }
 
-function fromRow(row) {
+function fromRow(row, codec) {
     return {
         id: row.id,
         type: row.type,
-        content: row.content,
-        summary: row.summary,
+        content: codec.decode(row.content, 'content'),
+        summary: codec.decode(row.summary, 'summary'),
         source: {
-            kind: row.source_kind,
-            locator: row.source_locator,
-            title: row.source_title,
+            kind: codec.decode(row.source_kind, 'source-kind'),
+            locator: codec.decode(row.source_locator, 'source-locator'),
+            title: codec.decode(row.source_title, 'source-title'),
         },
         scope: row.scope,
         sensitivity: row.sensitivity,
@@ -590,22 +683,12 @@ function fromRow(row) {
         validFrom: row.valid_from,
         validTo: row.valid_to,
         occurredAt: row.occurred_at,
-        tags: JSON.parse(row.tags || '[]'),
+        tags: JSON.parse(codec.decode(row.tags || '[]', 'tags')),
         status: row.status,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         forgottenAt: row.forgotten_at,
     };
-}
-
-function toFtsQuery(value) {
-    const tokens = String(value || '')
-        .normalize('NFKC')
-        .match(/[\p{L}\p{N}_-]+/gu)
-        ?.slice(0, 20);
-    return tokens?.length
-        ? tokens.map((token) => `"${token.replaceAll('"', '""')}"`).join(' OR ')
-        : '';
 }
 
 function renderMemory(memory) {

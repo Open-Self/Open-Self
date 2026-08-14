@@ -178,6 +178,79 @@ scanner. Review `--dry-run`, use a dedicated narrow folder, add directory names 
 restrict types with `--extensions md,ts,js` when the project contains sensitive material. The
 connector never calls a model or sends captured content over the network.
 
+### Calendar, email, and browser exports
+
+The same incremental record lifecycle is available for structured local exports:
+
+```bash
+openself capture calendar ./calendar.ics --watch
+openself capture email ./mail-export --watch --limit 1000
+openself capture browser ./History --watch --limit 500
+```
+
+| Connector | Accepted local sources | Memory mapping |
+|---|---|---|
+| calendar | ICS files or directories | VEVENT UID/recurrence key, event timestamp, location and description |
+| email | EML, MBOX/MBX, or directories | Message-ID key, decoded headers/body, event timestamp |
+| browser | bookmark HTML/JSON, Chromium History, Firefox places.sqlite | stable URL key, bookmark note or history event |
+
+Calendar recurrence rules are not expanded; exported VEVENT instances are captured as provided.
+Email parsing supports common plain text, HTML, base64, quoted-printable, and multipart messages,
+but it is not a forensic MIME implementation. Browser capture accepts only HTTP(S) URLs and removes
+embedded credentials, query strings, and fragments before creating a memory. All three connectors
+read local files only and make no OAuth, browser automation, email server, or calendar API calls.
+
+## Payload encryption and OS-bound keys
+
+```bash
+openself vault init --data-dir /absolute/path/to/openself-data
+openself vault status --data-dir /absolute/path/to/openself-data
+```
+
+Initialization generates a random 256-bit key and immediately migrates existing payloads in one
+SQLite transaction. AES-256-GCM with a fresh nonce and purpose-specific authenticated data protects:
+
+- memory content and summary
+- source kind, locator, and title
+- tags
+- deterministic local vectors
+- complete version-history snapshots
+
+FTS cannot search randomized ciphertext. In encrypted vaults, OpenSelf stores deterministic HMAC
+tokens in FTS5 instead. This blind index supports exact token retrieval without revealing the terms;
+it still reveals token equality/frequency and does not conceal access patterns. Vector ciphertext is
+decrypted in-process only for filtered candidate scoring.
+
+The key provider is selected by platform:
+
+- Windows: DPAPI `CurrentUser`, with an encrypted blob beside the vault
+- macOS: a generic password item in Keychain
+- Linux: Secret Service through `secret-tool`
+
+`vault.json` contains provider/key identifiers only. OpenSelf refuses to open a marked encrypted
+vault without the correct key and closes the SQLite handle on all initialization failures. For
+headless environments, `OPENSELF_VAULT_KEY` accepts exactly 32 bytes encoded as base64 or 64 hex
+characters; this bypasses OS-bound storage and shifts key protection to the operator.
+
+The following operational metadata remains plaintext so SQLite can enforce filters and lifecycle:
+memory UUID, type, scope, sensitivity, confidence, validity/event timestamps, status, lifecycle
+timestamps, vector model name, and row counts. Full file/page encryption requires a SQLCipher build
+and is outside this release. OS-bound encryption also means that losing the OS account/keychain can
+make the payload unrecoverable; test backups before relying on it.
+
+## Reproducible quality evaluations
+
+`npm run eval:context` loads `evals/context-vault.json` into a fresh in-memory Vault and reports:
+
+- Recall@K and mean reciprocal rank for scoped retrieval
+- temporal correctness across superseded and current decisions
+- privacy protection at public/private sensitivity ceilings
+- provenance completeness for required records
+
+The command exits with status 1 when any dataset threshold is missed. The dataset and thresholds are
+version controlled, make no model/network calls, and are intentionally small enough for local and CI
+runs. They are regression indicators, not a claim of broad real-world semantic benchmark coverage.
+
 ## Client configuration
 
 Install globally or let the client invoke the npm package:
@@ -226,12 +299,13 @@ history, create, patch, forget, merge, conflict checks, and vault statistics.
 
 ## Current limitations
 
-- No encrypted-at-rest vault or OS keychain integration yet.
+- Payload encryption leaves operational filter metadata and access patterns visible; full SQLite
+  page encryption is not included.
 - Local feature vectors improve fuzzy matching but do not provide the full semantic understanding of
   a neural embedding model.
 - No automatic conflict resolution between memories.
 - No multi-user ACL or remotely exposed authenticated transport.
 - No remote or multi-user dashboard; the authenticated HTTP surface is localhost-only.
-- Project folders support incremental scan and continuous polling; calendar, email, and browser
-  connectors are not implemented yet.
+- Calendar/email/browser connectors poll local exports rather than live cloud APIs, and calendar
+  recurrence rules are not expanded.
 - Forgotten rows are recoverable locally and are not cryptographically erased.

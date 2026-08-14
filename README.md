@@ -111,6 +111,11 @@ openself memory search --query "current architecture" --scope project/my-project
 
 # Poll for edits and deletions until Ctrl+C
 openself capture project ./my-project --watch --interval 5
+
+# Poll local exports from other high-signal sources
+openself capture calendar ./calendar.ics --watch
+openself capture email ./mail-export --watch
+openself capture browser ./Bookmarks --watch --limit 500
 ```
 
 The connector incrementally versions changed files and soft-forgets memories whose files were
@@ -119,6 +124,42 @@ configuration, and source-code extensions. Dependency/build directories, symlink
 binary files, `.env` files, and common credential/private-key filenames are excluded by default.
 Use `--extensions` and `--ignore` to narrow the source set further. Connector state contains hashes
 and memory IDs, not a second copy of file content, and stays under the OpenSelf data directory.
+
+Calendar capture reads ICS events. Email capture reads EML, MBOX/MBX, or directories containing
+those exports. Browser capture reads Netscape bookmark HTML, Chromium-style JSON, and Chromium or
+Firefox history SQLite files. Browser URLs are reduced to HTTP(S) origin and path: credentials,
+queries, and fragments are discarded before storage. These are local-export connectors; OpenSelf
+does not request account OAuth tokens or contact cloud services.
+
+## Encrypt the Context Vault
+
+Enable payload encryption for a data directory once:
+
+```bash
+openself vault init --data-dir /absolute/path/to/openself-data
+openself vault status --data-dir /absolute/path/to/openself-data
+```
+
+Existing plaintext payloads are migrated transactionally. New and existing content, summaries,
+source details, tags, local vectors, and version snapshots use AES-256-GCM. Lexical retrieval uses
+an HMAC blind index, so search terms are not stored in plaintext. The random key is protected by
+Windows DPAPI, macOS Keychain, or Linux Secret Service and is never written into `vault.json`.
+
+Scope, type, sensitivity, timestamps, status, record IDs, and access-frequency patterns remain
+visible as operational SQLite metadata. This is payload encryption, not SQLCipher/full-database
+encryption. Back up the vault while signed into the same OS account; losing the OS-bound key makes
+encrypted payloads unrecoverable. Headless deployments can explicitly supply a 32-byte base64 or
+hex key through `OPENSELF_VAULT_KEY` and assume responsibility for secret management.
+
+## Run Context Vault evaluations
+
+```bash
+npm run eval:context
+```
+
+The checked-in, deterministic suite measures Recall@K, mean reciprocal rank, temporal correctness,
+sensitivity leakage, and provenance completeness. It exits non-zero when a versioned threshold is
+missed, making retrieval and privacy regressions suitable for CI gating.
 
 ## Connect an AI client with MCP
 
@@ -226,6 +267,7 @@ messaging should be used only with clear consent, narrow boundaries, and appropr
 OpenSelf is **local-first**, not magically offline in every configuration.
 
 - Context Vault storage and FTS search stay on your machine.
+- Optional Vault encryption protects memory payloads at rest; filter metadata remains visible.
 - The MCP server itself makes no model API calls.
 - Ollama can keep generation local.
 - If you configure OpenAI, Anthropic, DeepSeek, or another cloud model, the context supplied to that

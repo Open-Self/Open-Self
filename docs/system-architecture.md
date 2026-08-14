@@ -11,6 +11,29 @@ OpenSelf operates as a **4-layer system**:
 3. **Brain & Runtime Layer** — Prompt building, LLM selection, full pipeline orchestration
 4. **Gateway & Persistence Layer** — Messaging platforms, storage, web interfaces
 
+## Context Vault subsystem (v0.8)
+
+The primary product path is now a local-first context layer alongside the legacy personality
+runtime:
+
+```text
+manual/import/capture -> typed memory -> SQLite + FTS5 + local vector -> CLI/MCP/dashboard
+                              |                         |
+                              +-- lifecycle versions   +-- scope/time/sensitivity filters
+```
+
+- `ContextStore` owns typed memory, provenance, temporal validity, soft forgetting, hybrid
+  retrieval, conflict detection, and version history.
+- Importers ingest documents and chat exports; polling connectors maintain project, ICS calendar,
+  EML/MBOX email, and browser bookmark/history sources with stable record IDs.
+- Optional AES-256-GCM protects payload fields, local vectors, and versions. HMAC blind tokens
+  replace plaintext FTS terms. Filter metadata remains plaintext.
+- `VaultKeyManager` binds the random key to Windows DPAPI, macOS Keychain, or Linux Secret Service.
+- CLI, authenticated localhost dashboard, JavaScript exports, and stdio MCP are separate access
+  surfaces over the same store.
+- `eval:context` gates recall/MRR, temporal correctness, sensitivity leakage, and provenance against
+  a versioned offline dataset.
+
 ## Message Processing Pipeline
 
 ```

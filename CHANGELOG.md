@@ -27,6 +27,15 @@
 - Safe project-capture defaults for dependency/build directories, symlinks, binary or oversized
   files, environment files, and common credential/private-key filenames; plus dry-run, extension,
   ignore, scope, sensitivity, size, and polling controls.
+- Incremental `calendar`, `email`, and `browser` capture from local ICS, EML/MBOX, bookmark
+  HTML/JSON, Chromium History, and Firefox places.sqlite sources.
+- Browser URL sanitization removes credentials, query strings, fragments, and non-HTTP(S) schemes
+  before storage; structured connectors use stable keys for update/forget lifecycle handling.
+- `openself vault init/status` with AES-256-GCM payload/vector/version encryption, HMAC blind FTS
+  indexes, transactional plaintext migration, and OS-bound keys through Windows DPAPI, macOS
+  Keychain, or Linux Secret Service.
+- `eval:context` regression suite and versioned dataset for Recall@K/MRR, temporal correctness,
+  sensitivity leakage, and provenance completeness, with non-zero exit on threshold failure.
 
 ### Changed
 

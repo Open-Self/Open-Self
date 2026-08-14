@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "benchmark:context": "node scripts/benchmark-context.js",
+    "eval:context": "node scripts/evaluate-context.js",
     "test:clone": "node src/cli/index.js test",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
@@ -65,6 +66,8 @@
   "files": [
     "src/",
     "scripts/benchmark-context.js",
+    "scripts/evaluate-context.js",
+    "evals/",
     "SOUL.md.example",
     "docs/",
     "README.md",

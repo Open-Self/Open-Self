@@ -1,23 +1,47 @@
 import chalk from 'chalk';
 import { resolve } from 'node:path';
+import {
+    parseBrowserSource,
+    parseCalendarSource,
+    parseEmailSource,
+} from '../context/capture-parsers.js';
 import { ProjectFolderCapture } from '../context/project-capture.js';
+import { RecordCapture } from '../context/record-capture.js';
 import { ContextStore } from '../context/store.js';
 
 export async function captureCommand(source, folderPath, options = {}) {
-    if (source !== 'project') {
-        throw new Error(`Unsupported capture source: ${source}. Currently available: project.`);
+    const parsers = {
+        calendar: parseCalendarSource,
+        email: parseEmailSource,
+        browser: parseBrowserSource,
+    };
+    if (source !== 'project' && !parsers[source]) {
+        throw new Error(
+            `Unsupported capture source: ${source}. Available: project, calendar, email, browser.`,
+        );
+    }
+    if (!folderPath && source !== 'project') {
+        throw new Error(`A local export path is required for ${source} capture`);
     }
 
     const dataDir = options.dataDir || process.env.DATA_DIR || './data';
     const store = new ContextStore({ dataDir });
-    const capture = new ProjectFolderCapture(store, folderPath || '.', {
-        projectName: options.name,
-        scope: options.scope,
-        sensitivity: options.sensitivity,
-        extensions: splitCsv(options.extensions),
-        ignore: splitCsv(options.ignore),
-        maxFileBytes: options.maxFileBytes,
-    });
+    const capture =
+        source === 'project'
+            ? new ProjectFolderCapture(store, folderPath || '.', {
+                  projectName: options.name,
+                  scope: options.scope,
+                  sensitivity: options.sensitivity,
+                  extensions: splitCsv(options.extensions),
+                  ignore: splitCsv(options.ignore),
+                  maxFileBytes: options.maxFileBytes,
+              })
+            : new RecordCapture(store, folderPath, parsers[source], {
+                  connector: source,
+                  scope: options.scope,
+                  sensitivity: options.sensitivity,
+                  limit: options.limit,
+              });
 
     if (!options.watch) {
         try {

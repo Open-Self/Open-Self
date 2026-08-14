@@ -26,6 +26,15 @@ export { ContextImporter, detectImportFormat, chunkDocument } from './context/im
 export { LocalVectorEncoder, cosineSimilarity } from './context/vectors.js';
 export { createContextServer } from './context/server.js';
 export { ProjectFolderCapture } from './context/project-capture.js';
+export { RecordCapture } from './context/record-capture.js';
+export {
+    parseCalendarSource,
+    parseEmailSource,
+    parseBrowserSource,
+} from './context/capture-parsers.js';
+export { VaultCodec, PlaintextCodec, normalizeKey } from './context/vault-crypto.js';
+export { VaultKeyManager, loadConfiguredVaultKey } from './context/vault-key-manager.js';
+export { evaluateContextVault } from './context/evaluator.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

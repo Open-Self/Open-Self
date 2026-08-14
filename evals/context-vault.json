@@ -1,0 +1,228 @@
+{
+    "name": "openself-context-v1",
+    "thresholds": {
+        "recallAtK": 0.9,
+        "meanReciprocalRank": 0.75,
+        "temporalCorrectness": 1,
+        "privacyProtection": 1,
+        "provenanceCompleteness": 1
+    },
+    "memories": [
+        {
+            "key": "atlas-database-old",
+            "memory": {
+                "type": "decision",
+                "content": "Project Atlas uses SQLite for the prototype database",
+                "summary": "Atlas prototype database",
+                "scope": "project/atlas",
+                "sensitivity": "private",
+                "validFrom": "2026-01-01T00:00:00.000Z",
+                "validTo": "2026-06-30T23:59:59.000Z",
+                "source": {
+                    "kind": "meeting",
+                    "locator": "atlas/architecture-01.md",
+                    "title": "Architecture review"
+                },
+                "tags": ["atlas", "database", "sqlite"]
+            }
+        },
+        {
+            "key": "atlas-database-current",
+            "memory": {
+                "type": "decision",
+                "content": "Project Atlas uses PostgreSQL for the production database",
+                "summary": "Atlas production database",
+                "scope": "project/atlas",
+                "sensitivity": "private",
+                "validFrom": "2026-07-01T00:00:00.000Z",
+                "source": { "kind": "document", "locator": "atlas/adr-004.md", "title": "ADR 004" },
+                "tags": ["atlas", "database", "postgresql"]
+            }
+        },
+        {
+            "key": "atlas-framework",
+            "memory": {
+                "type": "decision",
+                "content": "The Atlas dashboard uses Svelte for its user interface",
+                "summary": "Atlas UI framework",
+                "scope": "project/atlas",
+                "sensitivity": "personal",
+                "source": {
+                    "kind": "document",
+                    "locator": "atlas/frontend.md",
+                    "title": "Frontend plan"
+                },
+                "tags": ["atlas", "frontend", "svelte"]
+            }
+        },
+        {
+            "key": "borealis-database",
+            "memory": {
+                "type": "decision",
+                "content": "Project Borealis stores analytics in ClickHouse",
+                "summary": "Borealis analytics database",
+                "scope": "project/borealis",
+                "sensitivity": "private",
+                "source": {
+                    "kind": "document",
+                    "locator": "borealis/data.md",
+                    "title": "Data architecture"
+                },
+                "tags": ["borealis", "clickhouse"]
+            }
+        },
+        {
+            "key": "writing-preference",
+            "memory": {
+                "type": "preference",
+                "content": "Prefer concise status updates with concrete evidence",
+                "summary": "Status writing preference",
+                "scope": "personal/work",
+                "sensitivity": "personal",
+                "source": {
+                    "kind": "manual-note",
+                    "locator": "preferences/work.md",
+                    "title": "Work preferences"
+                },
+                "tags": ["writing", "status"]
+            }
+        },
+        {
+            "key": "public-conference",
+            "memory": {
+                "type": "event",
+                "content": "OpenSelf public community demo happens at Saigon AI Day",
+                "summary": "Public community demo",
+                "scope": "personal/events",
+                "sensitivity": "public",
+                "occurredAt": "2026-09-12T09:00:00.000Z",
+                "source": {
+                    "kind": "calendar",
+                    "locator": "calendar/community.ics",
+                    "title": "Community calendar"
+                },
+                "tags": ["conference", "public"]
+            }
+        },
+        {
+            "key": "private-health",
+            "memory": {
+                "type": "fact",
+                "content": "Private health identifier is MEDICAL-CEDAR-8842",
+                "summary": "Private health identifier",
+                "scope": "personal/health",
+                "sensitivity": "private",
+                "source": {
+                    "kind": "document",
+                    "locator": "health/record.md",
+                    "title": "Health record"
+                },
+                "tags": ["health", "private"]
+            }
+        },
+        {
+            "key": "restricted-finance",
+            "memory": {
+                "type": "fact",
+                "content": "Restricted finance recovery code is FINANCE-ORCHID-7391",
+                "summary": "Restricted finance code",
+                "scope": "personal/finance",
+                "sensitivity": "restricted",
+                "source": {
+                    "kind": "document",
+                    "locator": "finance/recovery.md",
+                    "title": "Recovery record"
+                },
+                "tags": ["finance", "restricted"]
+            }
+        }
+    ],
+    "recall": [
+        {
+            "name": "current Atlas database",
+            "query": "Atlas production database PostgreSQL",
+            "scope": "project/atlas",
+            "asOf": "2026-08-01T00:00:00.000Z",
+            "relevant": ["atlas-database-current"],
+            "k": 3
+        },
+        {
+            "name": "historical Atlas database",
+            "query": "Atlas prototype SQLite",
+            "scope": "project/atlas",
+            "asOf": "2026-05-01T00:00:00.000Z",
+            "relevant": ["atlas-database-old"],
+            "k": 3
+        },
+        {
+            "name": "Atlas UI",
+            "query": "user interface framework Svelte",
+            "scope": "project/atlas",
+            "asOf": "2026-08-01T00:00:00.000Z",
+            "relevant": ["atlas-framework"],
+            "k": 3
+        },
+        {
+            "name": "Borealis analytics",
+            "query": "Borealis analytics ClickHouse",
+            "scope": "project/borealis",
+            "relevant": ["borealis-database"],
+            "k": 3
+        },
+        {
+            "name": "writing preference",
+            "query": "how should status updates be written",
+            "scope": "personal/work",
+            "relevant": ["writing-preference"],
+            "k": 3
+        }
+    ],
+    "temporal": [
+        {
+            "name": "old decision active in May",
+            "query": "Atlas database",
+            "scope": "project/atlas",
+            "type": "decision",
+            "asOf": "2026-05-01T00:00:00.000Z",
+            "include": ["atlas-database-old"],
+            "exclude": ["atlas-database-current"],
+            "k": 10
+        },
+        {
+            "name": "new decision active in August",
+            "query": "Atlas database",
+            "scope": "project/atlas",
+            "type": "decision",
+            "asOf": "2026-08-01T00:00:00.000Z",
+            "include": ["atlas-database-current"],
+            "exclude": ["atlas-database-old"],
+            "k": 10
+        }
+    ],
+    "privacy": [
+        {
+            "name": "public ceiling blocks private health",
+            "query": "MEDICAL-CEDAR-8842",
+            "maxSensitivity": "public",
+            "forbidden": ["private-health"],
+            "k": 10
+        },
+        {
+            "name": "private ceiling blocks restricted finance",
+            "query": "FINANCE-ORCHID-7391",
+            "maxSensitivity": "private",
+            "forbidden": ["restricted-finance"],
+            "k": 10
+        }
+    ],
+    "provenance": [
+        "atlas-database-old",
+        "atlas-database-current",
+        "atlas-framework",
+        "borealis-database",
+        "writing-preference",
+        "public-conference",
+        "private-health",
+        "restricted-finance"
+    ]
+}
