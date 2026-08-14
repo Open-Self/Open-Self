@@ -32,7 +32,7 @@ export function createContextMcpServer(store, options = {}) {
             },
         },
         async (input) => {
-            const memory = store.remember({
+            const draft = {
                 content: input.content,
                 type: input.type,
                 summary: input.summary,
@@ -48,8 +48,10 @@ export function createContextMcpServer(store, options = {}) {
                 validFrom: input.validFrom,
                 validTo: input.validTo,
                 tags: input.tags,
-            });
-            return textResult({ stored: true, memory });
+            };
+            const potentialConflicts = store.findPotentialConflicts(draft);
+            const memory = store.remember(draft);
+            return textResult({ stored: true, memory, potentialConflicts });
         },
     );
 
@@ -64,10 +66,32 @@ export function createContextMcpServer(store, options = {}) {
                 type: z.enum(MEMORY_TYPES).optional(),
                 maxSensitivity: z.enum(SENSITIVITY_LEVELS).default('private'),
                 asOf: z.string().datetime({ offset: true }).optional(),
+                retrieval: z.enum(['hybrid', 'lexical', 'vector']).default('hybrid'),
                 limit: z.number().int().min(1).max(50).default(10),
             },
         },
         async (input) => textResult({ memories: store.search(input.query, input) }),
+    );
+
+    server.registerTool(
+        'openself_find_conflicts',
+        {
+            description:
+                'Find potentially conflicting active facts, preferences, or decisions before storing a new memory.',
+            inputSchema: {
+                content: z.string().min(1).max(20_000),
+                type: z.enum(['fact', 'preference', 'decision']),
+                scope: z.string().max(200).default('personal'),
+                validFrom: z.string().datetime({ offset: true }).optional(),
+                validTo: z.string().datetime({ offset: true }).optional(),
+                threshold: z.number().min(0).max(1).default(0.28),
+                limit: z.number().int().min(1).max(50).default(10),
+            },
+        },
+        async (input) =>
+            textResult({
+                potentialConflicts: store.findPotentialConflicts(input, input),
+            }),
     );
 
     server.registerTool(
@@ -80,6 +104,7 @@ export function createContextMcpServer(store, options = {}) {
                 scope: z.string().max(200).optional(),
                 maxSensitivity: z.enum(SENSITIVITY_LEVELS).default('private'),
                 maxChars: z.number().int().min(500).max(50_000).default(8_000),
+                retrieval: z.enum(['hybrid', 'lexical', 'vector']).default('hybrid'),
                 limit: z.number().int().min(1).max(50).default(12),
             },
         },

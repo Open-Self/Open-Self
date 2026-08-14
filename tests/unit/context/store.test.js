@@ -41,6 +41,10 @@ describe('ContextStore', () => {
         expect(second.created).toBe(false);
         expect(second.memory.id).toBe(first.memory.id);
         expect(store.stats().total).toBe(1);
+        expect(store.stats()).toMatchObject({
+            vectors: 1,
+            vectorModel: 'openself-feature-hash-v1-256',
+        });
     });
 
     it('requires a dedupe key for idempotent storage', () => {
@@ -65,6 +69,93 @@ describe('ContextStore', () => {
         expect(results).toHaveLength(1);
         expect(results[0].scope).toBe('project/acme/billing');
         expect(results[0].relevance).toBeGreaterThan(0);
+    });
+
+    it('uses local vectors when lexical search cannot match an alias', () => {
+        store.remember({
+            type: 'decision',
+            content: 'PostgreSQL is the storage backend',
+            scope: 'project/acme',
+        });
+
+        expect(
+            store.search('Which db did we choose?', {
+                scope: 'project/acme',
+                retrieval: 'lexical',
+            }),
+        ).toEqual([]);
+
+        const [result] = store.search('Which db did we choose?', {
+            scope: 'project/acme',
+            retrieval: 'hybrid',
+        });
+        expect(result.content).toContain('PostgreSQL');
+        expect(result.match).toMatchObject({ lexicalRank: null, vectorRank: 1 });
+        expect(result.match.vectorSimilarity).toBeGreaterThan(0.08);
+    });
+
+    it('rejects unknown retrieval modes', () => {
+        expect(() => store.search('database', { retrieval: 'magic' })).toThrow(
+            'retrieval must be hybrid, lexical, or vector',
+        );
+        expect(() => store.search('database', { maxSensitivity: 'secret' })).toThrow(
+            'maxSensitivity must be public, personal, private, or restricted',
+        );
+    });
+
+    it('flags similar current preferences as potential conflicts', () => {
+        const existing = store.remember({
+            type: 'preference',
+            content: 'My preferred code editor is Vim',
+            scope: 'personal/work',
+        });
+
+        const conflicts = store.findPotentialConflicts({
+            type: 'preference',
+            content: 'My preferred code editor is Zed',
+            scope: 'personal/work',
+        });
+
+        expect(conflicts).toHaveLength(1);
+        expect(conflicts[0]).toMatchObject({
+            id: existing.id,
+            reason: 'Same type and scope with overlapping validity',
+        });
+        expect(conflicts[0].similarity).toBeGreaterThan(0.28);
+    });
+
+    it('does not flag non-overlapping validity windows or non-conflict types', () => {
+        store.remember({
+            type: 'preference',
+            content: 'My preferred code editor is Vim',
+            scope: 'personal/work',
+            validTo: '2025-12-31T23:59:59.000Z',
+        });
+
+        expect(
+            store.findPotentialConflicts({
+                type: 'preference',
+                content: 'My preferred code editor is Zed',
+                scope: 'personal/work',
+                validFrom: '2026-01-01T00:00:00.000Z',
+            }),
+        ).toEqual([]);
+        expect(store.findPotentialConflicts({ type: 'note', content: 'Editor note' })).toEqual([]);
+        expect(() =>
+            store.findPotentialConflicts(
+                { type: 'preference', content: 'Editor note' },
+                { threshold: 2 },
+            ),
+        ).toThrow('conflict threshold must be between 0 and 1');
+    });
+
+    it('skips a corrupted local vector without breaking retrieval', () => {
+        const memory = store.remember({ content: 'A memory with a damaged vector' });
+        store.db
+            .prepare('UPDATE memory_vectors SET vector = ? WHERE memory_id = ?')
+            .run('not-json', memory.id);
+
+        expect(store.search('damaged vector', { retrieval: 'vector' })).toEqual([]);
     });
 
     it('filters memories that are invalid at the requested time', () => {

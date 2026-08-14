@@ -27,6 +27,8 @@ memory explicit and portable:
 - **Scoped:** keep personal context separate from `project/acme` or `relationship/minh`.
 - **Sensitivity-aware:** public, personal, private, and restricted memories are filtered at retrieval.
 - **Recoverable forgetting:** forgotten memories disappear from retrieval without destroying the audit trail.
+- **Hybrid retrieval:** FTS5 and deterministic local vectors are fused without an embedding API.
+- **Conflict-aware:** similar active facts, preferences, and decisions are surfaced before storage.
 - **Agent-native:** MCP tools work with compatible AI clients; the core is also a normal Node.js library.
 - **Local-first:** SQLite and FTS5 run on your machine with no account or server required.
 
@@ -47,6 +49,12 @@ openself memory add \
 
 # Recall it later
 openself memory search --query "Which database did we choose?" --scope project/openself
+
+# Check a possible preference change before storing it
+openself memory conflicts \
+  --type preference \
+  --scope personal/work \
+  --content "My preferred code editor is Zed"
 
 # Inspect the vault
 openself memory stats
@@ -99,12 +107,13 @@ Example MCP client configuration:
 }
 ```
 
-OpenSelf provides four tools:
+OpenSelf provides five tools:
 
 | Tool | Purpose |
 |---|---|
 | `openself_remember` | Store typed context with provenance and permissions |
 | `openself_search_memory` | Search active memories with scope/time/sensitivity filters |
+| `openself_find_conflicts` | Surface similar current facts/preferences/decisions before writing |
 | `openself_get_context` | Build a bounded, source-attributed context block for a task |
 | `openself_forget` | Soft-delete a memory and remove it from future retrieval |
 
@@ -130,8 +139,8 @@ See [Context Vault & MCP](./docs/context-vault.md) for the schema, security mode
 ```
 
 Supported types are `fact`, `preference`, `decision`, `commitment`, `relationship`, `event`, and
-`note`. SQLite is the source of truth; FTS5 provides fast Unicode full-text retrieval. The storage
-API is intentionally model-independent.
+`note`. SQLite is the source of truth. Unicode FTS5 results and deterministic 256-dimensional local
+feature vectors are combined with reciprocal-rank fusion. The storage API remains model-independent.
 
 ## JavaScript API
 
@@ -222,6 +231,7 @@ npm test
 npm run lint
 npm run format:check
 npm run test:coverage
+npm run benchmark:context -- --count=1000
 ```
 
 Key documentation:

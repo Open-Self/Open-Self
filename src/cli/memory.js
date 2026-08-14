@@ -14,6 +14,8 @@ export function memoryCommand(action, options = {}) {
                 return importMemories(store, options);
             case 'search':
                 return searchMemory(store, options);
+            case 'conflicts':
+                return findConflicts(store, options);
             case 'list':
                 return listMemories(store, options);
             case 'forget':
@@ -22,7 +24,7 @@ export function memoryCommand(action, options = {}) {
                 return printJson(store.stats());
             default:
                 throw new Error(
-                    `Unknown memory action: ${action}. Use add, import, search, list, forget, or stats.`,
+                    `Unknown memory action: ${action}. Use add, import, search, conflicts, list, forget, or stats.`,
                 );
         }
     } finally {
@@ -49,7 +51,7 @@ function importMemories(store, options) {
 
 function addMemory(store, options) {
     if (!options.content) throw new Error('--content is required for memory add');
-    const memory = store.remember({
+    const draft = {
         content: options.content,
         type: options.type,
         summary: options.summary,
@@ -65,9 +67,14 @@ function addMemory(store, options) {
         validFrom: options.validFrom,
         validTo: options.validTo,
         tags: splitTags(options.tags),
-    });
+    };
+    const potentialConflicts = store.findPotentialConflicts(draft);
+    const memory = store.remember(draft);
     console.log(chalk.green(`✓ Remembered ${memory.type} ${memory.id}`));
-    printJson(memory);
+    if (potentialConflicts.length) {
+        console.log(chalk.yellow(`⚠ ${potentialConflicts.length} potential conflict(s) found`));
+    }
+    printJson({ memory, potentialConflicts });
 }
 
 function searchMemory(store, options) {
@@ -78,7 +85,28 @@ function searchMemory(store, options) {
             type: options.type,
             limit: Number(options.limit || 10),
             maxSensitivity: options.maxSensitivity,
+            retrieval: options.retrieval,
         }),
+    );
+}
+
+function findConflicts(store, options) {
+    if (!options.content) throw new Error('--content is required for memory conflicts');
+    if (!options.type) throw new Error('--type is required for memory conflicts');
+    printJson(
+        store.findPotentialConflicts(
+            {
+                content: options.content,
+                type: options.type,
+                scope: options.scope,
+                validFrom: options.validFrom,
+                validTo: options.validTo,
+            },
+            {
+                threshold: options.threshold === undefined ? undefined : Number(options.threshold),
+                limit: Number(options.limit || 10),
+            },
+        ),
     );
 }
 

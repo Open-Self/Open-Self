@@ -8,6 +8,14 @@
 - Source-attributed document chunking and private timestamped chat-event ingestion.
 - SHA-256 import fingerprints and a durable SQLite import ledger make repeated imports idempotent.
 - `--dry-run`, explicit format override, scope, sensitivity, type, confidence, and tag controls.
+- Deterministic 256-dimensional local feature vectors with automatic backfill for existing vaults.
+- Hybrid FTS5/vector retrieval using reciprocal-rank fusion; lexical and vector-only modes remain
+  available for debugging and evaluation.
+- Potential conflict detection for active facts, preferences, and decisions with matching type,
+  exact scope, and overlapping validity windows.
+- `openself memory conflicts` and MCP `openself_find_conflicts`; MCP remember responses now include
+  conflict warnings.
+- Reproducible `benchmark:context` command for local insertion and hybrid-search measurements.
 
 ### Changed
 

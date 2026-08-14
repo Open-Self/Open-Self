@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { normalizeMemory } from './schema.js';
+import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
 
 const SELECT_COLUMNS = `
     memories.id, memories.type, memories.content, memories.summary,
@@ -15,6 +16,7 @@ const SELECT_COLUMNS = `
 export class ContextStore {
     constructor(options = {}) {
         const dataDir = options.dataDir || './data';
+        this.vectorEncoder = options.vectorEncoder || new LocalVectorEncoder();
         this.dbPath = options.dbPath || join(dataDir, 'context.db');
         if (this.dbPath !== ':memory:' && !existsSync(dirname(this.dbPath))) {
             mkdirSync(dirname(this.dbPath), { recursive: true });
@@ -26,6 +28,7 @@ export class ContextStore {
         this.db.pragma('busy_timeout = 5000');
         this._migrate();
         this._prepare();
+        this._backfillVectors();
     }
 
     _migrate() {
@@ -74,6 +77,13 @@ export class ContextStore {
 
             CREATE INDEX IF NOT EXISTS idx_import_items_memory_id
                 ON import_items(memory_id);
+
+            CREATE TABLE IF NOT EXISTS memory_vectors (
+                memory_id TEXT PRIMARY KEY REFERENCES memories(id),
+                vector TEXT NOT NULL,
+                model TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
         `);
     }
 
@@ -93,6 +103,10 @@ export class ContextStore {
             insertFts: this.db.prepare(
                 'INSERT INTO memory_fts (id, content, summary, tags) VALUES (?, ?, ?, ?)',
             ),
+            insertVector: this.db.prepare(`
+                INSERT OR REPLACE INTO memory_vectors (memory_id, vector, model, updated_at)
+                VALUES (?, ?, ?, ?)
+            `),
             get: this.db.prepare(`SELECT ${SELECT_COLUMNS} FROM memories WHERE id = ?`),
             forget: this.db.prepare(`
                 UPDATE memories
@@ -108,12 +122,13 @@ export class ContextStore {
                 SELECT
                     COUNT(*) AS total,
                     SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active,
-                    SUM(CASE WHEN status = 'forgotten' THEN 1 ELSE 0 END) AS forgotten
+                    SUM(CASE WHEN status = 'forgotten' THEN 1 ELSE 0 END) AS forgotten,
+                    (SELECT COUNT(*) FROM memory_vectors) AS vectors
                 FROM memories
             `),
         };
 
-        this._insertTransaction = this.db.transaction((memory) => {
+        this._writeMemory = (memory) => {
             this.statements.insert.run(toRow(memory));
             this.statements.insertFts.run(
                 memory.id,
@@ -121,7 +136,10 @@ export class ContextStore {
                 memory.summary,
                 memory.tags.join(' '),
             );
-        });
+            this._writeVector(memory);
+        };
+
+        this._insertTransaction = this.db.transaction((memory) => this._writeMemory(memory));
 
         this._insertOnceTransaction = this.db.transaction((memory, dedupeKey) => {
             const existing = this.statements.getImport.get(dedupeKey);
@@ -132,13 +150,7 @@ export class ContextStore {
                 };
             }
 
-            this.statements.insert.run(toRow(memory));
-            this.statements.insertFts.run(
-                memory.id,
-                memory.content,
-                memory.summary,
-                memory.tags.join(' '),
-            );
+            this._writeMemory(memory);
             this.statements.insertImport.run(dedupeKey, memory.id, memory.createdAt);
             return { memory, created: true };
         });
@@ -148,6 +160,32 @@ export class ContextStore {
             if (result.changes > 0) this.statements.deleteFts.run(id);
             return result.changes > 0;
         });
+    }
+
+    _writeVector(memory) {
+        const text = `${memory.content}\n${memory.summary}\n${memory.tags.join(' ')}`;
+        const vector = this.vectorEncoder.encode(text);
+        this.statements.insertVector.run(
+            memory.id,
+            JSON.stringify(vector),
+            this.vectorEncoder.model,
+            memory.updatedAt,
+        );
+    }
+
+    _backfillVectors() {
+        const rows = this.db
+            .prepare(
+                `SELECT ${SELECT_COLUMNS}
+                 FROM memories
+                 LEFT JOIN memory_vectors ON memory_vectors.memory_id = memories.id
+                 WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != ?`,
+            )
+            .all(this.vectorEncoder.model);
+        if (!rows.length) return;
+        this.db.transaction((items) => {
+            for (const row of items) this._writeVector(fromRow(row));
+        })(rows);
     }
 
     remember(input) {
@@ -172,16 +210,29 @@ export class ContextStore {
 
     search(query, options = {}) {
         const limit = clamp(options.limit ?? 10, 1, 100);
-        const scope = options.scope || null;
-        const type = options.type || null;
-        const sensitivity = options.maxSensitivity || 'restricted';
-        const sensitivityRank = ['public', 'personal', 'private', 'restricted'].indexOf(
-            sensitivity,
-        );
-        const asOf = options.asOf || new Date().toISOString();
         const ftsQuery = toFtsQuery(query);
-
         if (!ftsQuery) return this.list({ ...options, limit });
+
+        const retrieval = options.retrieval || 'hybrid';
+        if (!['hybrid', 'lexical', 'vector'].includes(retrieval)) {
+            throw new Error('retrieval must be hybrid, lexical, or vector');
+        }
+
+        const candidateLimit = clamp(Math.max(limit * 5, 20), 20, 500);
+        const lexical =
+            retrieval === 'vector'
+                ? []
+                : this._searchLexical(ftsQuery, { ...options, limit: candidateLimit });
+        const vector =
+            retrieval === 'lexical'
+                ? []
+                : this._searchVector(query, { ...options, limit: candidateLimit });
+
+        return fuseRankings(lexical, vector, limit);
+    }
+
+    _searchLexical(ftsQuery, options) {
+        const params = searchParams(options);
 
         const rows = this.db
             .prepare(
@@ -200,20 +251,87 @@ export class ContextStore {
                  ORDER BY rank ASC, confidence DESC, COALESCE(occurred_at, created_at) DESC
                  LIMIT @limit`,
             )
-            .all({
-                query: ftsQuery,
-                scope,
-                scopePrefix: scope ? `${scope}/%` : null,
-                type,
-                sensitivityRank,
-                asOf,
-                limit,
-            });
+            .all({ ...params, query: ftsQuery });
 
         return rows.map((row) => ({
             ...fromRow(row),
-            relevance: Number((1 / (1 + Math.abs(row.rank))).toFixed(4)),
+            lexicalScore: 1 / (1 + Math.abs(row.rank)),
         }));
+    }
+
+    _searchVector(query, options) {
+        const params = searchParams({
+            ...options,
+            limit: clamp(options.vectorCandidateLimit || 5_000, 100, 20_000),
+        });
+        const queryVector = this.vectorEncoder.encode(query);
+        const minimum = options.minVectorScore ?? 0.08;
+        const rows = this.db
+            .prepare(
+                `SELECT ${SELECT_COLUMNS}, memory_vectors.vector
+                 FROM memories
+                 JOIN memory_vectors ON memory_vectors.memory_id = memories.id
+                 WHERE memories.status = 'active'
+                   AND (@scope IS NULL OR memories.scope = @scope OR memories.scope LIKE @scopePrefix)
+                   AND (@type IS NULL OR memories.type = @type)
+                   AND CASE memories.sensitivity
+                       WHEN 'public' THEN 0 WHEN 'personal' THEN 1
+                       WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
+                   AND (memories.valid_from IS NULL OR memories.valid_from <= @asOf)
+                   AND (memories.valid_to IS NULL OR memories.valid_to >= @asOf)
+                 ORDER BY COALESCE(memories.occurred_at, memories.created_at) DESC
+                 LIMIT @limit`,
+            )
+            .all(params);
+
+        return rows
+            .map((row) => {
+                const storedVector = parseStoredVector(row.vector);
+                if (!storedVector) return null;
+                return {
+                    ...fromRow(row),
+                    vectorScore: cosineSimilarity(queryVector, storedVector),
+                };
+            })
+            .filter(Boolean)
+            .filter((memory) => memory.vectorScore >= minimum)
+            .sort((left, right) => {
+                if (right.vectorScore !== left.vectorScore) {
+                    return right.vectorScore - left.vectorScore;
+                }
+                return right.confidence - left.confidence;
+            })
+            .slice(0, options.limit);
+    }
+
+    findPotentialConflicts(input, options = {}) {
+        const memory = normalizeMemory(input);
+        if (!['fact', 'preference', 'decision'].includes(memory.type)) return [];
+
+        const threshold = options.threshold ?? 0.28;
+        if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+            throw new Error('conflict threshold must be between 0 and 1');
+        }
+        return this.search(memory.content, {
+            scope: memory.scope,
+            type: memory.type,
+            maxSensitivity: 'restricted',
+            retrieval: 'vector',
+            minVectorScore: threshold,
+            asOf: memory.validFrom || memory.occurredAt || new Date().toISOString(),
+            limit: options.limit || 10,
+        })
+            .filter(
+                (candidate) =>
+                    candidate.scope === memory.scope &&
+                    candidate.content !== memory.content &&
+                    validityOverlaps(memory, candidate),
+            )
+            .map((candidate) => ({
+                ...candidate,
+                similarity: candidate.match.vectorSimilarity,
+                reason: 'Same type and scope with overlapping validity',
+            }));
     }
 
     list(options = {}) {
@@ -276,6 +394,8 @@ export class ContextStore {
             total: Number(row.total || 0),
             active: Number(row.active || 0),
             forgotten: Number(row.forgotten || 0),
+            vectors: Number(row.vectors || 0),
+            vectorModel: this.vectorEncoder.model,
             byType: Object.fromEntries(byType.map((item) => [item.type, item.count])),
             dbPath: this.dbPath,
         };
@@ -347,6 +467,81 @@ function renderMemory(memory) {
     const date = memory.occurredAt || memory.validFrom || memory.createdAt;
     const source = memory.source.title || memory.source.locator || memory.source.kind;
     return `[${memory.type} | ${memory.scope} | ${date}] ${memory.content}\nSource: ${source} · confidence ${memory.confidence}`;
+}
+
+function searchParams(options) {
+    const scope = options.scope || null;
+    const sensitivity = options.maxSensitivity || 'restricted';
+    const sensitivityRank = ['public', 'personal', 'private', 'restricted'].indexOf(sensitivity);
+    if (sensitivityRank < 0) {
+        throw new Error('maxSensitivity must be public, personal, private, or restricted');
+    }
+    return {
+        scope,
+        scopePrefix: scope ? `${scope}/%` : null,
+        type: options.type || null,
+        sensitivityRank,
+        asOf: options.asOf || new Date().toISOString(),
+        limit: clamp(options.limit ?? 10, 1, 20_000),
+    };
+}
+
+function parseStoredVector(value) {
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function fuseRankings(lexical, vector, limit) {
+    const fused = new Map();
+    const add = (memory, rank, kind) => {
+        const current = fused.get(memory.id) || {
+            memory,
+            score: 0,
+            lexicalRank: null,
+            vectorRank: null,
+            vectorSimilarity: null,
+        };
+        current.score += 1 / (60 + rank);
+        if (kind === 'lexical') current.lexicalRank = rank;
+        if (kind === 'vector') {
+            current.vectorRank = rank;
+            current.vectorSimilarity = Number(memory.vectorScore.toFixed(4));
+        }
+        fused.set(memory.id, current);
+    };
+
+    lexical.forEach((memory, index) => add(memory, index + 1, 'lexical'));
+    vector.forEach((memory, index) => add(memory, index + 1, 'vector'));
+    const ranked = [...fused.values()].sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score;
+        return right.memory.confidence - left.memory.confidence;
+    });
+    const maxScore = ranked[0]?.score || 1;
+
+    return ranked.slice(0, limit).map((item) => {
+        const { lexicalScore: _lexicalScore, vectorScore: _vectorScore, ...memory } = item.memory;
+        return {
+            ...memory,
+            relevance: Number((item.score / maxScore).toFixed(4)),
+            match: {
+                lexicalRank: item.lexicalRank,
+                vectorRank: item.vectorRank,
+                vectorSimilarity: item.vectorSimilarity,
+            },
+        };
+    });
+}
+
+function validityOverlaps(left, right) {
+    const leftStart = left.validFrom || '0000-01-01T00:00:00.000Z';
+    const leftEnd = left.validTo || '9999-12-31T23:59:59.999Z';
+    const rightStart = right.validFrom || '0000-01-01T00:00:00.000Z';
+    const rightEnd = right.validTo || '9999-12-31T23:59:59.999Z';
+    return leftStart <= rightEnd && rightStart <= leftEnd;
 }
 
 function clamp(value, min, max) {

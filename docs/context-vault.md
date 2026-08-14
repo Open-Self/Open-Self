@@ -60,13 +60,37 @@ users must add authentication and authorization outside this local stdio server.
 
 ## Retrieval
 
-The first implementation uses SQLite FTS5 with Unicode tokenization, followed by deterministic
-filters for status, scope, type, sensitivity, and validity time. Results are ranked by BM25,
-confidence, and recency.
+The default retriever combines two local rankings:
 
-This deliberately avoids an embedding API in the trusted storage path. A future hybrid retriever
-may add local vectors and reciprocal-rank fusion, but SQLite remains the canonical store and all
-security filters apply after candidate generation.
+1. SQLite FTS5 with Unicode tokenization and BM25 ranking
+2. A deterministic 256-dimensional feature vector built from words, bigrams, character trigrams,
+   and a small explicit concept-alias layer
+
+Reciprocal-rank fusion combines both lists. Status, scope, type, sensitivity, and temporal validity
+filters apply to both candidate paths before fusion. `lexical` and `vector` modes remain available
+for debugging and evaluation.
+
+The local vector is not presented as a neural embedding: it improves aliases, spelling variation,
+and fuzzy retrieval while remaining small, deterministic, inspectable, and offline. SQLite remains
+the canonical store. Existing databases are backfilled with vectors when opened after an upgrade.
+
+## Potential conflict detection
+
+Before storing a `fact`, `preference`, or `decision`, OpenSelf compares it with active memories of
+the same type and exact scope. Similar memories whose validity windows overlap are returned as
+**potential conflicts**. OpenSelf does not automatically declare one memory true, overwrite the old
+memory, or ask an LLM to make the decision.
+
+```bash
+openself memory conflicts \
+  --type preference \
+  --scope personal/work \
+  --content "My preferred code editor is Zed"
+```
+
+The MCP `openself_remember` response includes `potentialConflicts`, and
+`openself_find_conflicts` can be called independently before a write. Applications should ask the
+user whether to expire, forget, or retain earlier memories.
 
 ## MCP tools
 
@@ -80,6 +104,11 @@ user explicitly requests it, and distinguish an observed fact from an inferred p
 
 Returns structured memory records. Use it when the application needs to inspect or cite individual
 memories.
+
+### `openself_find_conflicts`
+
+Checks a proposed fact, preference, or decision against active memories in the same exact scope and
+overlapping validity window. Results are warnings for human review, not automated truth judgments.
 
 ### `openself_get_context`
 
@@ -142,7 +171,8 @@ or imported personal data to Git.
 ## Current limitations
 
 - No encrypted-at-rest vault or OS keychain integration yet.
-- No semantic/vector retrieval yet; synonyms may require tags or explicit wording.
+- Local feature vectors improve fuzzy matching but do not provide the full semantic understanding of
+  a neural embedding model.
 - No automatic conflict resolution between memories.
 - No multi-user ACL or authenticated HTTP transport.
 - No continuous folder, calendar, email, or browser connectors yet; imports are explicit CLI actions.

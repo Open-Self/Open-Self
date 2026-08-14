@@ -61,7 +61,7 @@ ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 program
     .command('memory')
     .description('Import, store, search, list, and forget personal context')
-    .argument('[action]', 'add/import/search/list/forget/stats', 'list')
+    .argument('[action]', 'add/import/search/conflicts/list/forget/stats', 'list')
     .option('--file <paths...>', 'Files to import')
     .option('--format <format>', 'auto/markdown/text/whatsapp/telegram', 'auto')
     .option('--content <text>', 'Memory content')
@@ -72,6 +72,8 @@ program
     .option('--scope <scope>', 'Access scope (defaults to personal when adding)')
     .option('--sensitivity <level>', 'public/personal/private/restricted')
     .option('--max-sensitivity <level>', 'Maximum sensitivity returned', 'private')
+    .option('--retrieval <mode>', 'hybrid/lexical/vector', 'hybrid')
+    .option('--threshold <number>', 'Similarity threshold for conflict detection')
     .option('--confidence <number>', 'Confidence from 0 to 1')
     .option('--source-kind <kind>', 'Source type', 'manual')
     .option('--source <locator>', 'Source URL or file path')

@@ -26,6 +26,7 @@ describe('Context MCP server', () => {
         expect(tools.tools.map((tool) => tool.name)).toEqual([
             'openself_remember',
             'openself_search_memory',
+            'openself_find_conflicts',
             'openself_get_context',
             'openself_forget',
         ]);
@@ -45,5 +46,25 @@ describe('Context MCP server', () => {
 
         const payload = JSON.parse(result.content[0].text);
         expect(payload.memories[0].content).toContain('interoperability');
+
+        await client.callTool({
+            name: 'openself_remember',
+            arguments: {
+                type: 'preference',
+                content: 'My preferred code editor is Vim',
+                scope: 'personal/work',
+            },
+        });
+        const conflicting = await client.callTool({
+            name: 'openself_remember',
+            arguments: {
+                type: 'preference',
+                content: 'My preferred code editor is Zed',
+                scope: 'personal/work',
+            },
+        });
+        const conflictPayload = JSON.parse(conflicting.content[0].text);
+        expect(conflictPayload.stored).toBe(true);
+        expect(conflictPayload.potentialConflicts).toHaveLength(1);
     });
 });
