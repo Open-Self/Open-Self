@@ -90,6 +90,34 @@ task such as preparing a meeting brief or drafting a status update.
 
 Soft-deletes a memory by UUID. It becomes unavailable to normal reads and is removed from FTS.
 
+## File and chat ingestion
+
+`openself memory import` supports:
+
+- Markdown and MDX, split into notes using headings and a bounded chunk size
+- Plain text documents
+- WhatsApp text exports
+- Telegram JSON exports
+
+Documents default to `personal` sensitivity. Chat messages default to `private` and are stored as
+timestamped events. Automatic scopes are derived from the source name, but an explicit narrow scope
+such as `project/atlas` or `relationship/minh` is recommended.
+
+```bash
+openself memory import --file ./notes.md --scope project/atlas
+openself memory import --file ./chat.txt --scope relationship/minh
+openself memory import --file ./result.json --dry-run
+```
+
+Each candidate is fingerprinted from its format, absolute source locator, timestamp/sender metadata,
+and content. The fingerprint is stored separately from the memory. Re-importing an unchanged source
+is idempotent, including when the original memory was intentionally forgotten. Moving a source file
+changes its locator and therefore creates new provenance and fingerprints.
+
+WhatsApp exports do not include an explicit timezone. Their local date/time is normalized as UTC for
+ordering; consumers should treat it as an approximate timestamp. Telegram timestamps preserve the
+offset encoded by the export.
+
 ## Client configuration
 
 Install globally or let the client invoke the npm package:
@@ -117,5 +145,5 @@ or imported personal data to Git.
 - No semantic/vector retrieval yet; synonyms may require tags or explicit wording.
 - No automatic conflict resolution between memories.
 - No multi-user ACL or authenticated HTTP transport.
-- No connector ingestion pipeline into the new schema yet.
+- No continuous folder, calendar, email, or browser connectors yet; imports are explicit CLI actions.
 - Forgotten rows are recoverable locally and are not cryptographically erased.

@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { ContextImporter } from '../context/importer.js';
 import { ContextStore } from '../context/store.js';
 
 export function memoryCommand(action, options = {}) {
@@ -9,6 +10,8 @@ export function memoryCommand(action, options = {}) {
         switch (action) {
             case 'add':
                 return addMemory(store, options);
+            case 'import':
+                return importMemories(store, options);
             case 'search':
                 return searchMemory(store, options);
             case 'list':
@@ -19,12 +22,29 @@ export function memoryCommand(action, options = {}) {
                 return printJson(store.stats());
             default:
                 throw new Error(
-                    `Unknown memory action: ${action}. Use add, search, list, forget, or stats.`,
+                    `Unknown memory action: ${action}. Use add, import, search, list, forget, or stats.`,
                 );
         }
     } finally {
         store.close();
     }
+}
+
+function importMemories(store, options) {
+    if (!options.file?.length) throw new Error('--file is required for memory import');
+    const importer = new ContextImporter(store);
+    const reports = options.file.map((file) =>
+        importer.importFile(file, {
+            format: options.format,
+            scope: options.scope,
+            type: options.type,
+            sensitivity: options.sensitivity,
+            confidence: options.confidence === undefined ? undefined : Number(options.confidence),
+            tags: splitTags(options.tags),
+            dryRun: options.dryRun,
+        }),
+    );
+    printJson(reports);
 }
 
 function addMemory(store, options) {

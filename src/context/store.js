@@ -65,6 +65,15 @@ export class ContextStore {
                 tags,
                 tokenize = 'unicode61 remove_diacritics 2'
             );
+
+            CREATE TABLE IF NOT EXISTS import_items (
+                dedupe_key TEXT PRIMARY KEY,
+                memory_id TEXT NOT NULL REFERENCES memories(id),
+                imported_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_import_items_memory_id
+                ON import_items(memory_id);
         `);
     }
 
@@ -91,6 +100,10 @@ export class ContextStore {
                 WHERE id = @id AND status = 'active'
             `),
             deleteFts: this.db.prepare('DELETE FROM memory_fts WHERE id = ?'),
+            getImport: this.db.prepare('SELECT memory_id FROM import_items WHERE dedupe_key = ?'),
+            insertImport: this.db.prepare(
+                'INSERT INTO import_items (dedupe_key, memory_id, imported_at) VALUES (?, ?, ?)',
+            ),
             stats: this.db.prepare(`
                 SELECT
                     COUNT(*) AS total,
@@ -110,6 +123,26 @@ export class ContextStore {
             );
         });
 
+        this._insertOnceTransaction = this.db.transaction((memory, dedupeKey) => {
+            const existing = this.statements.getImport.get(dedupeKey);
+            if (existing) {
+                return {
+                    memory: this.get(existing.memory_id, { includeForgotten: true }),
+                    created: false,
+                };
+            }
+
+            this.statements.insert.run(toRow(memory));
+            this.statements.insertFts.run(
+                memory.id,
+                memory.content,
+                memory.summary,
+                memory.tags.join(' '),
+            );
+            this.statements.insertImport.run(dedupeKey, memory.id, memory.createdAt);
+            return { memory, created: true };
+        });
+
         this._forgetTransaction = this.db.transaction((id, now) => {
             const result = this.statements.forget.run({ id, now });
             if (result.changes > 0) this.statements.deleteFts.run(id);
@@ -121,6 +154,14 @@ export class ContextStore {
         const memory = normalizeMemory(input);
         this._insertTransaction(memory);
         return memory;
+    }
+
+    rememberOnce(input, dedupeKey) {
+        if (!dedupeKey || typeof dedupeKey !== 'string') {
+            throw new Error('A non-empty dedupe key is required');
+        }
+        const memory = normalizeMemory(input);
+        return this._insertOnceTransaction(memory, dedupeKey);
     }
 
     get(id, options = {}) {

@@ -22,6 +22,7 @@ export { loadConfig } from './config/loader.js';
 export { ContextStore } from './context/store.js';
 export { normalizeMemory, memoryInputSchema } from './context/schema.js';
 export { createContextMcpServer, runContextMcpServer } from './context/mcp.js';
+export { ContextImporter, detectImportFormat, chunkDocument } from './context/importer.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

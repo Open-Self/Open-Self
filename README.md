@@ -54,6 +54,27 @@ openself memory stats
 
 From this repository, replace `openself` with `node src/cli/index.js`.
 
+## Import existing context
+
+Import documents and chat exports directly into the vault:
+
+```bash
+# Markdown/text becomes source-attributed notes, split by headings and size
+openself memory import --file ./notes.md ./decisions.txt --scope project/atlas
+
+# WhatsApp .txt and Telegram result.json become private timestamped events
+openself memory import --file ./whatsapp-chat.txt --scope relationship/minh
+openself memory import --file ./result.json --scope relationship/team
+
+# Preview without writing
+openself memory import --file ./notes.md --dry-run
+```
+
+Format detection supports Markdown, plain text, WhatsApp exports, and Telegram JSON. Every imported
+item receives a stable source fingerprint, so rerunning the same import reports it as a duplicate
+instead of creating another memory. Use `--format` to override detection, `--sensitivity` to change
+the default, and `--tags` to attach comma-separated labels.
+
 ## Connect an AI client with MCP
 
 Run the stdio server directly:

@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `openself memory import` for Markdown/MDX, plain text, WhatsApp text exports, and Telegram JSON.
+- Source-attributed document chunking and private timestamped chat-event ingestion.
+- SHA-256 import fingerprints and a durable SQLite import ledger make repeated imports idempotent.
+- `--dry-run`, explicit format override, scope, sensitivity, type, confidence, and tag controls.
+
+### Changed
+
+- Telegram parsing now preserves the export's normalized ISO timestamp for Context Vault ingestion.
+- WhatsApp and Telegram imports default to `private`; document imports default to `personal`.
+
 ## [0.8.0] — 2026-08-13
 
 ### Added

@@ -30,6 +30,25 @@ describe('ContextStore', () => {
         });
     });
 
+    it('stores imported memories idempotently by dedupe key', () => {
+        const first = store.rememberOnce({ content: 'Imported project decision' }, 'source:item:1');
+        const second = store.rememberOnce(
+            { content: 'A changed value that must not create a duplicate' },
+            'source:item:1',
+        );
+
+        expect(first.created).toBe(true);
+        expect(second.created).toBe(false);
+        expect(second.memory.id).toBe(first.memory.id);
+        expect(store.stats().total).toBe(1);
+    });
+
+    it('requires a dedupe key for idempotent storage', () => {
+        expect(() => store.rememberOnce({ content: 'Missing key' }, '')).toThrow(
+            'A non-empty dedupe key is required',
+        );
+    });
+
     it('searches full text and respects nested scopes', () => {
         store.remember({
             type: 'decision',
