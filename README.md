@@ -62,6 +62,20 @@ openself memory stats
 
 From this repository, replace `openself` with `node src/cli/index.js`.
 
+## Local dashboard
+
+Launch the Context Vault dashboard:
+
+```bash
+openself dashboard
+openself dashboard --port 3210 --data-dir /absolute/path/to/openself-data
+```
+
+The CLI prints a tokenized bootstrap URL. The dashboard binds only to `127.0.0.1`, exchanges that
+token for an HttpOnly/SameSite session cookie, and protects mutations from cross-origin requests.
+It supports hybrid search, create/edit/forget, conflict review, duplicate merge, provenance fields,
+and version history. It is a local administration surface—not a public multi-user service.
+
 ## Import existing context
 
 Import documents and chat exports directly into the vault:
@@ -213,12 +227,15 @@ Files / chat exports / manual notes / agents
                     │
              ┌──────┴──────┐
              ▼             ▼
-          MCP tools    JavaScript API
+             MCP tools    JavaScript API
              │             │
              └──────┬──────┘
                     ▼
              AI clients/agents
 ```
+
+The authenticated localhost dashboard is a third interface over the same `ContextStore`; it does
+not maintain a separate copy of memory.
 
 The original personality pipeline, RAG index, and messaging gateways remain separate from Context
 Vault so existing users are not forced into a migration.

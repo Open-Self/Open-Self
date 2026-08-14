@@ -16,6 +16,11 @@
 - `openself memory conflicts` and MCP `openself_find_conflicts`; MCP remember responses now include
   conflict warnings.
 - Reproducible `benchmark:context` command for local insertion and hybrid-search measurements.
+- Authenticated localhost Context Vault dashboard with search, create/edit/forget, conflict review,
+  duplicate merge, provenance fields, and version history.
+- Immutable lifecycle snapshots for create, update, merge, migration baseline, and forget actions.
+- Token-to-HttpOnly-cookie bootstrap, localhost-only binding, CSP/security headers, API no-store,
+  cross-origin mutation blocking, and a dedicated `/api/context` namespace.
 
 ### Changed
 

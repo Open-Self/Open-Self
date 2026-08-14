@@ -17,6 +17,7 @@ export default defineConfig({
                 // CLI entry points — interactive commands, not unit-testable
                 'src/cli/index.js',
                 'src/cli/arena.js',
+                'src/cli/dashboard.js',
                 'src/cli/feed.js',
                 'src/cli/ghost.js',
                 'src/cli/mcp.js',
@@ -30,6 +31,7 @@ export default defineConfig({
                 // App entrypoint + static assets
                 'src/index.js',
                 'src/web/index.html',
+                'src/context/dashboard/dashboard.js',
                 // Heavy gateway drivers — integration-tested separately
                 'src/gateway/telegram.js',
                 'src/gateway/discord.js',

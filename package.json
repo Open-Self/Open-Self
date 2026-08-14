@@ -37,12 +37,12 @@
     "prepublishOnly": "npm run lint && npm test && npx --yes publint --strict",
     "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\""
   },
-    "keywords": [
-      "ai",
-      "ai-memory",
-      "mcp",
-      "personal-context",
-      "local-first",
+  "keywords": [
+    "ai",
+    "ai-memory",
+    "mcp",
+    "personal-context",
+    "local-first",
     "clone",
     "personality",
     "whatsapp",

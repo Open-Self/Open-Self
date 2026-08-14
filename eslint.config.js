@@ -4,13 +4,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
     {
-        ignores: [
-            'node_modules/',
-            'coverage/',
-            'data/',
-            'src/web/index.html',
-            'tests/.tmp/',
-        ],
+        ignores: ['node_modules/', 'coverage/', 'data/', 'src/web/index.html', 'tests/.tmp/'],
     },
     js.configs.recommended,
     prettier,
@@ -36,6 +30,12 @@ export default [
         rules: {
             'no-unused-expressions': 'off',
             'no-unused-vars': 'warn',
+        },
+    },
+    {
+        files: ['src/context/dashboard/**/*.js'],
+        languageOptions: {
+            globals: { ...globals.browser },
         },
     },
 ];

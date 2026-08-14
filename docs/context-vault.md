@@ -168,12 +168,38 @@ Install globally or let the client invoke the npm package:
 Use a dedicated data directory for real personal context. Do not commit `context.db`, its WAL files,
 or imported personal data to Git.
 
+## Local dashboard and version lifecycle
+
+```bash
+openself dashboard --data-dir /absolute/path/to/openself-data
+```
+
+The dashboard provides search, create, edit, forget, potential-conflict review, duplicate merge,
+provenance editing, and version history. Each lifecycle action records a complete local snapshot:
+
+- `created` for a new memory
+- `updated` for an edit
+- `merged` for the retained primary memory
+- `merged_into:<primary-id>` for a duplicate that was soft-forgotten
+- `forgotten` for a normal soft-delete
+- `baseline` when an older vault is first migrated to version history
+
+The dashboard server binds to `127.0.0.1`. A random bootstrap token is exchanged for an
+HttpOnly/SameSite cookie; API responses are not cached, framing is denied, a restrictive Content
+Security Policy is applied, and cross-origin mutations are rejected. This is defense in depth for a
+single-user localhost tool, not multi-user authentication. Any process running as the same OS user
+may still access the SQLite file directly.
+
+The authenticated API is namespaced at `/api/context`. It supports memory listing/search, detail,
+history, create, patch, forget, merge, conflict checks, and vault statistics.
+
 ## Current limitations
 
 - No encrypted-at-rest vault or OS keychain integration yet.
 - Local feature vectors improve fuzzy matching but do not provide the full semantic understanding of
   a neural embedding model.
 - No automatic conflict resolution between memories.
-- No multi-user ACL or authenticated HTTP transport.
+- No multi-user ACL or remotely exposed authenticated transport.
+- No remote or multi-user dashboard; the authenticated HTTP surface is localhost-only.
 - No continuous folder, calendar, email, or browser connectors yet; imports are explicit CLI actions.
 - Forgotten rows are recoverable locally and are not cryptographically erased.

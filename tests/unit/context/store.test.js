@@ -30,6 +30,71 @@ describe('ContextStore', () => {
         });
     });
 
+    it('updates memories and records immutable version snapshots', () => {
+        const memory = store.remember({
+            type: 'decision',
+            content: 'Use Firebase for the project',
+            source: { kind: 'meeting', title: 'Old review' },
+            tags: ['database'],
+        });
+
+        const updated = store.update(memory.id, {
+            content: 'Use SQLite for the project',
+            source: { title: 'New review' },
+        });
+        const history = store.history(memory.id);
+
+        expect(updated).toMatchObject({
+            content: 'Use SQLite for the project',
+            source: { kind: 'meeting', title: 'New review' },
+            tags: ['database'],
+        });
+        expect(history).toHaveLength(2);
+        expect(history[0]).toMatchObject({
+            version: 2,
+            changeKind: 'updated',
+            snapshot: { content: 'Use SQLite for the project' },
+        });
+        expect(history[1]).toMatchObject({
+            version: 1,
+            changeKind: 'created',
+            snapshot: { content: 'Use Firebase for the project' },
+        });
+        expect(store.update('00000000-0000-4000-8000-000000000000', {})).toBeNull();
+    });
+
+    it('merges duplicate memories, unions tags, and preserves audit history', () => {
+        const primary = store.remember({
+            type: 'fact',
+            content: 'The launch date is Friday',
+            tags: ['launch'],
+        });
+        const duplicate = store.remember({
+            type: 'fact',
+            content: 'We launch this Friday',
+            tags: ['calendar'],
+        });
+
+        const result = store.merge(primary.id, [duplicate.id], { tags: ['confirmed'] });
+
+        expect(result.memory.tags).toEqual(['launch', 'calendar', 'confirmed']);
+        expect(result.mergedIds).toEqual([duplicate.id]);
+        expect(store.get(duplicate.id)).toBeNull();
+        expect(store.get(duplicate.id, { includeForgotten: true }).status).toBe('forgotten');
+        expect(store.history(primary.id)[0].changeKind).toBe('merged');
+        expect(store.history(duplicate.id)[0].changeKind).toBe(`merged_into:${primary.id}`);
+    });
+
+    it('validates merge targets', () => {
+        const primary = store.remember({ content: 'Primary' });
+        expect(() => store.merge(primary.id, [])).toThrow(
+            'At least one duplicate memory ID is required',
+        );
+        expect(() => store.merge(primary.id, [primary.id])).toThrow(
+            'A memory cannot be merged into itself',
+        );
+    });
+
     it('stores imported memories idempotently by dedupe key', () => {
         const first = store.rememberOnce({ content: 'Imported project decision' }, 'source:item:1');
         const second = store.rememberOnce(
@@ -122,6 +187,16 @@ describe('ContextStore', () => {
             reason: 'Same type and scope with overlapping validity',
         });
         expect(conflicts[0].similarity).toBeGreaterThan(0.28);
+        expect(
+            store.findPotentialConflicts(
+                {
+                    type: 'preference',
+                    content: 'My preferred code editor is Zed',
+                    scope: 'personal/work',
+                },
+                { excludeIds: [existing.id] },
+            ),
+        ).toEqual([]);
     });
 
     it('does not flag non-overlapping validity windows or non-conflict types', () => {

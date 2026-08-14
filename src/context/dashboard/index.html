@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OpenSelf Context Vault</title>
+        <link rel="stylesheet" href="/dashboard.css" />
+    </head>
+    <body>
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">OPENSELF</p>
+                <h1>Context Vault</h1>
+            </div>
+            <div class="stats" aria-live="polite">
+                <span><strong id="active-count">0</strong> active</span>
+                <span><strong id="vector-count">0</strong> indexed</span>
+                <span id="model-name">local</span>
+            </div>
+        </header>
+
+        <main class="workspace">
+            <aside class="memory-panel">
+                <div class="toolbar">
+                    <input id="search" type="search" placeholder="Search your context…" />
+                    <input id="scope-filter" type="text" placeholder="Scope (optional)" />
+                    <select id="type-filter" aria-label="Memory type filter">
+                        <option value="">All types</option>
+                        <option>fact</option>
+                        <option>preference</option>
+                        <option>decision</option>
+                        <option>commitment</option>
+                        <option>relationship</option>
+                        <option>event</option>
+                        <option>note</option>
+                    </select>
+                    <button id="new-memory" class="primary">New memory</button>
+                </div>
+                <div id="memory-list" class="memory-list" aria-live="polite"></div>
+            </aside>
+
+            <section class="editor-panel">
+                <div id="empty-state" class="empty-state">
+                    <span class="mark">OS</span>
+                    <h2>Select a memory</h2>
+                    <p>Inspect provenance, edit context, review conflicts, or trace its history.</p>
+                </div>
+
+                <form id="memory-form" class="memory-form hidden">
+                    <div class="form-heading">
+                        <div>
+                            <p id="memory-id" class="memory-id"></p>
+                            <h2 id="form-title">Edit memory</h2>
+                        </div>
+                        <span id="memory-status" class="status-pill">active</span>
+                    </div>
+
+                    <label>Content<textarea id="content" rows="6" required></textarea></label>
+                    <div class="grid two">
+                        <label
+                            >Type<select id="type" required>
+                                <option>fact</option>
+                                <option>preference</option>
+                                <option>decision</option>
+                                <option>commitment</option>
+                                <option>relationship</option>
+                                <option>event</option>
+                                <option>note</option>
+                            </select></label
+                        >
+                        <label
+                            >Sensitivity<select id="sensitivity">
+                                <option>public</option>
+                                <option>personal</option>
+                                <option>private</option>
+                                <option>restricted</option>
+                            </select></label
+                        >
+                    </div>
+                    <div class="grid two">
+                        <label>Scope<input id="scope" value="personal" required /></label>
+                        <label
+                            >Confidence<input
+                                id="confidence"
+                                type="number"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value="1"
+                        /></label>
+                    </div>
+                    <label>Summary<input id="summary" maxlength="500" /></label>
+                    <label>Tags<input id="tags" placeholder="comma, separated" /></label>
+
+                    <details>
+                        <summary>Provenance & time</summary>
+                        <div class="grid two details-grid">
+                            <label>Source kind<input id="source-kind" /></label>
+                            <label>Source title<input id="source-title" /></label>
+                            <label class="wide">Source locator<input id="source-locator" /></label>
+                            <label
+                                >Occurred at<input id="occurred-at" type="datetime-local"
+                            /></label>
+                            <label>Valid from<input id="valid-from" type="datetime-local" /></label>
+                            <label>Valid to<input id="valid-to" type="datetime-local" /></label>
+                        </div>
+                    </details>
+
+                    <div id="conflicts" class="conflicts hidden" role="alert"></div>
+                    <div id="message" class="message hidden" role="status"></div>
+
+                    <div class="actions">
+                        <button type="submit" class="primary">Save</button>
+                        <button id="check-conflicts" type="button">Check conflicts</button>
+                        <button id="forget-memory" type="button" class="danger">Forget</button>
+                    </div>
+
+                    <details id="merge-section">
+                        <summary>Merge duplicates</summary>
+                        <p class="hint">
+                            Keep this memory and soft-forget the comma-separated IDs.
+                        </p>
+                        <div class="inline-action">
+                            <input id="duplicate-ids" placeholder="uuid, uuid" />
+                            <button id="merge-memory" type="button">Merge</button>
+                        </div>
+                    </details>
+
+                    <section class="history-section">
+                        <h3>Version history</h3>
+                        <div id="history-list" class="history-list"></div>
+                    </section>
+                </form>
+            </section>
+        </main>
+        <script src="/dashboard.js" defer></script>
+    </body>
+</html>

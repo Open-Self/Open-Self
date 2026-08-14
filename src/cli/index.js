@@ -21,6 +21,7 @@ import { ghostCommand } from './ghost.js';
 import { profileCommand } from './profile.js';
 import { memoryCommand } from './memory.js';
 import { mcpCommand } from './mcp.js';
+import { dashboardCommand } from './dashboard.js';
 import { wrapAction, handleError } from './utils/error-handler.js';
 
 // Notify users of new versions (cached; non-blocking; ignored in CI/sandbox)
@@ -93,6 +94,13 @@ program
     .description('Run the OpenSelf Context MCP server over stdio')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction(mcpCommand));
+
+program
+    .command('dashboard')
+    .description('Launch the authenticated local Context Vault dashboard')
+    .option('--port <port>', 'Local dashboard port', '3210')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction(dashboardCommand));
 
 program
     .command('setup')

@@ -29,6 +29,7 @@ export class ContextStore {
         this._migrate();
         this._prepare();
         this._backfillVectors();
+        this._backfillVersions();
     }
 
     _migrate() {
@@ -84,6 +85,19 @@ export class ContextStore {
                 model TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS memory_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                memory_id TEXT NOT NULL REFERENCES memories(id),
+                version INTEGER NOT NULL,
+                change_kind TEXT NOT NULL,
+                snapshot TEXT NOT NULL,
+                changed_at TEXT NOT NULL,
+                UNIQUE(memory_id, version)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_memory_versions_memory_id
+                ON memory_versions(memory_id, version DESC);
         `);
     }
 
@@ -108,6 +122,17 @@ export class ContextStore {
                 VALUES (?, ?, ?, ?)
             `),
             get: this.db.prepare(`SELECT ${SELECT_COLUMNS} FROM memories WHERE id = ?`),
+            update: this.db.prepare(`
+                UPDATE memories SET
+                    type = @type, content = @content, summary = @summary,
+                    source_kind = @sourceKind, source_locator = @sourceLocator,
+                    source_title = @sourceTitle, scope = @scope,
+                    sensitivity = @sensitivity, confidence = @confidence,
+                    valid_from = @validFrom, valid_to = @validTo,
+                    occurred_at = @occurredAt, tags = @tags,
+                    updated_at = @updatedAt
+                WHERE id = @id AND status = 'active'
+            `),
             forget: this.db.prepare(`
                 UPDATE memories
                 SET status = 'forgotten', forgotten_at = @now, updated_at = @now
@@ -118,6 +143,17 @@ export class ContextStore {
             insertImport: this.db.prepare(
                 'INSERT INTO import_items (dedupe_key, memory_id, imported_at) VALUES (?, ?, ?)',
             ),
+            nextVersion: this.db.prepare(
+                'SELECT COALESCE(MAX(version), 0) + 1 AS version FROM memory_versions WHERE memory_id = ?',
+            ),
+            insertVersion: this.db.prepare(`
+                INSERT INTO memory_versions (memory_id, version, change_kind, snapshot, changed_at)
+                VALUES (?, ?, ?, ?, ?)
+            `),
+            history: this.db.prepare(`
+                SELECT version, change_kind, snapshot, changed_at
+                FROM memory_versions WHERE memory_id = ? ORDER BY version DESC
+            `),
             stats: this.db.prepare(`
                 SELECT
                     COUNT(*) AS total,
@@ -137,6 +173,7 @@ export class ContextStore {
                 memory.tags.join(' '),
             );
             this._writeVector(memory);
+            this._recordVersion(memory, 'created');
         };
 
         this._insertTransaction = this.db.transaction((memory) => this._writeMemory(memory));
@@ -155,10 +192,53 @@ export class ContextStore {
             return { memory, created: true };
         });
 
-        this._forgetTransaction = this.db.transaction((id, now) => {
+        this._updateTransaction = this.db.transaction((memory, changeKind) => {
+            const result = this.statements.update.run(toRow(memory));
+            if (result.changes === 0) return null;
+            this.statements.deleteFts.run(memory.id);
+            this.statements.insertFts.run(
+                memory.id,
+                memory.content,
+                memory.summary,
+                memory.tags.join(' '),
+            );
+            this._writeVector(memory);
+            this._recordVersion(memory, changeKind);
+            return memory;
+        });
+
+        this._forgetTransaction = this.db.transaction((id, now, changeKind = 'forgotten') => {
             const result = this.statements.forget.run({ id, now });
-            if (result.changes > 0) this.statements.deleteFts.run(id);
+            if (result.changes > 0) {
+                this.statements.deleteFts.run(id);
+                const memory = this.get(id, { includeForgotten: true });
+                this._recordVersion(memory, changeKind);
+            }
             return result.changes > 0;
+        });
+
+        this._mergeTransaction = this.db.transaction((primaryId, duplicateIds, changes) => {
+            const primary = this.get(primaryId);
+            if (!primary) throw new Error(`Primary memory not found: ${primaryId}`);
+            const duplicates = duplicateIds.map((id) => {
+                if (id === primaryId) throw new Error('A memory cannot be merged into itself');
+                const memory = this.get(id);
+                if (!memory) throw new Error(`Duplicate memory not found: ${id}`);
+                return memory;
+            });
+            const tags = [
+                ...new Set([
+                    ...primary.tags,
+                    ...duplicates.flatMap((item) => item.tags),
+                    ...(changes.tags || []),
+                ]),
+            ];
+            const memory = this._updateMemory(primary, { ...changes, tags }, 'merged');
+            const now = new Date().toISOString();
+            for (const duplicate of duplicates) {
+                this._forgetTransaction(duplicate.id, now, `merged_into:${primaryId}`);
+            }
+            return { memory, mergedIds: duplicates.map((item) => item.id) };
         });
     }
 
@@ -188,6 +268,32 @@ export class ContextStore {
         })(rows);
     }
 
+    _backfillVersions() {
+        const rows = this.db
+            .prepare(
+                `SELECT ${SELECT_COLUMNS}
+                 FROM memories
+                 LEFT JOIN memory_versions ON memory_versions.memory_id = memories.id
+                 WHERE memory_versions.memory_id IS NULL`,
+            )
+            .all();
+        if (!rows.length) return;
+        this.db.transaction((items) => {
+            for (const row of items) this._recordVersion(fromRow(row), 'baseline');
+        })(rows);
+    }
+
+    _recordVersion(memory, changeKind) {
+        const { version } = this.statements.nextVersion.get(memory.id);
+        this.statements.insertVersion.run(
+            memory.id,
+            version,
+            changeKind,
+            JSON.stringify(memory),
+            memory.updatedAt,
+        );
+    }
+
     remember(input) {
         const memory = normalizeMemory(input);
         this._insertTransaction(memory);
@@ -200,6 +306,43 @@ export class ContextStore {
         }
         const memory = normalizeMemory(input);
         return this._insertOnceTransaction(memory, dedupeKey);
+    }
+
+    update(id, changes) {
+        const existing = this.get(id);
+        if (!existing) return null;
+        return this._updateMemory(existing, changes, 'updated');
+    }
+
+    _updateMemory(existing, changes = {}, changeKind = 'updated') {
+        const normalized = normalizeMemory({
+            ...existing,
+            ...changes,
+            id: existing.id,
+            source: { ...existing.source, ...(changes.source || {}) },
+        });
+        const memory = {
+            ...normalized,
+            status: 'active',
+            createdAt: existing.createdAt,
+            updatedAt: new Date().toISOString(),
+        };
+        return this._updateTransaction(memory, changeKind);
+    }
+
+    history(id) {
+        return this.statements.history.all(id).map((row) => ({
+            version: row.version,
+            changeKind: row.change_kind,
+            changedAt: row.changed_at,
+            snapshot: JSON.parse(row.snapshot),
+        }));
+    }
+
+    merge(primaryId, duplicateIds, changes = {}) {
+        const ids = [...new Set(duplicateIds || [])];
+        if (!ids.length) throw new Error('At least one duplicate memory ID is required');
+        return this._mergeTransaction(primaryId, ids, changes);
     }
 
     get(id, options = {}) {
@@ -309,6 +452,7 @@ export class ContextStore {
         if (!['fact', 'preference', 'decision'].includes(memory.type)) return [];
 
         const threshold = options.threshold ?? 0.28;
+        const excludeIds = new Set(options.excludeIds || []);
         if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
             throw new Error('conflict threshold must be between 0 and 1');
         }
@@ -323,6 +467,7 @@ export class ContextStore {
         })
             .filter(
                 (candidate) =>
+                    !excludeIds.has(candidate.id) &&
                     candidate.scope === memory.scope &&
                     candidate.content !== memory.content &&
                     validityOverlaps(memory, candidate),
