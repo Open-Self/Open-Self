@@ -19,6 +19,8 @@ export default defineConfig({
                 'src/cli/arena.js',
                 'src/cli/feed.js',
                 'src/cli/ghost.js',
+                'src/cli/mcp.js',
+                'src/cli/memory.js',
                 'src/cli/profile.js',
                 'src/cli/review.js',
                 'src/cli/setup.js',

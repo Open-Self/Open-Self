@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0] — 2026-08-13
+
+### Added
+
+- **Personal Context Vault:** typed facts, preferences, decisions, commitments, relationships,
+  events, and notes with provenance, scope, sensitivity, confidence, and temporal validity.
+- **SQLite + FTS5 storage:** local source of truth, Unicode full-text search, deterministic security
+  filters, bounded context construction, and recoverable forgetting.
+- **MCP server:** `openself_remember`, `openself_search_memory`, `openself_get_context`, and
+  `openself_forget` over stdio for compatible AI clients.
+- **Context CLI:** `openself memory add/search/list/forget/stats`.
+- Context Vault architecture, schema, security semantics, client configuration, and limitations in
+  `docs/context-vault.md`.
+
+### Changed
+
+- Product direction evolved from autonomous personality impersonation to private, persistent
+  context for AI agents. Existing personality, clone, and messaging commands remain compatible.
+- Privacy language now distinguishes local-first storage from cloud model configurations that send
+  selected context to a provider.
+- Package and CLI version bumped to 0.8.0; CLI onboarding now leads with memory and MCP workflows.
+- MCP SDK is lazy-loaded so non-MCP CLI commands do not pay its startup cost.
+
+### Security
+
+- Retrieval enforces memory status, hierarchical scope, temporal validity, type, and an ordered
+  sensitivity ceiling.
+- `restricted` memories are excluded from MCP search/context by default.
+- Dependency audit returned to zero known vulnerabilities after adding the new storage/MCP stack.
+
 ## [0.7.0] — 2026-07-07
 
 ### Changed (BREAKING)

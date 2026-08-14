@@ -2,6 +2,32 @@
 
 OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](../CHANGELOG.md) for detailed change entries.
 
+> **Direction update (v0.8):** OpenSelf is evolving from autonomous personality impersonation into
+> a local-first Personal Context Vault for AI agents. The personality and messaging features remain
+> compatible, but new work prioritizes durable memory, provenance, permissions, MCP interoperability,
+> and human-approved actions. See [Context Vault & MCP](./context-vault.md).
+
+## v0.8.0 — Personal Context Vault
+
+**Implemented vertical slice:**
+
+- Typed memory schema: facts, preferences, decisions, commitments, relationships, events, and notes
+- Provenance, hierarchical scope, sensitivity, confidence, and temporal validity
+- SQLite source of truth with Unicode FTS5 retrieval
+- Recoverable forgetting that immediately removes memories from retrieval
+- CLI commands for add, search, list, forget, and stats
+- MCP stdio server for remember, search, bounded context, and forget
+- Existing personality clone and messaging commands remain available
+
+**Next milestones:**
+
+1. Import existing chat-derived memories into Context Vault with source references
+2. Local hybrid lexical/vector retrieval and conflict detection
+3. Context dashboard with edit, merge, version history, and approval inbox
+4. Project-folder, calendar, email, and browser capture connectors
+5. Encryption at rest and OS keychain integration
+6. Recall, temporal correctness, privacy leakage, and provenance eval suites
+
 ## Released Versions
 
 ### v0.1.0 — 2026-02-20 (Initial Release)

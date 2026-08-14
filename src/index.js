@@ -19,6 +19,9 @@ export { HumanMimicry } from './mimicry/humanlike.js';
 export { SafetyGuard } from './safety/guard.js';
 export { ReviewQueue } from './safety/review-queue.js';
 export { loadConfig } from './config/loader.js';
+export { ContextStore } from './context/store.js';
+export { normalizeMemory, memoryInputSchema } from './context/schema.js';
+export { createContextMcpServer, runContextMcpServer } from './context/mcp.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

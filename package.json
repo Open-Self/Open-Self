@@ -1,7 +1,7 @@
 {
   "name": "openself",
-  "version": "0.7.0",
-  "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
+  "version": "0.8.0",
+  "description": "Private, persistent personal context and memory for every AI you use.",
   "type": "module",
   "sideEffects": false,
   "bin": {
@@ -36,8 +36,12 @@
     "prepublishOnly": "npm run lint && npm test && npx --yes publint --strict",
     "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\""
   },
-  "keywords": [
-    "ai",
+    "keywords": [
+      "ai",
+      "ai-memory",
+      "mcp",
+      "personal-context",
+      "local-first",
     "clone",
     "personality",
     "whatsapp",
@@ -81,7 +85,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@whiskeysockets/baileys": "^6.7.23",
+    "better-sqlite3": "^12.11.1",
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "discord.js": "^14.26.4",

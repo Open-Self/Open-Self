@@ -1,255 +1,217 @@
-# 🧑 OpenSelf
+# OpenSelf
 
 [![npm version](https://img.shields.io/npm/v/openself?color=blue)](https://www.npmjs.com/package/openself)
-[![npm downloads](https://img.shields.io/npm/dm/openself)](https://www.npmjs.com/package/openself)
 [![CI](https://github.com/Open-Self/Open-Self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
-### Your AI clone. Your messages. Your machine.
+### Your context. Your memory. Your rules.
 
-OpenSelf turns your chat history into an AI clone that speaks exactly like you — on WhatsApp, Telegram, and Discord. Open source. Self-hosted. Bring your own API key.
+OpenSelf is a private, persistent context layer for every AI you use. It stores decisions,
+preferences, commitments, relationships, events, and facts with their source, time, scope,
+confidence, and sensitivity—then exposes only the relevant context through MCP or its JavaScript API.
 
-> OpenClaw is AI that does things *for* you.
-> OpenSelf is AI that *is* you.
+Open source. Local-first. Bring your own model. Your existing OpenSelf personality and messaging
+tools continue to work.
 
----
+> A chatbot starts every conversation from zero. OpenSelf lets your agents remember without giving
+> them unrestricted access to your life.
 
-## 💡 Why OpenSelf?
+## Why OpenSelf?
 
-**ChatGPT doesn't know your catchphrases.** It doesn't know you greet your best friend with "ê" and your mom with "dạ". It doesn't know you never write "Best regards" because you never have.
+AI memory is usually trapped inside one vendor, mixed into an opaque conversation history, or
+missing the information needed to tell whether a memory is current and trustworthy. OpenSelf makes
+memory explicit and portable:
 
-OpenSelf learns from YOUR real messages — your vocabulary, humor, emoji habits, abbreviations, and tone — then runs 24/7 as your digital twin.
+- **Source-attributed:** every memory can point back to a file, chat, meeting, or agent.
+- **Time-aware:** `validFrom`, `validTo`, and `occurredAt` distinguish old beliefs from current ones.
+- **Scoped:** keep personal context separate from `project/acme` or `relationship/minh`.
+- **Sensitivity-aware:** public, personal, private, and restricted memories are filtered at retrieval.
+- **Recoverable forgetting:** forgotten memories disappear from retrieval without destroying the audit trail.
+- **Agent-native:** MCP tools work with compatible AI clients; the core is also a normal Node.js library.
+- **Local-first:** SQLite and FTS5 run on your machine with no account or server required.
 
-*I replaced myself on WhatsApp for a week. 156 messages. Nobody noticed. [Read the story →](./posts/drafts/blog-replaced-myself.md)*
+## Quick start
 
----
-
-## ⚡ Quick Start
-
-```bash
-# Install
-git clone https://github.com/Open-Self/Open-Self.git
-cd open-self && npm install
-
-# Feed your personality
-npx openself feed --whatsapp ./my-chat-export.txt --name "You"
-
-# Test your clone
-npx openself test
-
-# Go live
-npx openself start --telegram
-npx openself start --discord
-npx openself start --whatsapp
-```
-
-## 🧠 How It Works
-
-```
-You export chat history → Feed into OpenSelf → Clone learns personality
-→ Clone runs 24/7 on messaging apps → Replies in YOUR voice
-→ You review next morning "what did my clone say last night"
-```
-
-1. **Export** your chat history (WhatsApp, Telegram, or write a bio)
-2. **Feed** it to OpenSelf → AI learns your vocabulary, style, humor, catchphrases
-3. **Start** → Your clone runs 24/7 on your messaging apps
-4. **Review** → Check what your clone said each morning
-
-## 🎭 Features
-
-| Feature | Description |
-|---------|-------------|
-| **Personality Cloning** | Learns from your real messages, not generic AI |
-| **Human Mimicry** | Random reply delays, typing indicators, occasional typos |
-| **Safety First** | Boundaries, topic avoidance, review queue |
-| **SOUL.md** | Your personality in a file — editable and transparent |
-| **Multi-channel** | WhatsApp, Telegram, Discord — all ready |
-| **Multi-language** | Auto-detects English, Vietnamese, Spanish, French, German, Portuguese — clones your voice in it |
-| **Clone Arena** | Two clones debate each other on any topic |
-| **Ghost Mode** | Clone auto-replies when you're offline |
-| **BYOK** | Claude, GPT, DeepSeek, or Ollama (free, local) |
-| **100% Local** | Your data never leaves your machine |
-| **Clone Score** | Test how accurately your clone mimics you |
-| **Shareable Badge** | SVG badge for your README or profile |
-| **Profile Sharing** | Export/import personality for cross-clone debates |
-| **RAG Memory** | Clone references past conversations naturally |
-
-## 📋 CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `openself setup` | Interactive setup wizard |
-| `openself feed` | Feed chat history to train personality |
-| `openself test` | Clone Score test or interactive chat |
-| `openself start` | Start clone on messaging apps |
-| `openself share --web` | "Talk to My Clone" web page |
-| `openself review` | Review what your clone said |
-| `openself arena` | Clone vs Clone debate |
-| `openself ghost` | Ghost Mode — clone replies when offline |
-| `openself profile` | Export/import personality profiles |
-
-## 📊 Clone Score
-
-```
-npx openself test
-
-🧪 Clone Score: 89% (Grade: A-)
-Your clone is 89% you.
-```
-
-Share your score and challenge your friends!
-
-## 🏟️ Clone Arena
-
-Two clones debate each other — the viral "Clone vs Clone" feature:
+Requires Node.js 20 or newer.
 
 ```bash
-npx openself arena --topic "Cà phê hay trà sữa?"
+npm install -g openself
+
+# Store a durable decision
+openself memory add \
+  --type decision \
+  --scope project/openself \
+  --content "Use SQLite as the local source of truth" \
+  --source docs/architecture.md \
+  --tags architecture,database
+
+# Recall it later
+openself memory search --query "Which database did we choose?" --scope project/openself
+
+# Inspect the vault
+openself memory stats
 ```
 
-Export a friend's profile and pit your clones against each other:
+From this repository, replace `openself` with `node src/cli/index.js`.
+
+## Connect an AI client with MCP
+
+Run the stdio server directly:
 
 ```bash
-npx openself profile export        # Bundle your profile
-npx openself arena --soul2 friend.openself  # Debate!
+openself mcp
 ```
 
-## 👻 Ghost Mode
+Example MCP client configuration:
 
-Your clone replies when you're offline and stops when you're back:
+```json
+{
+  "mcpServers": {
+    "openself": {
+      "command": "npx",
+      "args": ["-y", "openself", "mcp"],
+      "env": {
+        "DATA_DIR": "/absolute/path/to/your/openself-data"
+      }
+    }
+  }
+}
+```
+
+OpenSelf provides four tools:
+
+| Tool | Purpose |
+|---|---|
+| `openself_remember` | Store typed context with provenance and permissions |
+| `openself_search_memory` | Search active memories with scope/time/sensitivity filters |
+| `openself_get_context` | Build a bounded, source-attributed context block for a task |
+| `openself_forget` | Soft-delete a memory and remove it from future retrieval |
+
+See [Context Vault & MCP](./docs/context-vault.md) for the schema, security model, and integration details.
+
+## Memory model
+
+```json
+{
+  "type": "decision",
+  "content": "Do not use Firebase for Project Atlas",
+  "scope": "project/atlas",
+  "sensitivity": "private",
+  "confidence": 0.95,
+  "validFrom": "2026-08-13T09:00:00.000Z",
+  "source": {
+    "kind": "meeting",
+    "locator": "notes/architecture.md",
+    "title": "Architecture review"
+  },
+  "tags": ["database", "architecture"]
+}
+```
+
+Supported types are `fact`, `preference`, `decision`, `commitment`, `relationship`, `event`, and
+`note`. SQLite is the source of truth; FTS5 provides fast Unicode full-text retrieval. The storage
+API is intentionally model-independent.
+
+## JavaScript API
+
+```js
+import { ContextStore } from 'openself';
+
+const store = new ContextStore({ dataDir: './data' });
+
+store.remember({
+    type: 'preference',
+    content: 'Prefer concise status updates with concrete evidence',
+    scope: 'personal/work',
+    source: { kind: 'manual', title: 'Working preferences' },
+});
+
+const context = store.buildContext('How should I write this project update?', {
+    scope: 'personal/work',
+    maxSensitivity: 'private',
+    maxChars: 4000,
+});
+
+console.log(context.context);
+store.close();
+```
+
+## Personality and messaging tools
+
+OpenSelf began as a local AI personality clone. Those workflows remain available while the project
+moves toward user-controlled context and human-approved actions:
 
 ```bash
-npx openself ghost on    # Clone takes over
-npx openself ghost off   # You're back
-npx openself ghost       # Check status
+openself setup
+openself feed --whatsapp ./chat.txt --name "You"
+openself feed --telegram ./result.json --name "You"
+openself test --interactive
+openself start --telegram
+openself start --discord
+openself start --whatsapp
 ```
 
-## 🔧 Setup
+Other compatible commands include `review`, `profile`, `share`, `arena`, and `ghost`. Autonomous
+messaging should be used only with clear consent, narrow boundaries, and appropriate disclosure.
 
-See the full [Setup Guide](./docs/setup-guide.md) for detailed instructions.
+## Privacy model
+
+OpenSelf is **local-first**, not magically offline in every configuration.
+
+- Context Vault storage and FTS search stay on your machine.
+- The MCP server itself makes no model API calls.
+- Ollama can keep generation local.
+- If you configure OpenAI, Anthropic, DeepSeek, or another cloud model, the context supplied to that
+  model leaves your machine under that provider's terms.
+- `restricted` memories are excluded from MCP retrieval unless the caller explicitly raises the
+  sensitivity ceiling.
+- The current stdio MCP transport inherits the permissions of the local client that launches it.
+  Protect the data directory and do not expose it as an unauthenticated network service.
+
+## Architecture
+
+```text
+Files / chat exports / manual notes / agents
+                    │
+                    ▼
+          typed memory + provenance
+                    │
+                    ▼
+        SQLite source of truth + FTS5
+                    │
+          scope · time · sensitivity
+                    │
+             ┌──────┴──────┐
+             ▼             ▼
+          MCP tools    JavaScript API
+             │             │
+             └──────┬──────┘
+                    ▼
+             AI clients/agents
+```
+
+The original personality pipeline, RAG index, and messaging gateways remain separate from Context
+Vault so existing users are not forced into a migration.
+
+## Development
 
 ```bash
-git clone https://github.com/Open-Self/Open-Self.git
-cd open-self && npm install
-cp .env.example .env    # Edit with your API key
-```
-
-**Feed your personality:**
-
-```bash
-npx openself feed --whatsapp ./chat-export.txt --name "Your Name"
-npx openself feed --telegram ./telegram-export/result.json --name "Your Name"
-npx openself feed --manual ./my-personality.md
-```
-
-**Test & Go Live:**
-
-```bash
-npx openself test                   # Clone Score test
-npx openself test --interactive     # Chat with your clone
-npx openself start --whatsapp       # QR code pairing
-npx openself start --telegram       # Telegram bot
-npx openself start --discord        # Discord bot
-```
-
-## 🏷️ Clone Score Badge
-
-Add to your GitHub README or website:
-
-```markdown
-[![OpenSelf Clone Score](http://localhost:3000/badge/yourname)](http://localhost:3000)
-```
-
-## 🔐 Privacy
-
-- All data stays on **YOUR** machine
-- Chat history is processed locally
-- No cloud, no tracking, no telemetry
-- You control every boundary via SOUL.md
-- Review queue lets you approve uncertain replies
-
-## 🛠 Supported LLM Providers
-
-| Provider | Cost/message | Setup |
-|---|---|---|
-| **Claude** (Anthropic) | ~$0.003 | API key |
-| **GPT-4o-mini** (OpenAI) | ~$0.0015 | API key |
-| **DeepSeek V3** | ~$0.0003 | API key |
-| **Ollama** (local) | $0 | Local install |
-
-Average user cost: **$2-5/month** (cheaper than a coffee ☕)
-
-## 📖 Documentation
-
-**Getting started:**
-- [Setup Guide](./docs/setup-guide.md) — Get started in 5 minutes
-- [Personality Tuning](./docs/personality-tuning.md) — Fine-tune SOUL.md
-- [Safety Guide](./docs/safety-guide.md) — Understand safety features
-
-**Reference & development:**
-- [Codebase Summary](./docs/codebase-summary.md) — Module map and data flow
-- [System Architecture](./docs/system-architecture.md) — Component design and security boundaries
-- [Code Standards](./docs/code-standards.md) — Development conventions and testing
-- [Project Roadmap](./docs/project-roadmap.md) — Release history and future plans
-
-**Resources:**
-- [SOUL.md.example](./SOUL.md.example) — Personality template
-- [CHANGELOG](./CHANGELOG.md) — Release history
-
-## 🧪 Testing
-
-```bash
-npm test              # Run tests with vitest
-npm run test:watch   # Watch mode for development
-npm run test:coverage # Generate coverage report
-npm run test:clone   # Run Clone Score test (the old 'npm test' behavior)
-```
-
-See [Code Standards](./docs/code-standards.md) for testing conventions.
-
-## 🛠 Development
-
-```bash
-npm run lint         # Check code with ESLint
-npm run lint:fix     # Auto-fix linting issues
-npm run format       # Format with Prettier
-npm run format:check # Check formatting
-```
-
-See [Code Standards](./docs/code-standards.md) for development guidelines and [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution process.
-
-## 🆘 Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| **WhatsApp QR code doesn't render** | Terminal may not support Unicode. Try WSL, Git Bash, or `--qr-ascii` mode if available. On Windows, use PowerShell Core v7+. |
-| **Clone never replies** | Check: (1) API key in `.env` is correct, (2) `data/SOUL.md` exists, (3) provider env var matches (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.). Run `npx openself setup` to re-configure. |
-| **"Vietnamese AI-reveal not detected"** | Upgrade to v0.6.0+. Earlier versions had a regex bug (`\t` vs `\b`). Run `npm update openself`. |
-| **Personality stats not used by clone** | Run `npx openself feed` again to regenerate `data/personality.json`. Without it, mimicry uses defaults (standard delays, no custom emoji frequency). |
-| **"No SOUL.md found" error** | Run `npx openself feed --whatsapp ./chat.txt --name "Your Name"` to create one. You need at least one chat export. |
-| **Clone replies too fast / too slow** | Edit `data/personality.json` and adjust `responseTimeAvg` (milliseconds). Or re-feed with more diverse conversation examples. |
-| **"Unknown provider" error** | Set one of: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, or `OLLAMA_BASE_URL` in `.env`. See [Setup Guide](./docs/setup-guide.md). |
-| **Memory errors on large chat exports** | Break into multiple feed commands: `npx openself feed --whatsapp chat1.txt --name You && npx openself feed --whatsapp chat2.txt --name You`. RAG indexing is incremental. |
-
-See [Safety Guide](./docs/safety-guide.md) for safety features and [System Architecture](./docs/system-architecture.md) for how the clone works.
-
-## 🤝 Contributing
-
-PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
-```bash
-git clone https://github.com/Open-Self/Open-Self.git
-cd open-self && npm install
-npx openself feed --whatsapp ./test-data/sample-whatsapp.txt --name "Harvey"
+npm install
 npm test
+npm run lint
+npm run format:check
+npm run test:coverage
 ```
 
-## 📜 License
+Key documentation:
 
-MIT — do whatever you want with it.
+- [Context Vault & MCP](./docs/context-vault.md)
+- [System Architecture](./docs/system-architecture.md)
+- [Setup Guide](./docs/setup-guide.md)
+- [Safety Guide](./docs/safety-guide.md)
+- [Project Roadmap](./docs/project-roadmap.md)
+- [Contributing](./CONTRIBUTING.md)
 
----
+## License
 
-**OpenSelf** — *AI that IS you.* 🧑
+MIT

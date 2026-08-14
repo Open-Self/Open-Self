@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * OpenSelf CLI — Your AI clone. Your messages. Your machine.
+ * OpenSelf CLI — Your context. Your memory. Your rules.
  */
 
 import { Command } from 'commander';
@@ -19,13 +19,19 @@ import { shareCommand } from './share.js';
 import { arenaCommand } from './arena.js';
 import { ghostCommand } from './ghost.js';
 import { profileCommand } from './profile.js';
+import { memoryCommand } from './memory.js';
+import { mcpCommand } from './mcp.js';
 import { wrapAction, handleError } from './utils/error-handler.js';
 
 // Notify users of new versions (cached; non-blocking; ignored in CI/sandbox)
 try {
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf-8'));
-    updateNotifier({ pkg, updateCheckInterval: 1000 * 60 * 60 * 24 }).notify({ isGlobal: true });
+    if (!process.argv.includes('mcp')) {
+        updateNotifier({ pkg, updateCheckInterval: 1000 * 60 * 60 * 24 }).notify({
+            isGlobal: true,
+        });
+    }
 } catch {
     // Silent — notifier shouldn't break CLI in restricted environments
 }
@@ -34,25 +40,54 @@ const program = new Command();
 
 program
     .name('openself')
-    .description('🧑 OpenSelf — Your AI clone. Your messages. Your machine.')
-    .version('0.6.0')
+    .description('OpenSelf — Private, persistent context for every AI you use.')
+    .version('0.8.0')
     .addHelpText(
         'after',
         `
 ${chalk.bold('Quick Start:')}
-  ${chalk.gray('$')} openself setup                              ${chalk.dim('# Configure API key')}
-  ${chalk.gray('$')} openself feed --whatsapp ./chat.txt --name "You"  ${chalk.dim('# Feed personality')}
-  ${chalk.gray('$')} openself test                               ${chalk.dim('# Clone Score test')}
-  ${chalk.gray('$')} openself start --telegram                   ${chalk.dim('# Go live')}
+  ${chalk.gray('$')} openself memory add --type decision --content "Use SQLite"  ${chalk.dim('# Remember')}
+  ${chalk.gray('$')} openself memory search --query "database"                   ${chalk.dim('# Recall')}
+  ${chalk.gray('$')} openself mcp                                                  ${chalk.dim('# Connect AI clients')}
 
-${chalk.bold('Fun Stuff:')}
-  ${chalk.gray('$')} openself arena --topic "Coffee or bubble tea?"     ${chalk.dim('# Clone vs Clone')}
-  ${chalk.gray('$')} openself ghost on                           ${chalk.dim('# Auto-reply offline')}
-  ${chalk.gray('$')} openself share --web                        ${chalk.dim('# "Talk to My Clone"')}
+${chalk.bold('Personality tools (legacy-compatible):')}
+  ${chalk.gray('$')} openself feed --whatsapp ./chat.txt --name "You"
+  ${chalk.gray('$')} openself test
 
 ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 `,
     );
+
+program
+    .command('memory')
+    .description('Store, search, list, and forget personal context')
+    .argument('[action]', 'add/search/list/forget/stats', 'list')
+    .option('--content <text>', 'Memory content')
+    .option('--query <text>', 'Search query')
+    .option('--id <uuid>', 'Memory ID')
+    .option('--type <type>', 'fact/preference/decision/commitment/relationship/event/note')
+    .option('--summary <text>', 'Short summary')
+    .option('--scope <scope>', 'Access scope (defaults to personal when adding)')
+    .option('--sensitivity <level>', 'public/personal/private/restricted', 'personal')
+    .option('--max-sensitivity <level>', 'Maximum sensitivity returned', 'private')
+    .option('--confidence <number>', 'Confidence from 0 to 1')
+    .option('--source-kind <kind>', 'Source type', 'manual')
+    .option('--source <locator>', 'Source URL or file path')
+    .option('--source-title <title>', 'Human-readable source title')
+    .option('--occurred-at <iso-date>', 'When the memory occurred')
+    .option('--valid-from <iso-date>', 'When the memory became valid')
+    .option('--valid-to <iso-date>', 'When the memory stops being valid')
+    .option('--tags <csv>', 'Comma-separated tags')
+    .option('--limit <number>', 'Maximum results')
+    .option('--include-forgotten', 'Include forgotten memories when listing')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction((action, options) => memoryCommand(action, options)));
+
+program
+    .command('mcp')
+    .description('Run the OpenSelf Context MCP server over stdio')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction(mcpCommand));
 
 program
     .command('setup')
