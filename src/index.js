@@ -25,6 +25,7 @@ export { createContextMcpServer, runContextMcpServer } from './context/mcp.js';
 export { ContextImporter, detectImportFormat, chunkDocument } from './context/importer.js';
 export { LocalVectorEncoder, cosineSimilarity } from './context/vectors.js';
 export { createContextServer } from './context/server.js';
+export { ProjectFolderCapture } from './context/project-capture.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

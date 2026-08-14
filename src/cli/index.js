@@ -22,6 +22,7 @@ import { profileCommand } from './profile.js';
 import { memoryCommand } from './memory.js';
 import { mcpCommand } from './mcp.js';
 import { dashboardCommand } from './dashboard.js';
+import { captureCommand } from './capture.js';
 import { wrapAction, handleError } from './utils/error-handler.js';
 
 // Notify users of new versions (cached; non-blocking; ignored in CI/sandbox)
@@ -101,6 +102,23 @@ program
     .option('--port <port>', 'Local dashboard port', '3210')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction(dashboardCommand));
+
+program
+    .command('capture')
+    .description('Capture continuously changing context from a local source')
+    .argument('<source>', 'Capture source (currently: project)')
+    .argument('[path]', 'Project folder', '.')
+    .option('--watch', 'Keep scanning for changes')
+    .option('--interval <seconds>', 'Watch polling interval', '5')
+    .option('--name <name>', 'Project name used to derive the default scope')
+    .option('--scope <scope>', 'Vault scope (defaults to project/<folder-name>)')
+    .option('--sensitivity <level>', 'public/personal/private/restricted', 'private')
+    .option('--extensions <csv>', 'Allowed file extensions, such as md,js,ts')
+    .option('--ignore <csv>', 'Additional directory names to ignore')
+    .option('--max-file-bytes <bytes>', 'Maximum file size', '256000')
+    .option('--dry-run', 'Report changes without writing memories or connector state')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction((source, path, options) => captureCommand(source, path, options)));
 
 program
     .command('setup')

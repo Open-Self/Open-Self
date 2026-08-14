@@ -147,6 +147,37 @@ WhatsApp exports do not include an explicit timezone. Their local date/time is n
 ordering; consumers should treat it as an approximate timestamp. Telegram timestamps preserve the
 offset encoded by the export.
 
+## Continuous project-folder capture
+
+The project connector turns a changing local folder into a maintained Vault scope:
+
+```bash
+openself capture project ./atlas --dry-run
+openself capture project ./atlas
+openself capture project ./atlas --watch --interval 5
+```
+
+The default scope is `project/<folder-name>`. Each captured chunk has `project-file` provenance with
+a path relative to the selected root. The connector state file, stored under
+`<data-dir>/connectors/`, contains a SHA-256 content hash and memory IDs for each source file. A scan
+uses that state to apply the following lifecycle:
+
+- unchanged file: no database write or new version
+- new file: create bounded source-attributed note chunks
+- changed file: update existing chunk IDs where possible, producing lifecycle versions
+- fewer chunks or deleted file: soft-forget obsolete memory IDs immediately
+
+`--watch` is a polling loop rather than an operating-system file watcher, which makes its behavior
+consistent across Linux, macOS, and Windows. It performs an initial scan and then scans at the
+configured interval until `Ctrl+C` or a termination signal.
+
+Safety defaults exclude symlinks, known dependency/build/output directories, unsupported
+extensions, files larger than 256 KB, binary content, `.env` variants, private-key extensions, and
+common credential/secret filenames. These rules reduce accidental capture; they are not a secret
+scanner. Review `--dry-run`, use a dedicated narrow folder, add directory names with `--ignore`, and
+restrict types with `--extensions md,ts,js` when the project contains sensitive material. The
+connector never calls a model or sends captured content over the network.
+
 ## Client configuration
 
 Install globally or let the client invoke the npm package:
@@ -201,5 +232,6 @@ history, create, patch, forget, merge, conflict checks, and vault statistics.
 - No automatic conflict resolution between memories.
 - No multi-user ACL or remotely exposed authenticated transport.
 - No remote or multi-user dashboard; the authenticated HTTP surface is localhost-only.
-- No continuous folder, calendar, email, or browser connectors yet; imports are explicit CLI actions.
+- Project folders support incremental scan and continuous polling; calendar, email, and browser
+  connectors are not implemented yet.
 - Forgotten rows are recoverable locally and are not cryptographically erased.

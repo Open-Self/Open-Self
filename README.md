@@ -97,6 +97,29 @@ item receives a stable source fingerprint, so rerunning the same import reports 
 instead of creating another memory. Use `--format` to override detection, `--sensitivity` to change
 the default, and `--tags` to attach comma-separated labels.
 
+## Capture a project folder
+
+Keep project context current without repeatedly importing files by hand:
+
+```bash
+# Preview what the connector would capture
+openself capture project ./my-project --dry-run
+
+# Scan once, then search the derived project scope
+openself capture project ./my-project
+openself memory search --query "current architecture" --scope project/my-project
+
+# Poll for edits and deletions until Ctrl+C
+openself capture project ./my-project --watch --interval 5
+```
+
+The connector incrementally versions changed files and soft-forgets memories whose files were
+deleted, so stale source text stops appearing in retrieval. It captures common text, documentation,
+configuration, and source-code extensions. Dependency/build directories, symlinks, oversized or
+binary files, `.env` files, and common credential/private-key filenames are excluded by default.
+Use `--extensions` and `--ignore` to narrow the source set further. Connector state contains hashes
+and memory IDs, not a second copy of file content, and stays under the OpenSelf data directory.
+
 ## Connect an AI client with MCP
 
 Run the stdio server directly:
@@ -215,7 +238,7 @@ OpenSelf is **local-first**, not magically offline in every configuration.
 ## Architecture
 
 ```text
-Files / chat exports / manual notes / agents
+Files / project capture / chat exports / manual notes / agents
                     │
                     ▼
           typed memory + provenance

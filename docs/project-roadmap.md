@@ -24,7 +24,8 @@ OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](
 1. ✅ Import Markdown/text, WhatsApp, and Telegram with provenance and deduplication
 2. ✅ Local FTS5/vector rank fusion and potential conflict detection
 3. ✅ Authenticated localhost dashboard with edit, merge, version history, and conflict review
-4. Continuous project-folder, calendar, email, and browser capture connectors
+4. **Partial:** Continuous capture connectors: project-folder scan/watch complete; calendar, email,
+   and browser connectors pending
 5. Encryption at rest and OS keychain integration
 6. Recall, temporal correctness, privacy leakage, and provenance eval suites
 

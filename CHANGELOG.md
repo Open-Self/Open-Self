@@ -21,6 +21,12 @@
 - Immutable lifecycle snapshots for create, update, merge, migration baseline, and forget actions.
 - Token-to-HttpOnly-cookie bootstrap, localhost-only binding, CSP/security headers, API no-store,
   cross-origin mutation blocking, and a dedicated `/api/context` namespace.
+- `openself capture project` for one-shot or continuously polled project-folder ingestion.
+- Incremental connector state that versions changed source chunks, skips unchanged files, and
+  soft-forgets context removed from disk.
+- Safe project-capture defaults for dependency/build directories, symlinks, binary or oversized
+  files, environment files, and common credential/private-key filenames; plus dry-run, extension,
+  ignore, scope, sensitivity, size, and polling controls.
 
 ### Changed
 
