@@ -13,9 +13,25 @@ stable channels. Local verification passed 527 tests in 56 files with 88.95% lin
 the same coverage exclusions and local timeout qualification below apply. The 16 additional
 tests cover release-channel selection, rejected tags/versions and Actions output generation.
 
-Candidate platform CI, released artifact verification and registry publication must be
-recorded after they finish. The verified v0.13.2 distribution below remains the installation
-baseline until those results are available. A candidate does not close the stable 1.0 gate.
+Candidate commit [`c4698c5`](https://github.com/Open-Self/Open-Self/tree/c4698c5619713f2202dae89b969afc17bbb83c45)
+passed all six jobs in [branch CI](https://github.com/Open-Self/Open-Self/actions/runs/34262282291).
+The [tag workflow](https://github.com/Open-Self/Open-Self/actions/runs/34262782179) repeated
+all six successfully and packaged the artifact. GitHub reports the release as a prerelease;
+its Latest release remains v0.13.2. The npm job received `NPM_TAG=next` but failed because
+`NPM_TOKEN` was absent. Registry dist-tags still contained only `latest: 0.7.0` when checked.
+Private vulnerability reporting was enabled and no open issues were returned at this audit.
+
+The downloaded [candidate artifact](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0-rc.1/openself-1.0.0-rc.1.tgz)
+contains version `1.0.0-rc.1`; its 104 archive entries were checked for runtime data, databases,
+credentials and generated directories. Its SHA-256 matches the GitHub asset digest:
+
+```text
+3790661d97437e5f8f959a0f1e0feb12d9b51167070d3671bd61aca518d9120c
+```
+
+The README offers this candidate separately from the v0.13.2 installation baseline.
+Registry publication and the final stable-version gates remain open. A candidate does not
+close the stable 1.0 gate; external provider mocks and dashboard audit limits still apply.
 
 ## Evidence by requirement
 
@@ -62,10 +78,11 @@ gateway, provider or dashboard interaction has been exercised live.
    publishing credential as the Actions `NPM_TOKEN` secret (or implement and verify a replacement
    trusted-publishing flow). Do not put credentials in issues, files or chat. Rerun only the
    failed publish job for an existing verified release and confirm its exact registry version.
-5. **Run the final 1.0 candidate through the complete gates.** Recheck open release blockers,
+5. **Run the final stable 1.0 version through the complete gates.** The RC evidence above closes
+   the candidate platform/artifact checks, but registry publication remains incomplete. Recheck open release blockers,
    compatibility and upgrade notes, private reporting, platform CI, artifact contents/digest,
-   and actual registry publication. Current evidence proves the cited 0.x artifact, not a
-   future 1.0 version. External provider mocks and local-dashboard scope must remain explicit.
+   and actual registry publication. Current evidence proves the cited 0.x and RC artifacts, not a
+   future stable 1.0 version. External provider mocks and local-dashboard scope must remain explicit.
 
 No open GitHub issues were returned at audit time. That does not close the gaps above:
 absence of issue reports is weaker evidence than an exercised contract.
