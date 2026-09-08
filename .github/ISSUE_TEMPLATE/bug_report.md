@@ -8,11 +8,14 @@ assignees: ''
 
 ## Describe the Bug
 
+For a security vulnerability, use [private reporting](https://github.com/Open-Self/Open-Self/security/advisories/new).
+Use synthetic data below; do not attach personal vaults, chat exports, keys or passphrases.
+
 A clear and concise description of the bug.
 
 ## Steps to Reproduce
 
-1. Run `npx openself ...`
+1. Run `openself ...` (or `node src/cli/index.js ...` from a checkout)
 2. With file `...`
 3. See error
 
@@ -28,7 +31,8 @@ What actually happened. Include error messages if any.
 
 - **OS:** (e.g., Windows 11, macOS 14, Ubuntu 22.04)
 - **Node.js version:** (run `node -v`)
-- **OpenSelf version:** (run `npx openself --version`)
+- **OpenSelf version:** (run `openself --version`, or `node src/cli/index.js --version`)
+- **Installation source:** (npm version, GitHub tarball, or checkout commit)
 - **LLM Provider:** (e.g., Claude, GPT, DeepSeek, Ollama)
 
 ## Chat Export Format

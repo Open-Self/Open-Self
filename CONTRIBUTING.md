@@ -1,170 +1,89 @@
 # Contributing to OpenSelf
 
-First off, thank you for considering contributing to OpenSelf! 🎉
+OpenSelf is a local-first Context Vault with existing personality and messaging integrations.
+Start with the [roadmap](./docs/project-roadmap.md), [API contract](./docs/api-reference.md)
+and [support policy](./docs/support-policy.md). See [release readiness](./docs/release-readiness.md)
+for the current evidence and remaining work before 1.0.
 
-## How Can I Contribute?
+## Bugs and proposals
 
-### 🐛 Reporting Bugs
+Use the repository's bug or feature issue template. Include the installed version, Node
+version, OS, reproducible steps and a small synthetic fixture. Do not upload personal
+vaults, chat histories or credentials. Report vulnerabilities privately using
+[SECURITY.md](./SECURITY.md), not public issues.
 
-- Use the [Bug Report](https://github.com/Open-Self/Open-Self/issues/new?template=bug_report.md) template
-- Include your Node.js version, OS, and steps to reproduce
+Useful contributions include recovery reliability, permission boundaries, realistic retrieval
+evaluations, accessibility, source capture and clear documentation. Explain the user problem
+and expected behavior before proposing an integration or a public contract change.
 
-### 💡 Suggesting Features
+## Local development
 
-- Use the [Feature Request](https://github.com/Open-Self/Open-Self/issues/new?template=feature_request.md) template
-- Describe the use case and expected behavior
-
-### 🔧 Submitting Changes
-
-1. **Fork** the repository
-2. **Create a branch** from `main`:
-   ```bash
-   git checkout -b <your-name>/<type>/<description>
-   # Example: minhvu/feat/spanish-language-support
-   ```
-3. **Make your changes** — follow the code style below
-4. **Test** your changes:
-   ```bash
-   npm test                    # Run unit + integration tests (vitest)
-   npm run test:coverage       # Check coverage
-   npm run test:clone          # Run Clone Score test (optional, slow)
-   npx openself feed --whatsapp ./test-data/sample-whatsapp.txt --name Harvey
-   ```
-5. **Lint & format:**
-   ```bash
-   npm run lint                # Check for linting errors
-   npm run lint:fix            # Auto-fix if possible
-   npm run format              # Auto-format code
-   ```
-6. **Commit** with a descriptive message (see format below):
-   ```bash
-   git commit -m "feat: add Spanish language support"
-   ```
-7. **Push** and create a **Pull Request**
-   - Title: <70 characters, descriptive
-   - Body: Include summary + test plan
-
-### Commit Message Format
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` — New feature
-- `fix:` — Bug fix
-- `docs:` — Documentation only
-- `refactor:` — Code change that neither fixes a bug nor adds a feature
-- `test:` — Adding or updating tests
-- `chore:` — Maintenance tasks
-
-## Code Style
-
-See [Code Standards](./docs/code-standards.md) for detailed guidelines.
-
-**Quick summary:**
-- **ESM modules** — `import`/`export`, Node >=22.13
-- **File naming** — kebab-case (e.g., `personality-extractor.js`)
-- **File size** — <200 lines of code per file
-- **Indentation** — 4 spaces (Prettier enforced)
-- **Comments** — Explain *why*, not *what*
-- **Error handling** — Structured errors with `.code` property
-- **No secrets** — Never commit `.env`, API keys, session tokens
-
-## Project Structure
-
-```
-src/
-├── parsers/       # Chat history parsers (WhatsApp, Telegram, etc.)
-├── personality/   # Personality extraction & SOUL.md generation
-├── brain/         # Clone brain (LLM integration, system prompts)
-├── mimicry/       # Human-like behavior simulation
-├── safety/        # Safety guards, AI detection, review queue
-├── config/        # Configuration loading
-├── cli/           # CLI commands
-└── index.js       # Main entry (re-exports)
-```
-
-## Testing
-
-All code changes require tests. Use [Vitest](https://vitest.dev/):
+Use Node >=22.13. CI covers Node 22.13.0 and 24 on Linux, Windows and macOS. Fork the
+repository and create a branch from `main`, then run `npm ci`. Native SQLite installation
+needs a compatible prebuild or a working native build toolchain.
 
 ```bash
-npm test              # Run all tests
-npm run test:watch   # Watch mode (develop faster)
-npm run test:coverage # Check coverage
+npm run lint
+npm run format:check
+npm test
+npm run test:coverage
+npm run test:types
+npm run test:package
+npm run eval:context
+npm audit --audit-level=moderate
+npx --yes publint --strict
 ```
 
-**Test location:** Mirror the `src/` structure in `tests/`:
-- `tests/unit/<module>/<module>.test.js`
-- `tests/integration/<feature>.test.js`
-- `tests/fixtures/` for test data
+`test:package` builds the real tarball, installs production dependencies in a temporary consumer,
+compiles NodeNext/Bundler examples and exercises CLI, MCP, dashboard, capture and recovery.
+It requires package-registry access. Run checks appropriate to the change; the complete CI
+matrix is required before a release. Use only synthetic fixtures and smoke-test data.
+For checkout CLI testing, use `node src/cli/index.js`; `npx openself` can run a different
+published registry version.
 
-**Mocking:** SDK mocks in `tests/helpers/mock-*.js` (no real API calls).
+Source uses ESM, kebab-case filenames and four-space formatting enforced by Prettier.
+Keep changes focused and explain non-obvious decisions. Put regression tests under
+`tests/unit/` or `tests/integration/` and synthetic fixtures under `tests/fixtures/`.
+Prefer behavior checks over tests that simply repeat the implementation.
 
-**Coverage target:** ≥50% on core modules (brain, safety, personality, parsers). See [Code Standards](./docs/code-standards.md).
+Public API changes require declarations, consumer examples and relevant documentation.
+Preserve released-schema fixtures; do not regenerate historical schemas from current code.
+Update the changelog and upgrade guide when users must change their calls or workflows.
+Exact error messages are not a stable public interface unless explicitly documented.
 
-## Release Process (Maintainers)
+Coverage gates are global lines >=80%, functions >=85%, branches >=72%, as configured in
+[vitest.config.js](./vitest.config.js). That configuration has explicit exclusions, so the
+percentage does not prove every entrypoint or live external integration was exercised.
+Provider mocks test behavior without sending messages or spending API credits.
 
-### Preparing a Release
+## Pull requests
 
-1. **Update version & changelog:**
-   ```bash
-   # Edit package.json: "version": "0.X.0"
-   # Edit CHANGELOG.md: add entry at top with [0.X.0] — YYYY-MM-DD
-   ```
+Use a conventional commit message such as `fix(context): preserve history on failed capture`.
+Describe the user-visible problem, resulting behavior, relevant validation and any migration
+or compatibility impact. Include only task-relevant source, tests, docs and dependency metadata.
+Never commit `.env`, credentials, databases, coverage or temporary files.
 
-2. **Run full CI locally:**
-   ```bash
-   npm test
-   npm run lint
-   npm run format:check
-   npx publint --strict     # npm publish validation
-   npm pack --dry-run       # Check bundled files
-   ```
+See [code standards](./docs/code-standards.md) for additional guidance. Executable lint,
+format and CI configuration define the current automated gates.
 
-3. **Commit & tag:**
-   ```bash
-   git add package.json CHANGELOG.md docs/
-   git commit -m "release: v0.X.0"
-   git tag v0.X.0
-   git push origin main
-   git push origin v0.X.0
-   ```
+## Maintainer releases
 
-4. **Publish to npm:**
-   ```bash
-   npm publish
-   ```
+Follow the [release process](./docs/project-roadmap.md#release-process):
 
-5. **Create GitHub Release:**
-   - Go to Releases → Draft Release
-   - Tag: `v0.X.0`
-   - Title: `v0.X.0 — <descriptive title>`
-   - Body: Copy CHANGELOG entry
+1. Update the manifest, lockfile, dated changelog and applicable migration notes.
+2. Run the required checks and inspect package contents for private or generated data.
+3. Commit and push. Verify all CI jobs for the exact commit before creating its version tag.
+4. Push the matching `vX.Y.Z` tag. The release workflow repeats CI, checks the tag version,
+   creates one tarball and publishes it as a GitHub release asset.
+5. The npm job publishes that same artifact with provenance. Configure `NPM_TOKEN` in
+   repository Actions secrets; never put the token in a file, issue, PR or chat message.
+6. Verify the downloaded artifact digest and the exact version's registry metadata separately.
+   If npm failed, resolve its stated cause and rerun failed jobs; do not move an existing tag.
+7. Update README installation status when registry publication becomes available.
 
-### Hotfixes (v0.X.1)
-
-For urgent bug fixes:
-```bash
-git checkout -b hotfix/v0.X.1
-# Make fix, commit, test
-git tag v0.X.1
-npm publish
-```
-
-## What We're Looking For
-
-High-impact contributions right now:
-
-- 🌍 **New language support** — parsers for Line, WeChat, Facebook Messenger
-- 🧠 **Better personality extraction** — more accurate style matching
-- 🔐 **Safety improvements** — better AI detection, new boundary types
-- 🌐 **i18n** — UI strings in multiple languages
-- 📖 **Documentation** — tutorials, setup guides, personality tuning tips
-- 🧪 **Tests** — unit tests, integration tests
-
-## Questions?
-
-Open a [Discussion](https://github.com/Open-Self/Open-Self/discussions) — we're happy to help!
+Hotfixes use the same gates. A successful GitHub release is not evidence that npm publication
+succeeded. Do not bypass the verified-artifact workflow with a manual `npm publish` from a checkout.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
+Contributions are licensed under the repository's [MIT License](./LICENSE).

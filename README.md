@@ -36,8 +36,16 @@ memory explicit and portable:
 
 Requires Node.js 22.13 or newer. Node.js 24 is also tested.
 
+As checked on 2026-09-09, npm `latest` is v0.7.0 and does not contain the Context Vault
+commands below. The current verified Context Vault build is
+[v0.13.1 on GitHub](https://github.com/Open-Self/Open-Self/releases/tag/v0.13.1).
+Download its [openself-0.13.1.tgz](https://github.com/Open-Self/Open-Self/releases/download/v0.13.1/openself-0.13.1.tgz)
+asset and verify SHA-256 `76ac2d70dc7902443268efe167f260d46aa0523d6f3922955265ef9aa0e53c1b`,
+then install the downloaded file:
+
 ```bash
-npm install -g openself
+npm install -g ./openself-0.13.1.tgz
+openself --version
 
 # Store a durable decision
 openself memory add \
@@ -61,6 +69,8 @@ openself memory stats
 ```
 
 From this repository, replace `openself` with `node src/cli/index.js`.
+See [release readiness](./docs/release-readiness.md) for publication status and remaining
+v1.0 gates. The [upgrade guide](./docs/upgrade-guide.md) covers existing vaults.
 
 ## Local dashboard
 

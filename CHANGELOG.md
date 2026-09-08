@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Documentation and maintenance
+
+- Corrected installation instructions while npm remains on v0.7.0; Context Vault users are directed to the verified GitHub artifact.
+- Updated security reporting, contribution checks and maintainer release instructions to match the current project and workflow.
+- Added an evidence-based v1.0 readiness audit, including remaining native-key-provider and conflict-window verification work.
+
 ## [0.13.1] - 2026-09-09
 
 ### Fixed

@@ -40,7 +40,8 @@ Implemented, with [recovery documentation](./backup-recovery.md):
 
 Portable recovery requires the encrypted archive and its passphrase. The destination
 requires an available OS key provider. Archives are capped at 256 MiB and exclude
-connector polling state and legacy application files; copying SQLite alone is not
+legacy JSON connector state and legacy application files; v0.13+ SQLite checkpoints are
+included. Copying SQLite alone is not
 a portable encrypted backup.
 
 ## Phase 4: Agent permissions and accountability - v0.11.0
@@ -74,6 +75,7 @@ The [API reference](./api-reference.md), [support policy](./support-policy.md), 
 
 Before v1.0: review remaining release-blocking issues against these contracts, verify
 the final version through all release gates, and complete registry publication.
+The [release-readiness audit](./release-readiness.md) tracks evidence and concrete gaps.
 
 ### v0.13 capture recovery
 
