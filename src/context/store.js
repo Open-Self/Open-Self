@@ -566,24 +566,29 @@ export class ContextStore {
             )
             .all(params);
 
-        return rows
-            .map((row) => {
-                const storedVector = parseStoredVector(this.codec.decode(row.vector, 'vector'));
-                if (!storedVector) return null;
-                return {
-                    ...fromRow(row, this.codec),
-                    vectorScore: cosineSimilarity(queryVector, storedVector),
-                };
-            })
-            .filter(Boolean)
-            .filter((memory) => memory.vectorScore >= minimum)
+        return this._scoreVectorRows(rows, queryVector, minimum, options.limit);
+    }
+
+    _scoreVectorRows(rows, queryVector, minimum, limit, excludedContent, maxCandidates = Infinity) {
+        const candidates = [];
+        let examined = 0;
+        for (const row of rows) {
+            const storedVector = parseStoredVector(this.codec.decode(row.vector, 'vector'));
+            if (!storedVector) continue;
+            const memory = fromRow(row, this.codec);
+            if (memory.content === excludedContent) continue;
+            const vectorScore = cosineSimilarity(queryVector, storedVector);
+            if (vectorScore >= minimum) candidates.push({ ...memory, vectorScore });
+            if (++examined >= maxCandidates) break;
+        }
+        return candidates
             .sort((left, right) => {
                 if (right.vectorScore !== left.vectorScore) {
                     return right.vectorScore - left.vectorScore;
                 }
                 return right.confidence - left.confidence;
             })
-            .slice(0, options.limit);
+            .slice(0, limit);
     }
 
     findPotentialConflicts(input, options = {}) {
@@ -591,33 +596,53 @@ export class ContextStore {
         if (!['fact', 'preference', 'decision'].includes(memory.type)) return [];
 
         const threshold = options.threshold ?? 0.28;
-        const excludeIds = new Set(options.excludeIds || []);
         if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
             throw new Error('conflict threshold must be between 0 and 1');
         }
         if (!this.codec.indexQuery(memory.content)) return [];
-        return this.search(memory.content, {
-            scope: memory.scope,
-            type: memory.type,
-            maxSensitivity: options.maxSensitivity || 'restricted',
-            allowedScopes: options.allowedScopes,
-            retrieval: 'vector',
-            minVectorScore: threshold,
-            asOf: memory.validFrom || memory.occurredAt || new Date().toISOString(),
-            limit: options.limit || 10,
-        })
-            .filter(
-                (candidate) =>
-                    !excludeIds.has(candidate.id) &&
-                    candidate.scope === memory.scope &&
-                    candidate.content !== memory.content &&
-                    validityOverlaps(memory, candidate),
+        const { sensitivityRank, allowedScopes } = searchParams(options);
+        const limit = clamp(options.limit || 10, 1, 100);
+        // Metadata eligibility precedes the candidate budget. Unlike point-in-time
+        // search, conflicts span the entire proposed interval (null = unbounded).
+        const rows = this.db
+            .prepare(
+                `
+            SELECT ${SELECT_COLUMNS}, memory_vectors.vector
+            FROM memories JOIN memory_vectors ON memory_vectors.memory_id = memories.id
+            WHERE memories.status = 'active'
+              AND memories.scope = @scope AND memories.type = @type
+              AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
+              AND CASE memories.sensitivity WHEN 'public' THEN 0 WHEN 'personal' THEN 1
+                  WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
+              AND memories.id NOT IN (SELECT value FROM json_each(@excludeIds))
+              AND (memories.valid_from IS NULL OR memories.valid_to IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(memories.valid_to))
+              AND (@end IS NULL OR memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@end))
+              AND (@start IS NULL OR memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@start))
+            ORDER BY context_timestamp(COALESCE(memories.occurred_at, memories.created_at)) DESC
+        `,
             )
-            .map((candidate) => ({
-                ...candidate,
-                similarity: candidate.match.vectorSimilarity,
-                reason: 'Same type and scope with overlapping validity',
-            }));
+            .iterate({
+                scope: memory.scope,
+                type: memory.type,
+                sensitivityRank,
+                allowedScopes,
+                excludeIds: JSON.stringify(options.excludeIds || []),
+                start: memory.validFrom ?? null,
+                end: memory.validTo ?? null,
+            });
+        const vector = this._scoreVectorRows(
+            rows,
+            this.vectorEncoder.encode(memory.content),
+            threshold,
+            limit,
+            memory.content,
+            5_000,
+        );
+        return fuseRankings([], vector, limit).map((candidate) => ({
+            ...candidate,
+            similarity: candidate.match.vectorSimilarity,
+            reason: 'Same type and scope with overlapping validity',
+        }));
     }
 
     list(options = {}) {
@@ -832,14 +857,6 @@ function fuseRankings(lexical, vector, limit) {
             },
         };
     });
-}
-
-function validityOverlaps(left, right) {
-    const leftStart = left.validFrom ? Date.parse(left.validFrom) : -Infinity;
-    const leftEnd = left.validTo ? Date.parse(left.validTo) : Infinity;
-    const rightStart = right.validFrom ? Date.parse(right.validFrom) : -Infinity;
-    const rightEnd = right.validTo ? Date.parse(right.validTo) : Infinity;
-    return leftStart <= rightEnd && rightStart <= leftEnd;
 }
 
 function clamp(value, min, max) {

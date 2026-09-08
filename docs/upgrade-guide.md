@@ -3,6 +3,15 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v0.13.1 to v0.13.2
+
+Conflict detection now considers the full proposed validity interval, so future or historical
+overlaps can appear even when the stored memory is not valid at the proposal's start time.
+Missing bounds are unbounded; `occurredAt` is event metadata, not a validity boundary.
+Scope/policy filters, excluded IDs and identical content no longer consume the conflict
+candidate budget. Ordinary `search`/`list` as-of behavior, schema 2 and public exports remain
+unchanged. Conflict scores are still heuristic; see the candidate limits in the Context Vault guide.
+
 ## From v0.13.0 to v0.13.1
 
 Temporal validation, retrieval and sorting now compare instants instead of ISO strings.

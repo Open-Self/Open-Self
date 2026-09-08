@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-09-09
+
+### Fixed
+
+- Conflict detection selects overlapping validity intervals across the full proposed window instead of searching only at its start time.
+- Exact scope, sensitivity, owner policy, excluded IDs, non-overlap and identical content are removed before conflict candidate/result limits.
+- Reversed legacy validity intervals are excluded from conflict candidates.
+
+### Added
+
+- Full-window, open-bound, millisecond-boundary, policy and candidate-starvation regressions, including 5,001 identical records.
+- A schema-2 migration fixture frozen from v0.13.1, with synthetic capture checkpoint state verified by the installed consumer.
+
 ### Documentation and maintenance
 
 - Corrected installation instructions while npm remains on v0.7.0; Context Vault users are directed to the verified GitHub artifact.

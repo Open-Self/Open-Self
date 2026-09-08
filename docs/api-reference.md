@@ -54,7 +54,7 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `forget(id)` | `true` for the first successful soft-delete, `false` for missing/already-forgotten records |
 | `search(query, options?)` | Ranked active records; queries without indexable terms return filtered, unranked list results |
 | `list(options?)` | Records ordered by event/creation time with pagination, without relevance ranking |
-| `findPotentialConflicts(input, options?)` | Similar current facts/preferences/decisions; punctuation-only proposals return `[]` |
+| `findPotentialConflicts(input, options?)` | Similar active facts/preferences/decisions with overlapping validity intervals; punctuation-only proposals return `[]` |
 | `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string |
 | `stats()` | Counts by status/type, vector model/count, encryption mode, and database path |
 | `close()` | Releases the SQLite handle; do not use the store afterwards |

@@ -98,6 +98,17 @@ the same type and exact scope. Similar memories whose validity windows overlap a
 **potential conflicts**. OpenSelf does not automatically declare one memory true, overwrite the old
 memory, or ask an LLM to make the decision.
 
+Conflict selection considers the full proposed `validFrom`–`validTo` interval, with inclusive
+bounds and absent bounds treated as unbounded. `occurredAt` does not replace a validity bound.
+For example, a stored March–June decision can conflict with a January–December proposal.
+This differs from ordinary search, which selects memories valid at a single `asOf` instant.
+
+Exact scope, type, sensitivity, allowed scopes, excluded IDs and temporal overlap are applied
+before the candidate budget. Identical content is also excluded before counting candidates.
+Up to 5,000 eligible, non-identical records with usable vectors are scored, newest event/creation
+time first, and the best scores up to `limit` are returned. This is bounded heuristic retrieval,
+not an exhaustive contradiction detector over an arbitrarily large vault.
+
 ```bash
 openself memory conflicts \
   --type preference \

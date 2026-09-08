@@ -19,7 +19,7 @@ const version = execFileSync(process.execPath, [require.resolve('openself/cli'),
 }).trim();
 assert.equal(version, pkg.version);
 
-for (const released of ['v0.9.1', 'v0.11.0']) {
+for (const released of ['v0.9.1', 'v0.11.0', 'v0.13.1']) {
     const db = new Database(`${released}.db`);
     db.exec(readFileSync(`${released}.sql`, 'utf8'));
     db.close();
@@ -38,8 +38,12 @@ for (const released of ['v0.9.1', 'v0.11.0']) {
         assert.equal(store.db.pragma('user_version', { simple: true }), 2);
         assert.equal(
             store.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
-            0,
+            released === 'v0.13.1' ? 1 : 0,
         );
+        if (released === 'v0.13.1') {
+            const checkpoint = store.db.prepare('SELECT snapshot FROM capture_checkpoints').get();
+            assert.deepEqual(JSON.parse(checkpoint.snapshot).files['fixture.md'].memoryIds, [id]);
+        }
     } finally {
         store.close();
     }
@@ -86,6 +90,29 @@ try {
         validFrom: '2026-01-01T15:00:00+07:00',
         validTo: '2026-01-01T04:00:00-05:00',
     });
+    const overlap = store.remember({
+        type: 'decision',
+        content: 'Use PostgreSQL for database storage',
+        scope: 'project/fixture',
+        sensitivity: 'public',
+        validFrom: '2026-03-01T00:00:00Z',
+        validTo: '2026-06-01T00:00:00Z',
+    });
+    const overlapResult = await client.callTool({
+        name: 'openself_find_conflicts',
+        arguments: {
+            type: 'decision',
+            content: 'Use SQLite for database storage',
+            scope: 'project/fixture',
+            validFrom: '2026-01-01T00:00:00Z',
+            validTo: '2026-12-01T00:00:00Z',
+            threshold: 0,
+        },
+    });
+    assert.deepEqual(
+        JSON.parse(overlapResult.content[0].text).potentialConflicts.map((memory) => memory.id),
+        [overlap.id],
+    );
     const temporalResult = await client.callTool({
         name: 'openself_search_memory',
         arguments: { query: 'Temporal', retrieval: 'lexical', asOf: '2026-01-01T08:00:00Z' },

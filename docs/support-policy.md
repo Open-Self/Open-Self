@@ -41,8 +41,8 @@ compiles TypeScript in NodeNext and Bundler modes, checks all public value expor
 executes the CLI, upgrades frozen released schemas, exercises MCP permissions, serves
 an authenticated dashboard asset, and round-trips an encrypted backup.
 
-Migration fixtures contain synthetic data and schema SQL frozen from the v0.9.1 and
-v0.11.0 release tags, with source hashes recorded in each file. They are not generated
+Migration fixtures contain synthetic data and schema SQL frozen from the v0.9.1,
+v0.11.0 and v0.13.1 release tags, with source hashes recorded in each file. They are not generated
 from the current migration code during tests. This detects schema drift independently
 of current initialization logic; it does not prove recovery of arbitrary corrupted data.
 

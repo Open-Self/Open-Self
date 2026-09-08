@@ -126,6 +126,31 @@ describe('MCP owner policy enforcement', () => {
         }
     });
 
+    it('finds full-window conflicts through both tools while preserving owner policy', async () => {
+        const existing = {
+            type: 'decision',
+            content: 'Use PostgreSQL for database storage',
+            scope: 'project/atlas',
+            validFrom: '2026-03-01T00:00:00Z',
+            validTo: '2026-06-01T00:00:00Z',
+            sensitivity: 'public',
+        };
+        const allowed = store.remember(existing);
+        store.remember({ ...existing, sensitivity: 'restricted' });
+        store.remember({ ...existing, scope: 'project/atlas/child' });
+        await connect();
+        const args = {
+            ...existing,
+            content: 'Use SQLite for database storage',
+            validFrom: '2026-01-01T00:00:00Z',
+            validTo: '2026-12-01T00:00:00Z',
+        };
+        for (const name of ['find_conflicts', 'remember']) {
+            const result = payload(await call(name, args));
+            expect(result.potentialConflicts.map(({ id }) => id)).toEqual([allowed.id]);
+        }
+    });
+
     it('enforces write capabilities, write ceilings and forget ownership without existence leaks', async () => {
         const hidden = store.remember({ content: 'foreign secret', scope: 'personal' });
         const restricted = store.remember({

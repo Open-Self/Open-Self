@@ -80,7 +80,7 @@ try {
         consumer,
     );
     copyFileSync(join(root, 'tests', 'package', 'smoke.mjs'), join(consumer, 'smoke.mjs'));
-    for (const version of ['v0.9.1', 'v0.11.0'])
+    for (const version of ['v0.9.1', 'v0.11.0', 'v0.13.1'])
         copyFileSync(
             join(root, 'tests', 'fixtures', 'migrations', `${version}.sql`),
             join(consumer, `${version}.sql`),
