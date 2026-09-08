@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Private, persistent personal context and memory for every AI you use.",
   "type": "module",
   "sideEffects": false,
@@ -10,9 +10,11 @@
   "main": "./src/index.js",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "default": "./src/index.js"
     },
     "./cli": {
+      "types": "./types/cli.d.ts",
       "default": "./src/cli/index.js"
     },
     "./package.json": "./package.json"
@@ -25,18 +27,20 @@
     "benchmark:context": "node scripts/benchmark-context.js",
     "eval:context": "node scripts/evaluate-context.js",
     "test:clone": "node src/cli/index.js test",
-    "lint": "eslint src/ tests/",
-    "lint:fix": "eslint src/ tests/ --fix",
-    "format": "prettier --write src/ tests/",
-    "format:check": "prettier --check src/ tests/",
+    "lint": "eslint src/ tests/ scripts/",
+    "lint:fix": "eslint src/ tests/ scripts/ --fix",
+    "format": "prettier --write src/ tests/ types/ scripts/ tsconfig.types.json",
+    "format:check": "prettier --check src/ tests/ types/ scripts/ tsconfig.types.json",
     "feed": "node src/cli/index.js feed",
     "setup": "node src/cli/index.js setup",
     "arena": "node src/cli/index.js arena",
     "ghost": "node src/cli/index.js ghost",
     "profile": "node src/cli/index.js profile",
     "prepack": "npm run lint && npm test",
-    "prepublishOnly": "npm run lint && npm test && npx --yes publint --strict",
-    "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\""
+    "prepublishOnly": "npm run lint && npm test && npm run test:types && npx --yes publint --strict",
+    "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\"",
+    "test:types": "tsc -p tsconfig.types.json",
+    "test:package": "node scripts/test-package.js"
   },
   "keywords": [
     "ai",
@@ -64,6 +68,7 @@
     "url": "https://github.com/Open-Self/Open-Self/issues"
   },
   "files": [
+    "types/",
     "src/",
     "scripts/benchmark-context.js",
     "scripts/evaluate-context.js",
@@ -91,6 +96,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.5.0",
     "@whiskeysockets/baileys": "^6.7.23",
     "better-sqlite3": "^12.11.1",
     "chalk": "^5.6.2",
@@ -115,6 +123,8 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
     "prettier": "^3.9.4",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
-  }
+  },
+  "types": "./types/index.d.ts"
 }

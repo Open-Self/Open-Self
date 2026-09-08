@@ -566,6 +566,7 @@ export class ContextStore {
         if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
             throw new Error('conflict threshold must be between 0 and 1');
         }
+        if (!this.codec.indexQuery(memory.content)) return [];
         return this.search(memory.content, {
             scope: memory.scope,
             type: memory.type,

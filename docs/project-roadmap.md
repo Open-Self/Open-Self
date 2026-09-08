@@ -65,6 +65,16 @@ OS isolation is still required for untrusted agents. Policy changes require a se
 v1.0 is a quality gate, not a date promise. Community adoption and download counts are
 not substitutes for correctness or evidence of a successful release.
 
+### v0.12 compatibility candidate
+
+Delivered declaration coverage for every root export, strict consumer type checks,
+frozen released-schema migration fixtures, and isolated installed-package tests.
+The [API reference](./api-reference.md), [support policy](./support-policy.md), and
+[upgrade guide](./upgrade-guide.md) define the candidate surface and its boundaries.
+
+Before v1.0: review remaining release-blocking issues against these contracts, verify
+the final version through all release gates, and complete registry publication.
+
 ## Release process
 
 1. Finish the phase with task-relevant source, tests, and documentation.

@@ -38,6 +38,12 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Public TypeScript contract
+        run: npm run test:types
+
+      - name: Installed package compatibility
+        run: npm run test:package
+
       - name: Unit tests
         run: npm test
 

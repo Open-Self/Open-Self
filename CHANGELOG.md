@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-08
+
+### Added
+
+- TypeScript declarations for all 50 existing root exports, including nullable memory results, optional retrieval metadata, policy/capability types, backup results, and legacy API signatures.
+- Public export parity and strict positive/negative consumer type checks.
+- Isolated npm-tarball consumer checks under NodeNext and Bundler, with runtime CLI, MCP, dashboard, encrypted recovery, and frozen-schema upgrade tests.
+- Synthetic migration fixtures frozen from v0.9.1 and v0.11.0, preserving history, forgotten state, IDs, and import deduplication.
+- API reference, support/compatibility policy, and upgrade guide.
+
+### Fixed
+
+- Punctuation-only conflict proposals return no candidates instead of reading absent vector match metadata.
+
+### Changed
+
+- CI and tag-release verification now run type and installed-package gates on every supported platform/runtime.
+- Public declaration dependencies ship with the package; TypeScript remains a development-only tool.
+
 ## [0.11.0] - 2026-09-08
 
 ### Added

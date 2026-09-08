@@ -263,6 +263,9 @@ console.log(context.context);
 store.close();
 ```
 
+TypeScript declarations cover every root export. See the [API reference](./docs/api-reference.md),
+[support policy](./docs/support-policy.md), and [upgrade guide](./docs/upgrade-guide.md).
+
 ## Personality and messaging tools
 
 OpenSelf began as a local AI personality clone. Those workflows remain available while the project
@@ -332,6 +335,8 @@ npm test
 npm run lint
 npm run format:check
 npm run test:coverage
+npm run test:types
+npm run test:package
 npm run benchmark:context -- --count=1000
 ```
 
