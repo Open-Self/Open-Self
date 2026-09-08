@@ -1,360 +1,95 @@
 # Project Roadmap
 
-OpenSelf's release history, current work, and future vision. See [CHANGELOG.md](../CHANGELOG.md) for detailed change entries.
-
-> **Direction update (v0.8):** OpenSelf is evolving from autonomous personality impersonation into
-> a local-first Personal Context Vault for AI agents. The personality and messaging features remain
-> compatible, but new work prioritizes durable memory, provenance, permissions, MCP interoperability,
-> and human-approved actions. See [Context Vault & MCP](./context-vault.md).
-
-## v0.8.0 — Personal Context Vault
-
-**Implemented vertical slice:**
-
-- Typed memory schema: facts, preferences, decisions, commitments, relationships, events, and notes
-- Provenance, hierarchical scope, sensitivity, confidence, and temporal validity
-- SQLite source of truth with Unicode FTS5 retrieval
-- Recoverable forgetting that immediately removes memories from retrieval
-- CLI commands for add, search, list, forget, and stats
-- MCP stdio server for remember, search, bounded context, and forget
-- Existing personality clone and messaging commands remain available
-
-**Completed milestones:**
-
-1. ✅ Import Markdown/text, WhatsApp, and Telegram with provenance and deduplication
-2. ✅ Local FTS5/vector rank fusion and potential conflict detection
-3. ✅ Authenticated localhost dashboard with edit, merge, version history, and conflict review
-4. **Complete:** Continuous local capture for project folders, ICS calendars, EML/MBOX email, and
-   browser bookmark/history exports
-5. **Complete:** AES-256-GCM payload encryption, blind lexical indexes, and OS-bound key protection
-6. **Complete:** Recall/MRR, temporal correctness, sensitivity leakage, and provenance eval suites
-
-## Released Versions
-
-### v0.1.0 — 2026-02-20 (Initial Release)
-
-**Core personality engine:**
-- Chat export parsers (WhatsApp .txt, Telegram JSON, generic text)
-- Personality extractor (emoji frequency, catchphrases, vocabulary, Vietnamese traits)
-- SOUL.md auto-generator
-- Clone Brain with 4 LLM providers (Claude, GPT, DeepSeek, Ollama)
-- Human mimicry (reply delays, typing simulation, typo injection)
-- Safety system (AI reveal detection EN+VN, boundary enforcement, review queue)
-- CLI with 5 commands: setup, feed, test, start (stub), review
-
-### v0.2.0 — 2026-02-21 (Memory & Gateways)
-
-**RAG + Telegram + Web:**
-- Vector-based memory (Vectra + embeddings)
-- Per-contact conversation history
-- Telegram gateway (grammy bot, group chat awareness)
-- Interactive test mode (`--interactive` flag)
-- "Talk to My Clone" web UI (Express server on localhost)
-- Full 10-step message processing pipeline
-
-### v0.3.0 — 2026-02-23 (Arena & Discord)
-
-**Clone vs Clone debates:**
-- Clone Arena (two clones debate topics)
-- Ghost Mode (auto-reply when offline)
-- Discord gateway (discord.js, DM + @mention responses)
-- Shareable clone score badge (`/badge/:name` SVG endpoint)
-- Arena spectate via web (`/arena/:id`)
-- Automatic RAG indexing during feed
-
-### v0.4.0 — 2026-02-26 (WhatsApp)
-
-**Mobile messaging:**
-- WhatsApp gateway (Baileys SDK with QR code pairing)
-- Profile export/import (`.openself` bundles)
-- All 3 messaging platforms fully live
-
-### v0.5.0 — 2026-03-16 (Polish & Documentation)
-
-**UX improvements:**
-- 3 documentation guides (setup, personality tuning, safety)
-- GitHub Actions CI (Node 20/22 smoke tests)
-- Colored CLI help with quickstart examples
-- Global error handler with friendly messages
-- `files` field in package.json for npm publish prep
-
-### v0.6.0 — 2026-05-07 (Completion & Publish-Ready)
-
-**Testing, security, polish:**
-
-**Fixed (P0 critical):**
-- Vietnamese AI-reveal regex: `\t` → `\b` word boundary (now detects VN patterns)
-- Web route path traversal: `/arena/:id` and `/badge/:name` validation
-- Personality pipeline: numeric stats from extractor now persist to `data/personality.json` and merge at runtime (was silently defaulting)
-
-**Fixed (P1):**
-- WhatsApp reconnection: removed deprecated `printQRInTerminal`, added qrcode-terminal; fixed event listener leaks
-- Profile import sanitization: code-fence stripping, length cap, user warning
-- Centralized CLI error handler with structured exit codes (2=config, 3=network, 1=generic)
-- 7 additional refinements per phase-02
-
-**Added:**
-- Vitest test suite + coverage reporting
-- ESLint v9 flat config + Prettier formatting
-- Zod runtime validation for SOUL.md
-- update-notifier on CLI start
-- New modules: `personality-loader.js`, `soul-schema.js`, `error-handler.js`
-
-**Breaking changes:**
-- `npm test` now runs vitest (use `npm run test:clone` for Clone Score test)
-
-**Metrics:**
-- All 3 P0 bugs fixed with regression tests
-- All 9 P1 bugs fixed
-- Coverage ≥50% on core modules
-- ESLint + Prettier clean
-- CI matrix: Linux + Windows × Node 20/22 (Node 18 dropped — baileys requires ≥20)
-- 4 new docs created (7 total in `./docs/`)
-
-## In Progress
-
-**Phase 09 (this session):** Documentation completion
-- Create codebase-summary.md, system-architecture.md, code-standards.md, project-roadmap.md
-- Update README badges and Troubleshooting section
-- Create/extend CONTRIBUTING.md
-- Extend safety-guide.md with profile import threat model
-
----
-
-## Future Candidates
-
-### v0.7.0 — TypeScript & Modularization (Speculative)
-
-**Goal:** Improve type safety and maintainability.
-
-**Planned work:**
-- Migrate critical modules to TypeScript (brain, safety, config)
-- JSDoc type annotations for remaining JS files
-- Modularize large files: extractor (3 modules), test.js (2 modules), whatsapp.js (2 modules)
-- Build time: `tsc` type check
-- Full type coverage on exports
-
-**Not committed:** TypeScript adds complexity; migration is gradual and optional.
-
-### Post-v0.8 Voice and Multi-profile Work (Speculative)
-
-**Goal:** Evaluate optional voice and multi-profile workflows without weakening the local-first
-Context Vault.
-
-**Planned features:**
-- Voice cloning via TTS (text-to-speech) integration
-- Multi-clone profile vault (manage 3+ personalities locally)
-- Export profiles with voice models
-
-**Not committed:** Voice APIs are expensive and can introduce biometric privacy risk. Context memory
-versioning and the authenticated local dashboard are already delivered in v0.8.
-
-### v0.9.0 — Semantic Release & Auto-Publish (Speculative)
-
-**Goal:** Automate versioning and npm publishing.
-
-**Planned work:**
-- semantic-release integration
-- Auto-tag releases based on conventional commits
-- Auto-publish to npm registry on release
-- Automated changelog generation
-
-**Not committed:** Requires careful setup to avoid publishing unstable versions.
-
-### v1.0.0 — Stable API & Public Service (Speculative)
-
-**Goal:** Long-term stability and optional hosted service.
-
-**Planned features:**
-- Frozen API contracts (no breaking changes in 1.x)
-- Comprehensive API docs (OpenAPI spec)
-- Optional hosted "Share My Clone" service (centralized arena)
-- Signed profile bundles (for trusted imports)
-- Multi-tenant support investigation
-
-**Constraints:**
-- No cloud sync (data always local-first)
-- No telemetry or tracking
-- Optional opt-in public service (user controls visibility)
-
----
-
-## Non-Goals
-
-**OpenSelf will NOT:**
-
-- **Cloud sync:** All data stays on user's machine. No automatic backup to cloud.
-- **Telemetry:** Never collect usage data, conversation transcripts, or device info.
-- **SaaS:** Not building a subscription service. Optional public share service would be opt-in.
-- **Training on user data:** User's conversations never used to improve global models.
-- **Proprietary platforms only:** Will stay open source (MIT license). Commercial forks welcome.
-- **Voice messaging UX:** Audio transcription / playback considered low-priority.
-- **Full TypeScript rewrite:** Migration is gradual; plain JS + JSDoc is acceptable long-term.
-
----
-
-## Success Metrics by Version
-
-| Metric | v0.5.0 | v0.6.0 | v0.7.0 (candidate) | v1.0.0 (candidate) |
-|--------|--------|--------|-------------------|-------------------|
-| **Platforms** | 3 (WhatsApp, Telegram, Discord) | 3 | 4+ (Signal, Matrix) | 5+ |
-| **Test Coverage** | 0% | ≥50% | ≥70% | ≥80% |
-| **Docs** | 3 guides | 7 docs | 10 docs | 12+ docs |
-| **Type Safety** | JSDoc partial | JSDoc full | TS ≥50% | TS ≥80% |
-| **npm Downloads/mo** | <100 | 200-500 (target) | 1000+ | 5000+ |
-| **CI Platforms** | Linux | Linux + Windows | 3 platforms | 4+ platforms |
-| **Breaking Changes** | ✓ (v0.x) | 1 (npm test) | 0 (v1.0 locks) | 0 |
-| **API Stability** | Evolving | Pre-release | Stable | Frozen |
-
----
-
-## Development Priorities
-
-### Short Term (Next Sprint)
-
-1. **Publish v0.6.0 to npm** (after phase 09 docs)
-2. **Community feedback cycle** (20-30 early users)
-3. **Bug reports & hotfixes** (v0.6.1, v0.6.2)
-4. **Usage metrics** (stars, forks, issues from community)
-
-### Medium Term (2-3 months)
-
-1. **Evaluate TypeScript migration** (feedback from v0.6 users)
-2. **Modularize large files** (phase 05 follow-up)
-3. **Expand test suite** (community contributions?)
-4. **New gateway candidates** (Slack, Matrix, Signal interest from users?)
-
-### Long Term (6+ months)
-
-1. **Platform stability:** Lock v1.0.0 API
-2. **Optional service:** Investigate "Share My Clone" public service
-3. **Voice cloning:** TTS integration (if community interest)
-4. **Ecosystem:** Documentation for custom gateways, providers
-
----
-
-## Community Contribution Roadmap
-
-**OpenSelf welcomes:**
-- Bug reports and fixes
-- New LLM provider integrations (local models, proprietary APIs)
-- New messaging platforms (Signal, Matrix, Slack, etc.)
-- Documentation improvements
-- Personality extraction enhancements (dialect detection, emoji categories)
-- Test coverage improvements
-
-**How to contribute:**
-1. Fork repo
-2. Branch: `<name>/feat/...` or `<name>/fix/...`
-3. Add tests + docs
-4. Submit PR with clear description
-5. Code review via maintainer
-
-**Maintainers:**
-- Primary: minhvu2212@gmail.com
-- Help wanted: [CONTRIBUTING.md](../CONTRIBUTING.md)
-
----
-
-## Release Process (v0.6.0+)
-
-### Manual Release Steps
-
-1. **Prepare release branch:**
-   ```bash
-   git checkout -b release/v0.X.0
-   ```
-
-2. **Update version:**
-   - Bump `package.json` version
-   - Update `CHANGELOG.md` with all changes
-   - Verify `npm pack --dry-run` shows expected files
-
-3. **Final checks:**
-   ```bash
-   npm test                 # All tests pass
-   npm run lint             # ESLint clean
-   npm run format:check     # Prettier clean
-   npx publint --strict     # npm publish validation
-   ```
-
-4. **Commit & tag:**
-   ```bash
-   git add package.json CHANGELOG.md docs/
-   git commit -m "release: v0.X.0"
-   git tag v0.X.0
-   ```
-
-5. **Push & publish:**
-   ```bash
-   git push origin release/v0.X.0
-   git push origin v0.X.0
-   npm publish              # To npm registry
-   ```
-
-6. **GitHub Release:**
-   - Create release from tag
-   - Attach release notes from CHANGELOG.md
-   - Trigger GitHub Actions (CI validates)
-
-7. **Merge to main:**
-   ```bash
-   git checkout main
-   git merge release/v0.X.0
-   ```
-
-### Version Numbering
-
-- **Major (X.0.0):** Breaking API changes (0.6 → 1.0 locks API)
-- **Minor (0.X.0):** New features (0.5 → 0.6 = tests + security)
-- **Patch (0.0.X):** Bug fixes only (0.6.0 → 0.6.1 = hotfix)
-
-### Breaking Change Policy
-
-**v0.x:** Breaking changes allowed (pre-release)
-- Documented clearly in CHANGELOG
-- Migration guide provided
-- Deprecation warning in previous version (if possible)
-
-**v1.0+:** No breaking changes (API locked)
-- Additions only
-- Deprecations with 2-version warning
-- Major breaking changes reserved for v2.0+
-
----
-
-## Decision Log
-
-| Decision | Rationale | Date |
-|----------|-----------|------|
-| Stay ESM-only | Node ≥18 assumed; CommonJS adds maintenance burden | 2026-02 |
-| Gradual TypeScript | JSDoc sufficient for v0.x; TS migration low-priority | 2026-02 |
-| No cloud sync | User control prioritized over convenience | 2026-02 |
-| Zod for validation | Lightweight, easy to debug, no TypeScript dependency | 2026-05 |
-| Vitest over Jest | Faster, ESM-native, simpler config | 2026-05 |
-| Manual release (v0.6) | semantic-release overhead not justified pre-v1.0 | 2026-05 |
-
----
-
-## FAQs
-
-**Q: When will OpenSelf publish to npm?**
-A: Package metadata and validation are publish-ready; registry releases remain an explicit
-maintainer-controlled operation.
-
-**Q: Will OpenSelf support TypeScript?**
-A: JSDoc + Zod provide type safety for v0.x. Gradual migration to TypeScript planned for v0.7+, not required.
-
-**Q: Can I run OpenSelf in the cloud?**
-A: The core can run on a private host, but the Context Vault dashboard intentionally binds to
-localhost and is not a remotely exposed multi-user service.
-
-**Q: Will there be a web dashboard?**
-A: Yes. v0.8 includes an authenticated localhost dashboard for search, edit, merge, conflict review,
-forgetting, and version history.
-
-**Q: Can I contribute a new messaging platform?**
-A: Yes! Create a gateway class extending the base pattern. See [CONTRIBUTING.md](../CONTRIBUTING.md).
-
-**Q: How do I report a security issue?**
-A: Email security concerns to minhvu2212@gmail.com or file a private security advisory on GitHub.
+OpenSelf is a local-first Personal Context Vault for AI agents. Delivery is phased:
+implement the capability, verify its behavior, then release it with migration notes.
+See [CHANGELOG.md](../CHANGELOG.md) for implementation history and
+[GitHub Releases](https://github.com/Open-Self/Open-Self/releases) for published artifacts.
+A changelog entry alone is not evidence of publication to npm.
+
+## Phase 1: Context foundation — implemented in v0.8.0
+
+- Typed memory, provenance, hierarchical scopes, temporal validity, and sensitivity filtering.
+- SQLite/FTS5 storage, recoverable forgetting, bounded context construction.
+- CLI, JavaScript API, and stdio MCP integration.
+- Existing personality and messaging workflows remain available.
+
+## Phase 2: Usable private vault — v0.9.0
+
+- Markdown/text and chat imports with durable deduplication.
+- Local hybrid retrieval and potential conflict detection.
+- Authenticated localhost dashboard with editing, merging, and version history.
+- Incremental project, calendar, email, and browser export capture.
+- AES-256-GCM payload encryption, blind lexical indexes, and OS-bound key storage.
+- Versioned retrieval, temporal, sensitivity, and provenance evaluations.
+- Linux, Windows, and macOS verification on Node 22.13 and 24.
+- Tag releases gated by CI, with a downloadable npm tarball and separate npm publication.
+
+Node 20 users must upgrade to Node >=22.13 before installing v0.9.0. Existing local
+vaults are opened in place; enabling encryption remains an explicit user action.
+Payload encryption does not hide scope, timestamps, IDs, or other operational metadata.
+
+## Phase 3: Recovery and portability — next
+
+Deliver a documented, tested recovery path before calling the vault stable:
+
+- Consistent backup while a vault is open, including version history and import ledgers.
+- Encrypted portable backup with explicit key recovery; no silent plaintext exports.
+- Restore validation, schema compatibility checks, and refusal to overwrite an existing vault.
+- Tests for interrupted writes, corrupted backups, wrong keys, and restored retrieval behavior.
+- CLI recovery guide and a release with an end-to-end backup/restore example.
+
+OS-bound keys currently require the original account or an explicitly managed environment key.
+Do not describe copying the SQLite file alone as a portable encrypted backup.
+
+## Phase 4: Agent permissions and accountability — planned
+
+- Owner-configured scope and sensitivity ceilings that agents cannot raise themselves.
+- Explicit read/write capabilities per MCP client configuration.
+- Local access audit with retention controls and no unnecessary payload duplication.
+- Adversarial permission tests and documented trust boundaries.
+
+The current stdio server inherits the launching client's local permissions. Per-call
+sensitivity filters are not a multi-user authorization system.
+
+## Phase 5: Stable public API — v1.0 candidate
+
+- Document supported JavaScript exports, errors, schemas, and compatibility guarantees.
+- Ship declarations or equivalent checked API documentation for library consumers.
+- Migration fixtures from released vault schemas and installed-package integration tests.
+- Recovery, permission, retrieval, and packaging gates pass on all supported platforms.
+- Publish a support policy and an upgrade guide; resolve release-blocking issues.
+
+v1.0 is a quality gate, not a date promise. Community adoption and download counts are
+not substitutes for correctness or evidence of a successful release.
+
+## Release process
+
+1. Finish the phase with task-relevant source, tests, and documentation.
+2. Update the manifest and lockfile version, plus dated changelog and migration notes.
+3. Run lint, formatting, tests with coverage, context evaluations, and strict publint.
+4. Inspect `npm pack --dry-run` for expected content and absence of private runtime data.
+5. Commit with a conventional message, push, and verify CI for that exact commit.
+6. Push the matching `vX.Y.Z` tag. Release CI repeats the platform matrix, checks the
+   tag against the manifest, packages the source, and creates a GitHub release.
+7. The publish job uploads that same tarball to npm with provenance. It requires the
+   `NPM_TOKEN` repository secret and fails explicitly if credentials are absent.
+8. Verify both the GitHub artifact and the npm version. If npm authentication fails,
+   configure credentials and rerun the failed publish job; do not move the release tag.
+
+CLI and MCP versions are read from `package.json`. Before v1.0, breaking changes must
+have prominent migration notes. Stable 1.x releases will preserve documented contracts;
+breaking changes require a new major version.
+
+## Contribution priorities
+
+Recovery tooling, permission boundaries, realistic retrieval evaluations, reproducible
+bug reports, accessibility, and documentation are welcome. See
+[CONTRIBUTING.md](../CONTRIBUTING.md) and [SECURITY.md](../SECURITY.md).
+
+## Project boundaries
+
+- MIT licensed and local-first; no mandatory cloud service or automatic cloud sync.
+- No telemetry, tracking, or training on user data.
+- Cloud model integrations are optional and send supplied context to that provider.
+- Human approval and explicit consent guide action-oriented integrations.
+- The Context Vault dashboard stays a local administration interface.

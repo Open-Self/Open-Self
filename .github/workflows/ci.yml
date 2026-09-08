@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main]
   pull_request:
@@ -13,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        node-version: [20, 22]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['22.13.0', '24']
 
     steps:
       - uses: actions/checkout@v4
@@ -41,16 +42,15 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Coverage (Linux + Node 20 only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+      - name: Coverage (Linux + Node 22.13 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.13.0'
         run: npm run test:coverage
 
-      - name: Context retrieval and privacy evaluations (Linux + Node 20 only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+      - name: Context retrieval and privacy evaluations
         run: npm run eval:context
 
       - name: Upload coverage artifact
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.13.0'
         uses: actions/upload-artifact@v4
         with:
           name: coverage
@@ -65,10 +65,10 @@ jobs:
           test -f data/SOUL.md
           test -f data/personality.json
 
-      - name: Publint (Linux + Node 20 only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+      - name: Publint (Linux + Node 22.13 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.13.0'
         run: npx --yes publint --strict
 
-      - name: NPM pack dry-run (Linux + Node 20 only)
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+      - name: NPM pack dry-run (Linux + Node 22.13 only)
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.13.0'
         run: npm pack --dry-run

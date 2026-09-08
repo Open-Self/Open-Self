@@ -60,7 +60,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 See [Code Standards](./docs/code-standards.md) for detailed guidelines.
 
 **Quick summary:**
-- **ESM modules** — `import`/`export`, Node ≥18
+- **ESM modules** — `import`/`export`, Node >=22.13
 - **File naming** — kebab-case (e.g., `personality-extractor.js`)
 - **File size** — <200 lines of code per file
 - **Indentation** — 4 spaces (Prettier enforced)

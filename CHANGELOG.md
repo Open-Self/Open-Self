@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-08
+
 ### Added
 
 - `openself memory import` for Markdown/MDX, plain text, WhatsApp text exports, and Telegram JSON.
@@ -39,6 +41,10 @@
 
 ### Changed
 
+- **Requires Node.js >=22.13.0.** Upgrade Node before installing; current CLI dependencies no longer support Node 20.
+- CLI and MCP versions now read the package manifest to prevent release version drift.
+- CI validates Linux, Windows, and macOS on Node 22.13 and 24; tag releases run the same gates.
+- Release packaging produces a GitHub artifact and fails explicitly when npm credentials are missing.
 - Telegram parsing now preserves the export's normalized ISO timestamp for Context Vault ingestion.
 - WhatsApp and Telegram imports default to `private`; document imports default to `personal`.
 

@@ -4,7 +4,7 @@ Get OpenSelf running in 5 minutes. This guide covers installation, API key confi
 
 ## Prerequisites
 
-- **Node.js** ≥ 18.0.0 ([download](https://nodejs.org))
+- **Node.js** ≥ 22.13.0 ([download](https://nodejs.org))
 - **An LLM API key** — Claude, GPT, DeepSeek, or [Ollama](https://ollama.ai) (free, local)
 - **Chat history** — WhatsApp `.txt` export, Telegram JSON export, or a manual personality brief
 

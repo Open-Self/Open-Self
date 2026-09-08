@@ -4,6 +4,7 @@
  * OpenSelf CLI — Your context. Your memory. Your rules.
  */
 
+import { packageVersion } from '../version.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import updateNotifier from 'update-notifier';
@@ -44,7 +45,7 @@ const program = new Command();
 program
     .name('openself')
     .description('OpenSelf — Private, persistent context for every AI you use.')
-    .version('0.8.0')
+    .version(packageVersion)
     .addHelpText(
         'after',
         `

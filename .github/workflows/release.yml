@@ -1,38 +1,65 @@
 name: Release
 
-# Publishes to npm when a version tag (e.g. v0.7.0) is pushed. Requires an
-# NPM_TOKEN repository secret. prepublishOnly (lint + test + publint) gates the
-# publish, and npm provenance is attached via the id-token permission.
 on:
   push:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Verify release tag matches package
+        run: node --input-type=module -e "import { packageVersion } from './src/version.js'; if (process.env.GITHUB_REF_NAME !== 'v' + packageVersion) process.exit(1)"
+      - name: Package verified source
+        run: npm pack --ignore-scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: openself-*.tgz
+          if-no-files-found: error
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const text = fs.readFileSync('CHANGELOG.md', 'utf8'); const version = process.env.GITHUB_REF_NAME.slice(1); const notes = text.split('## [' + version + ']')[1]?.split('\n## [')[0]; if (!notes) process.exit(1); fs.writeFileSync('release-notes.md', notes.slice(notes.indexOf('\n')).trim());"
+          gh release create "$GITHUB_REF_NAME" openself-*.tgz --verify-tag --title "$GITHUB_REF_NAME — Context Vault" --notes-file release-notes.md
+
   publish:
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Publish to npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+      - name: Publish verified package to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN secret not set — skipping publish."
-            echo "Add the secret to enable tag-triggered releases, or publish manually."
-            exit 0
+            echo "::error::GitHub release is available, but npm publication requires the NPM_TOKEN repository secret. Configure it and rerun failed jobs."
+            exit 1
           fi
-          npm publish --provenance --access public
+          npm publish openself-*.tgz --provenance --access public

@@ -34,7 +34,7 @@ memory explicit and portable:
 
 ## Quick start
 
-Requires Node.js 20 or newer.
+Requires Node.js 22.13 or newer. Node.js 24 is also tested.
 
 ```bash
 npm install -g openself

@@ -1,3 +1,4 @@
+import { packageVersion } from '../version.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -7,7 +8,7 @@ import { MEMORY_TYPES, SENSITIVITY_LEVELS } from './schema.js';
 export function createContextMcpServer(store, options = {}) {
     const server = new McpServer({
         name: 'openself-context',
-        version: options.version || '0.8.0',
+        version: options.version || packageVersion,
     });
 
     server.registerTool(
