@@ -32,6 +32,36 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=moderate
 
+      - name: Prepare isolated macOS keychain
+        if: matrix.os == 'macos-latest'
+        run: |
+          security create-keychain -p openself-ci-test-only "$RUNNER_TEMP/openself-test.keychain-db"
+          security default-keychain -s "$RUNNER_TEMP/openself-test.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/openself-test.keychain-db"
+          security unlock-keychain -p openself-ci-test-only "$RUNNER_TEMP/openself-test.keychain-db"
+
+      - name: Install Linux native key provider
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools dbus-x11
+
+      - name: Native OS key integration (Windows and macOS)
+        if: matrix.os != 'ubuntu-latest'
+        timeout-minutes: 5
+        run: npm run test:native-key
+
+      - name: Native OS key integration (isolated Linux session)
+        if: matrix.os == 'ubuntu-latest'
+        timeout-minutes: 5
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/openself-keyring"
+          mkdir -p "$XDG_DATA_HOME"
+          chmod 700 "$XDG_DATA_HOME"
+          dbus-run-session -- bash -e -c 'printf %s openself-ci-test-only | gnome-keyring-daemon --unlock --daemonize --components=secrets >/dev/null; npm run test:native-key'
+
+      - name: Remove isolated macOS keychain
+        if: always() && matrix.os == 'macos-latest'
+        run: security delete-keychain "$RUNNER_TEMP/openself-test.keychain-db"
+
       - name: Lint
         run: npm run lint
 

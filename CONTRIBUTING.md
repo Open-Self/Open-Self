@@ -41,6 +41,10 @@ matrix is required before a release. Use only synthetic fixtures and smoke-test 
 For checkout CLI testing, use `node src/cli/index.js`; `npx openself` can run a different
 published registry version.
 
+`npm run test:native-key` separately checks the real OS provider. Read the
+[native-key verification guide](./docs/native-key-verification.md) for platform setup and
+test-owned cleanup; CI runs it in isolated keychain/session environments.
+
 Source uses ESM, kebab-case filenames and four-space formatting enforced by Prettier.
 Keep changes focused and explain non-obvious decisions. Put regression tests under
 `tests/unit/` or `tests/integration/` and synthetic fixtures under `tests/fixtures/`.

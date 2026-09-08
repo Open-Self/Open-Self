@@ -40,7 +40,8 @@
     "prepublishOnly": "npm run lint && npm test && npm run test:types && npx --yes publint --strict",
     "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\"",
     "test:types": "tsc -p tsconfig.types.json",
-    "test:package": "node scripts/test-package.js"
+    "test:package": "node scripts/test-package.js",
+    "test:native-key": "node scripts/test-native-key.js"
   },
   "keywords": [
     "ai",

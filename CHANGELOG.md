@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Verification
+
+- Added a real OS key-provider integration gate: synthetic-key roundtrip, encrypted vault reopen in a fresh process, unavailable-provider failure and missing-key refusal.
+- CI prepares an isolated macOS keychain and Linux Secret Service session; Windows uses DPAPI with a test-owned temporary blob.
+
 ## [0.13.2] - 2026-09-09
 
 ### Fixed
