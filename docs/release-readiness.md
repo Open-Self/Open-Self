@@ -29,7 +29,7 @@ credentials and generated directories. Its SHA-256 matches the GitHub asset dige
 3790661d97437e5f8f959a0f1e0feb12d9b51167070d3671bd61aca518d9120c
 ```
 
-The README offers this candidate separately from the v0.13.2 installation baseline.
+This candidate was superseded by RC.2 below; the README now links the corrected candidate.
 Registry publication and the final stable-version gates remain open. A candidate does not
 close the stable 1.0 gate; external provider mocks and dashboard audit limits still apply.
 
@@ -41,7 +41,26 @@ unchanged timestamps and sends explicit nulls for cleared dates. All 12 local br
 pass across UTC, Ho Chi Minh City and New York, including the later repeated DST instant.
 See [browser regressions](../tests/browser/dashboard.spec.js) and the
 [upgrade notes](./upgrade-guide.md#from-v100-rc1-to-v100-rc2). The new browser job is required
-alongside the six platform jobs. RC.2 release evidence must be recorded after publication.
+alongside the six platform jobs.
+
+Commit [`735e426`](https://github.com/Open-Self/Open-Self/tree/735e4269e3cf184e4f07834243f3e3f3873bad4a)
+passed all seven jobs in [branch CI](https://github.com/Open-Self/Open-Self/actions/runs/34264369673)
+and again in [release verification](https://github.com/Open-Self/Open-Self/actions/runs/34265417469).
+The local suite also passed 527 Vitest tests, 12 Chromium tests, the installed consumer,
+declaration/lint/format checks, context evaluations, strict publint and dependency audit.
+Line coverage remains 88.95%; browser tests run separately and are not included in that metric.
+
+The downloaded [RC.2 artifact](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0-rc.2/openself-1.0.0-rc.2.tgz)
+contains version `1.0.0-rc.2` and the dashboard correction. Its 104 entries were checked for
+runtime/generated files and its SHA-256 matches the release asset digest:
+
+```text
+b2c4bea0758360f08b966cb416d73e8b25995b9c6119eb43205b0ebdb77ed838
+```
+
+GitHub confirms RC.2 is a prerelease and Latest remains v0.13.2. The separate npm job received
+`NPM_TAG=next` and failed for missing `NPM_TOKEN`; registry dist-tags still list only v0.7.0
+as latest. Stable 1.0 and successful registry publication remain unverified.
 
 ## Evidence by requirement
 

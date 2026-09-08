@@ -74,19 +74,21 @@ v1.0 gates. The [upgrade guide](./docs/upgrade-guide.md) covers existing vaults.
 
 ### Try the v1.0 release candidate
 
-[v1.0.0-rc.1](https://github.com/Open-Self/Open-Self/releases/tag/v1.0.0-rc.1) is an opt-in
-prerelease with the same runtime API and schema 2 as v0.13.2. Its release gates passed all
-six OS/Node combinations, including real OS key storage. Read the
-[candidate upgrade notes](./docs/upgrade-guide.md#from-v0132-to-v100-rc1) and test with a copied vault.
-Download [openself-1.0.0-rc.1.tgz](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0-rc.1/openself-1.0.0-rc.1.tgz),
-verify SHA-256 `3790661d97437e5f8f959a0f1e0feb12d9b51167070d3671bd61aca518d9120c`, then run:
+[v1.0.0-rc.2](https://github.com/Open-Self/Open-Self/releases/tag/v1.0.0-rc.2) is an opt-in
+prerelease with the same public API and schema 2 as v0.13.2. It fixes dashboard saves that
+truncated timestamps and date clearing that retained old values. Its release gates passed all
+six OS/Node combinations, including real OS key storage, plus Chromium date-edit regressions
+in three timezones. Read the [candidate upgrade notes](./docs/upgrade-guide.md#from-v100-rc1-to-v100-rc2)
+and test with a copied vault. Prefer this candidate for the dashboard timestamp correction.
+Download [openself-1.0.0-rc.2.tgz](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0-rc.2/openself-1.0.0-rc.2.tgz),
+verify SHA-256 `b2c4bea0758360f08b966cb416d73e8b25995b9c6119eb43205b0ebdb77ed838`, then run:
 
 ```bash
-npm install -g ./openself-1.0.0-rc.1.tgz
+npm install -g ./openself-1.0.0-rc.2.tgz
 openself --version
 ```
 
-Expect `1.0.0-rc.1`. npm publication is still blocked by missing release credentials;
+Expect `1.0.0-rc.2`. npm publication is still blocked by missing release credentials;
 `openself@next` is not yet available. This candidate does not declare stable 1.0 support.
 
 ## Local dashboard
