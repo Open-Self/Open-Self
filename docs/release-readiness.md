@@ -1,7 +1,7 @@
 # v1.0 release readiness
 
 Audit date: 2026-09-09. Runtime baseline:
-[`697f8db` / v0.13.1](https://github.com/Open-Self/Open-Self/tree/697f8db2f7e1696559472169732139ab6d11c5f9).
+[`3c22e07` / v0.13.2](https://github.com/Open-Self/Open-Self/tree/3c22e074b6284914312550197fdb63bfb89643f8).
 This is a point-in-time evidence record, not a declaration of 1.0 stability. Update the
 evidence and remaining work when changes ship; a green build alone does not close every item.
 
@@ -18,14 +18,14 @@ evidence and remaining work when changes ship; a green build alone does not clos
 | MCP owner policy and audit | [Policy tests](../tests/unit/context/mcp-policy.test.js), [permission guide](./agent-permissions.md) | Tool-boundary behavior checked; direct owner filesystem/shell access remains outside that boundary |
 | Public API and declarations | [API reference](./api-reference.md), [export contract](../tests/contracts/exports.ts), [consumer contract](../tests/contracts/consumer.ts) | All 50 root value exports checked with positive/negative TypeScript cases; 1.x compatibility is not yet frozen |
 | Upgrade and installed package | [Frozen migration fixtures](../tests/fixtures/migrations/), [package test](../scripts/test-package.js), [upgrade guide](./upgrade-guide.md) | Schema 0/1 upgrade fixtures and real tarball installation checked; schema-2 fixture added in the follow-up below |
-| Platform and quality gates | [Exact-commit CI](https://github.com/Open-Self/Open-Self/actions/runs/34255405632), [release verification](https://github.com/Open-Self/Open-Self/actions/runs/34255975885) | Six OS/Node combinations passed; release workflow's overall failure is the separate npm job |
+| Platform and quality gates | [Exact-commit CI](https://github.com/Open-Self/Open-Self/actions/runs/34258836498), [release verification](https://github.com/Open-Self/Open-Self/actions/runs/34259371537) | Six OS/Node combinations passed; release workflow's overall failure is the separate npm job |
 | Support and private reporting | [Support policy](./support-policy.md), [security policy](../SECURITY.md), [contributing](../CONTRIBUTING.md) | Policies present; private vulnerability reporting enabled and read back via GitHub API on audit date |
 | Registry publication | `npm view openself version`, repository secret names, release publish log | Incomplete: npm latest is 0.7.0; no NPM_TOKEN secret is configured |
 
-The successful local suite contained 499 tests. Reported line coverage was 88.93%, with
-the exclusions listed in [vitest.config.js](../vitest.config.js). One local run timed out
-while cleaning up test files; the rerun passed with a 30-second local hook timeout. CI
-passed with its unchanged default timeouts. Coverage is not a claim that every CLI,
+The successful local suite contained 511 tests. Reported line coverage was 88.95%, with
+the exclusions listed in [vitest.config.js](../vitest.config.js). Local coverage used 30-second
+test/hook timeouts to accommodate local filesystem latency; CI passed with its unchanged
+default timeouts. Coverage is not a claim that every CLI,
 gateway, provider or dashboard interaction has been exercised live.
 
 ## Remaining work before v1.0
@@ -60,12 +60,12 @@ absence of issue reports is weaker evidence than an exercised contract.
 ## Verified distribution
 
 The available Context Vault artifact is
-[openself-0.13.1.tgz](https://github.com/Open-Self/Open-Self/releases/download/v0.13.1/openself-0.13.1.tgz),
-from the [v0.13.1 release](https://github.com/Open-Self/Open-Self/releases/tag/v0.13.1).
+[openself-0.13.2.tgz](https://github.com/Open-Self/Open-Self/releases/download/v0.13.2/openself-0.13.2.tgz),
+from the [v0.13.2 release](https://github.com/Open-Self/Open-Self/releases/tag/v0.13.2).
 Its downloaded SHA-256 was verified as:
 
 ```text
-76ac2d70dc7902443268efe167f260d46aa0523d6f3922955265ef9aa0e53c1b
+10594cb80bcf19d12f747837b4efcf7ed12137fd2946df8812090a2d0e7627c2
 ```
 
 The npm publish job failed explicitly because `NPM_TOKEN` was absent. Until publication is
