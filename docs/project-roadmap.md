@@ -84,6 +84,13 @@ regressions verify rollback and retry, per-file savepoints preserve project scan
 and backup tests verify checkpoint recovery and schema-1 compatibility. Legacy JSON checkpoint
 import and the schema-2 upgrade are documented in the upgrade guide.
 
+### Native key-provider release gate
+
+The shared CI workflow now exercises actual DPAPI, Keychain and Secret Service providers
+with synthetic keys on both supported Node versions. It verifies fresh-process reopening
+and refusal on missing keys or unavailable provider commands. See the
+[native verification guide](./native-key-verification.md) for isolation and test limits.
+
 ## Release process
 
 1. Finish the phase with task-relevant source, tests, and documentation.

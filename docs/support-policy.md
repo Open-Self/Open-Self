@@ -15,6 +15,10 @@ Report security-sensitive findings using [SECURITY.md](../SECURITY.md).
   in `package-lock.json`, under strict NodeNext and Bundler module resolution.
 - Payload key providers require Windows DPAPI, macOS Keychain, or an accessible Linux
   Secret Service session. Cloud model/gateway services require their own credentials.
+- The [native key gate](./native-key-verification.md) tests real provider roundtrips,
+  fresh-process vault reopening and refusal on unavailable commands or missing keys.
+  CI isolates macOS keychain and Linux session state; this is same-account testing,
+  not proof of cross-account or hardware-backed isolation.
 
 ## Release and maintenance policy
 

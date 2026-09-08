@@ -14,7 +14,7 @@ evidence and remaining work when changes ship; a green build alone does not clos
 | Imports, local vectors and incremental capture | [Context tests](../tests/unit/context/), [capture recovery](../tests/unit/context/capture-recovery.test.js) | Tested with synthetic local sources, including process exit and retry |
 | Authenticated local dashboard | [Server implementation](../src/context/server.js), [installed consumer](../tests/package/smoke.mjs) | Token-protected routes and real HTTP asset serving checked; not proof of a complete browser accessibility audit |
 | Payload encryption and portable recovery | [Backup tests](../tests/unit/context/backup.test.js), [crypto tests](../tests/unit/context/vault-crypto.test.js) | Wrong keys, corruption, overwrite refusal, schema compatibility and checkpoint restore checked |
-| Native OS key storage | [Key manager tests](../tests/unit/context/vault-key-manager.test.js), [provider implementation](../src/context/vault-key-manager.js) | Incomplete: tests inject a Map-backed provider; real OS provider roundtrips are not a CI gate |
+| Native OS key storage | [Native key gate](../scripts/test-native-key.js), [native CI results](https://github.com/Open-Self/Open-Self/actions/runs/34260595279), [verification guide](./native-key-verification.md) | Real DPAPI, Keychain and Secret Service checks passed on both supported Node versions at supplemental commit `dafd5b2`; mock tests remain for failure injection |
 | MCP owner policy and audit | [Policy tests](../tests/unit/context/mcp-policy.test.js), [permission guide](./agent-permissions.md) | Tool-boundary behavior checked; direct owner filesystem/shell access remains outside that boundary |
 | Public API and declarations | [API reference](./api-reference.md), [export contract](../tests/contracts/exports.ts), [consumer contract](../tests/contracts/consumer.ts) | All 50 root value exports checked with positive/negative TypeScript cases; 1.x compatibility is not yet frozen |
 | Upgrade and installed package | [Frozen migration fixtures](../tests/fixtures/migrations/), [package test](../scripts/test-package.js), [upgrade guide](./upgrade-guide.md) | Schema 0/1 upgrade fixtures and real tarball installation checked; schema-2 fixture added in the follow-up below |
@@ -37,10 +37,11 @@ gateway, provider or dashboard interaction has been exercised live.
    zero candidates where one interval-overlap candidate was expected. The correction applies temporal and
    permission filters before candidate limits. [Store regressions](../tests/unit/context/conflict-window.test.js)
    cover full windows, bounds, exclusions and 5,001 identical records; MCP policy tests exercise both tools.
-2. **Exercise native key providers.** Add isolated synthetic-key roundtrips for Windows DPAPI,
-   macOS Keychain and Linux Secret Service, with cleanup of only test-owned state. Validate
-   explicit failure when the provider/session is unavailable. Mock-based backup tests remain
-   useful but do not substitute for these integration checks.
+2. **Closed by supplemental native-provider CI at `dafd5b2`.** Real Windows DPAPI, macOS
+   Keychain and Linux Secret Service roundtrips passed on Node 22.13.0 and 24. The gate
+   reopens an encrypted vault in a fresh process, checks unavailable-command behavior,
+   removes only the test-owned key, and checks missing-key refusal. These same-account
+   checks do not establish cross-account isolation or availability in every desktop session.
 3. **Closed by the v0.13.2 fixtures: released schema-2 baseline.**
    [Frozen v0.13.1 SQL](../tests/fixtures/migrations/v0.13.1.sql) records its historical source hash
    and synthetic checkpoint state. The installed consumer verifies its memories, versions,
