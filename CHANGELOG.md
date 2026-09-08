@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-08
+
+### Added
+
+- Passphrase-encrypted portable Context Vault backup/restore through CLI and JavaScript API.
+- Consistent live-WAL snapshots preserve memories, forgotten records, history, vectors, lexical indexes, and import deduplication.
+- AES-256-GCM archive encryption with scrypt-derived keys; payload keys are recovered inside the archive and rebound to the destination OS account.
+- Restore validates authentication, schema, SQLite integrity, foreign keys, payloads, history, and vectors before publishing a new destination.
+- Recovery guide covering key management, automation, exclusions, interrupted operations, and the 256 MiB archive limit.
+
+### Security
+
+- Existing backup files and restore destinations are refused; incomplete writes are never published as completed backups.
+- Plaintext source vaults are encrypted and rebuilt entirely in memory before writing the restored database.
+- Explicit database schema versioning rejects newer schemas before normal initialization modifies them.
+
 ## [0.9.1] - 2026-09-08
 
 ### Security

@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { userInfo } from 'node:os';
+import { normalizeKey } from './vault-crypto.js';
 
 const CONFIG_VERSION = 1;
 
@@ -13,13 +14,13 @@ export class VaultKeyManager {
         this.backend = options.backend;
     }
 
-    initialize() {
+    initialize(options = {}) {
         if (existsSync(this.configPath)) {
             throw new Error(`Vault encryption is already configured at ${this.configPath}`);
         }
         const backend = this.backend || defaultBackend(this.dataDir);
         const keyId = randomUUID();
-        const key = randomBytes(32);
+        const key = options.key ? normalizeKey(options.key) : randomBytes(32);
         mkdirSync(this.dataDir, { recursive: true });
         backend.store(keyId, key);
         const config = {

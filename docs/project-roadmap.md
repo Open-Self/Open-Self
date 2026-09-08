@@ -28,9 +28,9 @@ Node 20 users must upgrade to Node >=22.13 before installing v0.9.0. Existing lo
 vaults are opened in place; enabling encryption remains an explicit user action.
 Payload encryption does not hide scope, timestamps, IDs, or other operational metadata.
 
-## Phase 3: Recovery and portability — next
+## Phase 3: Recovery and portability - v0.10.0
 
-Deliver a documented, tested recovery path before calling the vault stable:
+Implemented, with [recovery documentation](./backup-recovery.md):
 
 - Consistent backup while a vault is open, including version history and import ledgers.
 - Encrypted portable backup with explicit key recovery; no silent plaintext exports.
@@ -38,8 +38,10 @@ Deliver a documented, tested recovery path before calling the vault stable:
 - Tests for interrupted writes, corrupted backups, wrong keys, and restored retrieval behavior.
 - CLI recovery guide and a release with an end-to-end backup/restore example.
 
-OS-bound keys currently require the original account or an explicitly managed environment key.
-Do not describe copying the SQLite file alone as a portable encrypted backup.
+Portable recovery requires the encrypted archive and its passphrase. The destination
+requires an available OS key provider. Archives are capped at 256 MiB and exclude
+connector polling state and legacy application files; copying SQLite alone is not
+a portable encrypted backup.
 
 ## Phase 4: Agent permissions and accountability — planned
 

@@ -125,9 +125,11 @@ program
 
 program
     .command('vault')
-    .description('Configure OS-bound Context Vault payload encryption')
-    .argument('[action]', 'init/status', 'status')
+    .description('Encrypt, back up, and restore the Context Vault')
+    .argument('[action]', 'init/status/backup/restore', 'status')
     .option('--data-dir <path>', 'OpenSelf data directory')
+    .option('--file <path>', 'Encrypted backup file to create or restore')
+    .option('--passphrase-file <path>', 'Read the backup passphrase from a protected file')
     .action(wrapAction((action, options) => vaultCommand(action, options)));
 
 program

@@ -6,6 +6,8 @@ import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
 
+export const VAULT_SCHEMA_VERSION = 1;
+
 const SELECT_COLUMNS = `
     memories.id, memories.type, memories.content, memories.summary,
     memories.source_kind, memories.source_locator, memories.source_title,
@@ -19,7 +21,9 @@ export class ContextStore {
     constructor(options = {}) {
         const dataDir = options.dataDir || './data';
         this.vectorEncoder = options.vectorEncoder || new LocalVectorEncoder();
-        this.dbPath = options.dbPath || join(dataDir, 'context.db');
+        this.dbPath = Buffer.isBuffer(options.dbPath)
+            ? ':memory:'
+            : options.dbPath || join(dataDir, 'context.db');
         const vaultDirectory =
             options.dataDir || (this.dbPath === ':memory:' ? null : dirname(this.dbPath));
         const encryptionKey =
@@ -32,12 +36,15 @@ export class ContextStore {
             mkdirSync(dirname(this.dbPath), { recursive: true });
         }
 
-        this.db = new Database(this.dbPath);
+        this.db = new Database(Buffer.isBuffer(options.dbPath) ? options.dbPath : this.dbPath);
         try {
+            if (this.db.pragma('user_version', { simple: true }) > VAULT_SCHEMA_VERSION) {
+                throw new Error('This vault requires a newer OpenSelf schema version');
+            }
             this.db.pragma('journal_mode = WAL');
             this.db.pragma('foreign_keys = ON');
             this.db.pragma('busy_timeout = 5000');
-            this._migrate();
+            this.db.transaction(() => this._migrate())();
             this._assertEncryptionMode();
             this._prepare();
             this._migrateEncryption();
@@ -121,6 +128,9 @@ export class ContextStore {
                 value TEXT NOT NULL
             );
         `);
+        if (this.db.pragma('user_version', { simple: true }) !== VAULT_SCHEMA_VERSION) {
+            this.db.pragma(`user_version = ${VAULT_SCHEMA_VERSION}`);
+        }
     }
 
     _assertEncryptionMode() {

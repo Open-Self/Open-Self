@@ -151,6 +151,19 @@ encryption. Back up the vault while signed into the same OS account; losing the 
 encrypted payloads unrecoverable. Headless deployments can explicitly supply a 32-byte base64 or
 hex key through `OPENSELF_VAULT_KEY` and assume responsibility for secret management.
 
+## Portable backup and recovery
+
+```bash
+openself vault backup --data-dir ./data --file ./context.osbackup
+openself vault restore --file ./context.osbackup --data-dir ./recovered-data
+```
+
+A confirmed passphrase encrypts the entire snapshot, including the payload key, version
+history, and import ledger. Restore validates the archive and creates an encrypted vault
+bound to the destination OS account. Existing destinations are refused. See the
+[backup and recovery guide](./docs/backup-recovery.md) for key recovery, automation,
+256 MiB archive limit, and the distinction from a whole application-directory backup.
+
 ## Run Context Vault evaluations
 
 ```bash
