@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-08
+
+### Security
+
+- Update locked `fast-uri` to 3.1.7 and `qs` to 6.16.0 to resolve the two dependencies flagged by npm audit.
+- CI and release verification now block on moderate or higher dependency advisories instead of ignoring audit failures.
+
 ## [0.9.0] - 2026-09-08
 
 ### Added
