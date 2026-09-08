@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-08
+
+### Added
+
+- Owner-managed MCP policy files with fixed client aliases, literal scope roots, sensitivity ceilings, and independent read/remember/forget capabilities.
+- Local metadata-only MCP audit with attempted/allowed/denied/error outcomes, bounded retention, and owner list/prune/clear commands.
+- Fail-closed policy loading, denied-ID indistinguishability, write-only conflict suppression, and memory rollback when terminal audit recording fails.
+- Adversarial MCP tests and a policy configuration, upgrade, trust-boundary, and audit guide.
+
+### Security
+
+- Conflict responses now honor the MCP sensitivity ceiling rather than implicitly reading restricted records.
+- Punctuation-only search fallback preserves sensitivity and temporal filters.
+- Scope hierarchy matching is case-sensitive and treats SQL wildcard characters literally; allowed-scope unions filter candidates before ranking and limits.
+- **MCP behavior change:** requesting restricted sensitivity alone no longer grants it. Configure an explicit owner policy; trusted-local mode has a fixed private ceiling.
+
 ## [0.10.0] - 2026-09-08
 
 ### Added

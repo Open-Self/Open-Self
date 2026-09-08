@@ -36,6 +36,8 @@ export { VaultCodec, PlaintextCodec, normalizeKey } from './context/vault-crypto
 export { VaultKeyManager, loadConfiguredVaultKey } from './context/vault-key-manager.js';
 export { evaluateContextVault } from './context/evaluator.js';
 export { backupVault, restoreVault } from './context/backup.js';
+export { loadMcpPolicy } from './context/access-policy.js';
+export { AccessAudit } from './context/access-audit.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

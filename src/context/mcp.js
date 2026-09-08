@@ -1,3 +1,6 @@
+import { dirname, join } from 'node:path';
+import { AccessPolicy, loadMcpPolicy } from './access-policy.js';
+import { AccessAudit } from './access-audit.js';
 import { packageVersion } from '../version.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -6,12 +9,71 @@ import { ContextStore } from './store.js';
 import { MEMORY_TYPES, SENSITIVITY_LEVELS } from './schema.js';
 
 export function createContextMcpServer(store, options = {}) {
+    const policy = new AccessPolicy(options.policy);
+    const audit =
+        options.audit ||
+        new AccessAudit({
+            dbPath:
+                store.dbPath === ':memory:'
+                    ? ':memory:'
+                    : join(dirname(store.dbPath), 'mcp-audit.db'),
+            retentionDays: options.auditRetentionDays,
+            maxEntries: options.auditMaxEntries,
+        });
     const server = new McpServer({
         name: 'openself-context',
         version: options.version || packageVersion,
     });
 
-    server.registerTool(
+    const close = server.close.bind(server);
+    server.close = async () => {
+        try {
+            await close();
+        } finally {
+            if (!options.audit) audit.close();
+        }
+    };
+    function register(name, configuration, handler) {
+        server.registerTool(name, configuration, async (input) => {
+            let event;
+            try {
+                event = audit.begin(policy.clientId, name);
+                const capability =
+                    name === 'openself_remember'
+                        ? 'remember'
+                        : name === 'openself_forget'
+                          ? 'forget'
+                          : 'read';
+                policy.require(capability);
+                const execute = () => {
+                    const result = handler(input);
+                    audit.finish(event, 'allowed');
+                    return result;
+                };
+                // Memory mutations roll back if terminal audit recording fails.
+                return capability === 'read'
+                    ? execute()
+                    : store.db.transaction(execute).immediate();
+            } catch (error) {
+                const denied = error.code === 'ACCESS_DENIED';
+                if (event !== undefined) {
+                    try {
+                        audit.finish(event, denied ? 'denied' : 'error');
+                    } catch {
+                        /* The durable attempt remains available. */
+                    }
+                }
+                return {
+                    ...textResult({
+                        error: denied ? 'Access denied by MCP policy' : 'MCP operation failed',
+                    }),
+                    isError: true,
+                };
+            }
+        });
+    }
+
+    register(
         'openself_remember',
         {
             description:
@@ -32,7 +94,7 @@ export function createContextMcpServer(store, options = {}) {
                 tags: z.array(z.string().max(80)).max(50).default([]),
             },
         },
-        async (input) => {
+        (input) => {
             const draft = {
                 content: input.content,
                 type: input.type,
@@ -50,13 +112,16 @@ export function createContextMcpServer(store, options = {}) {
                 validTo: input.validTo,
                 tags: input.tags,
             };
-            const potentialConflicts = store.findPotentialConflicts(draft);
+            policy.requireMemory(draft);
+            const potentialConflicts = policy.capabilities.includes('read')
+                ? store.findPotentialConflicts(draft, policy.readOptions({ scope: draft.scope }))
+                : [];
             const memory = store.remember(draft);
             return textResult({ stored: true, memory, potentialConflicts });
         },
     );
 
-    server.registerTool(
+    register(
         'openself_search_memory',
         {
             description:
@@ -71,10 +136,10 @@ export function createContextMcpServer(store, options = {}) {
                 limit: z.number().int().min(1).max(50).default(10),
             },
         },
-        async (input) => textResult({ memories: store.search(input.query, input) }),
+        (input) => textResult({ memories: store.search(input.query, policy.readOptions(input)) }),
     );
 
-    server.registerTool(
+    register(
         'openself_find_conflicts',
         {
             description:
@@ -89,13 +154,13 @@ export function createContextMcpServer(store, options = {}) {
                 limit: z.number().int().min(1).max(50).default(10),
             },
         },
-        async (input) =>
+        (input) =>
             textResult({
-                potentialConflicts: store.findPotentialConflicts(input, input),
+                potentialConflicts: store.findPotentialConflicts(input, policy.readOptions(input)),
             }),
     );
 
-    server.registerTool(
+    register(
         'openself_get_context',
         {
             description:
@@ -109,28 +174,52 @@ export function createContextMcpServer(store, options = {}) {
                 limit: z.number().int().min(1).max(50).default(12),
             },
         },
-        async (input) => textResult(store.buildContext(input.query, input)),
+        (input) => textResult(store.buildContext(input.query, policy.readOptions(input))),
     );
 
-    server.registerTool(
+    register(
         'openself_forget',
         {
             description:
                 'Forget a memory by ID. This is a recoverable soft-delete and removes it from search/context.',
             inputSchema: { id: z.string().uuid() },
         },
-        async ({ id }) => textResult({ forgotten: store.forget(id), id }),
+        ({ id }) =>
+            store.db
+                .transaction(() => {
+                    const memory = store.db
+                        .prepare(
+                            "SELECT scope, sensitivity FROM memories WHERE id = ? AND status = 'active'",
+                        )
+                        .get(id);
+                    policy.requireMemory(memory);
+                    return textResult({ forgotten: store.forget(id), id });
+                })
+                .immediate(),
     );
 
     return server;
 }
 
 export async function runContextMcpServer(options = {}) {
+    if (Boolean(options.policyFile) !== Boolean(options.clientId))
+        throw new Error('--policy and --client must be supplied together');
+    const policy = options.policyFile
+        ? loadMcpPolicy(options.policyFile, options.clientId)
+        : options.policy;
+    // Validate owner policy before creating or migrating any vault files.
+    new AccessPolicy(policy);
     const store = options.store || new ContextStore({ dataDir: options.dataDir });
-    const server = createContextMcpServer(store, options);
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    return { server, store };
+    let server;
+    try {
+        server = createContextMcpServer(store, { ...options, policy });
+        await server.connect(new StdioServerTransport());
+        return { server, store };
+    } catch (error) {
+        await server?.close();
+        if (!options.store) store.close();
+        throw error;
+    }
 }
 
 function textResult(value) {

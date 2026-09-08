@@ -54,9 +54,11 @@ Sensitivity is ordered:
 public < personal < private < restricted
 ```
 
-Search only returns memories at or below `maxSensitivity`. MCP search/context default to `private`,
-which means `restricted` data requires an explicit caller decision. Applications serving multiple
-users must add authentication and authorization outside this local stdio server.
+Search only returns memories at or below `maxSensitivity`. MCP clamps this against an owner
+policy ceiling, with a fixed `private` ceiling in trusted-local mode. Restricted access requires
+an explicit owner grant. Scope filtering applies before retrieval limits, including punctuation-only
+fallback queries and conflict responses. See [Agent permissions and audit](./agent-permissions.md).
+This tool boundary does not replace OS isolation or network authentication.
 
 ## Retrieval
 

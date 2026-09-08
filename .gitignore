@@ -6,6 +6,9 @@ data/
 context.db
 context.db-shm
 context.db-wal
+mcp-audit.db
+mcp-audit.db-shm
+mcp-audit.db-wal
 vault-key.dpapi
 .claude
 .opencode

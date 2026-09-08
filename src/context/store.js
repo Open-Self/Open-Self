@@ -456,7 +456,13 @@ export class ContextStore {
     search(query, options = {}) {
         const limit = clamp(options.limit ?? 10, 1, 100);
         const ftsQuery = this.codec.indexQuery(query);
-        if (!ftsQuery) return this.list({ ...options, limit });
+        if (!ftsQuery)
+            return this.list({
+                ...options,
+                limit,
+                maxSensitivity: options.maxSensitivity || 'restricted',
+                asOf: options.asOf || new Date().toISOString(),
+            });
 
         const retrieval = options.retrieval || 'hybrid';
         if (!['hybrid', 'lexical', 'vector'].includes(retrieval)) {
@@ -486,7 +492,8 @@ export class ContextStore {
                  JOIN memories ON memories.id = memory_fts.id
                  WHERE memory_fts MATCH @query
                    AND memories.status = 'active'
-                   AND (@scope IS NULL OR memories.scope = @scope OR memories.scope LIKE @scopePrefix)
+                   AND (@scope IS NULL OR memories.scope = @scope OR substr(memories.scope, 1, length(@scope) + 1) = @scope || '/')
+                   AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
                    AND (@type IS NULL OR memories.type = @type)
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
@@ -517,7 +524,8 @@ export class ContextStore {
                  FROM memories
                  JOIN memory_vectors ON memory_vectors.memory_id = memories.id
                  WHERE memories.status = 'active'
-                   AND (@scope IS NULL OR memories.scope = @scope OR memories.scope LIKE @scopePrefix)
+                   AND (@scope IS NULL OR memories.scope = @scope OR substr(memories.scope, 1, length(@scope) + 1) = @scope || '/')
+                   AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
                    AND (@type IS NULL OR memories.type = @type)
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
@@ -561,7 +569,8 @@ export class ContextStore {
         return this.search(memory.content, {
             scope: memory.scope,
             type: memory.type,
-            maxSensitivity: 'restricted',
+            maxSensitivity: options.maxSensitivity || 'restricted',
+            allowedScopes: options.allowedScopes,
             retrieval: 'vector',
             minVectorScore: threshold,
             asOf: memory.validFrom || memory.occurredAt || new Date().toISOString(),
@@ -585,9 +594,28 @@ export class ContextStore {
         const clauses = [options.includeForgotten ? '1 = 1' : "status = 'active'"];
         const params = { limit: clamp(options.limit ?? 20, 1, 100), offset: options.offset || 0 };
         if (options.scope) {
-            clauses.push('(scope = @scope OR scope LIKE @scopePrefix)');
+            clauses.push(
+                "(scope = @scope OR substr(scope, 1, length(@scope) + 1) = @scope || '/')",
+            );
             params.scope = options.scope;
-            params.scopePrefix = `${options.scope}/%`;
+        }
+        if (options.allowedScopes !== undefined) {
+            params.allowedScopes = JSON.stringify(options.allowedScopes);
+            clauses.push(
+                "EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/')",
+            );
+        }
+        if (options.maxSensitivity) {
+            params.sensitivityRank = searchParams(options).sensitivityRank;
+            clauses.push(
+                "CASE sensitivity WHEN 'public' THEN 0 WHEN 'personal' THEN 1 WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank",
+            );
+        }
+        if (options.asOf) {
+            params.asOf = options.asOf;
+            clauses.push(
+                '(valid_from IS NULL OR valid_from <= @asOf) AND (valid_to IS NULL OR valid_to >= @asOf)',
+            );
         }
         if (options.type) {
             clauses.push('type = @type');
@@ -716,7 +744,8 @@ function searchParams(options) {
     }
     return {
         scope,
-        scopePrefix: scope ? `${scope}/%` : null,
+        allowedScopes:
+            options.allowedScopes === undefined ? null : JSON.stringify(options.allowedScopes),
         type: options.type || null,
         sensitivityRank,
         asOf: options.asOf || new Date().toISOString(),

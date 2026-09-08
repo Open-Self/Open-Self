@@ -198,6 +198,12 @@ Example MCP client configuration:
 }
 ```
 
+For per-agent scope, sensitivity, and read/write permissions, launch with
+`--policy /protected/mcp-policy.json --client atlas-reader`. Policy is fixed by the
+owner at startup; agent tool arguments cannot expand it.
+[Agent permissions and audit](./docs/agent-permissions.md) covers configuration,
+trust boundaries, and `openself audit list/prune/clear`.
+
 OpenSelf provides five tools:
 
 | Tool | Purpose |
@@ -285,8 +291,8 @@ OpenSelf is **local-first**, not magically offline in every configuration.
 - Ollama can keep generation local.
 - If you configure OpenAI, Anthropic, DeepSeek, or another cloud model, the context supplied to that
   model leaves your machine under that provider's terms.
-- `restricted` memories are excluded from MCP retrieval unless the caller explicitly raises the
-  sensitivity ceiling.
+- `restricted` memories require an explicit owner policy grant; a tool request cannot raise the
+  configured sensitivity ceiling.
 - The current stdio MCP transport inherits the permissions of the local client that launches it.
   Protect the data directory and do not expose it as an unauthenticated network service.
 

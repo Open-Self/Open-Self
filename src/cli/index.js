@@ -5,6 +5,7 @@
  */
 
 import { packageVersion } from '../version.js';
+import { auditCommand } from './audit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import updateNotifier from 'update-notifier';
@@ -95,8 +96,23 @@ program
 program
     .command('mcp')
     .description('Run the OpenSelf Context MCP server over stdio')
+    .option('--policy <path>', 'Owner-managed MCP policy JSON')
+    .option('--client <id>', 'Client identity selected by the owner')
+    .option('--audit-retention-days <days>', 'Audit retention in days', '30')
+    .option('--audit-max-entries <count>', 'Maximum retained audit entries', '10000')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction(mcpCommand));
+
+program
+    .command('audit')
+    .description('Inspect or prune local MCP access metadata')
+    .argument('[action]', 'list/prune/clear', 'list')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .option('--client <id>', 'Filter by owner-configured client identity')
+    .option('--limit <count>', 'Maximum results', '50')
+    .option('--retention-days <days>', 'Retention in days', '30')
+    .option('--max-entries <count>', 'Maximum retained entries', '10000')
+    .action(wrapAction(auditCommand));
 
 program
     .command('dashboard')

@@ -72,7 +72,8 @@ The restored database uses the usual payload encryption model: operational metad
 visible locally, as explained in [Context Vault](./context-vault.md).
 
 This is **not a whole application-directory backup**. It excludes personality profiles,
-messaging sessions, API keys, source documents, and `connectors/` polling state. Existing
+messaging sessions, API keys, source documents, owner MCP policy files, `mcp-audit.db`,
+and `connectors/` polling state. Reapply owner policy when attaching agents to a restored vault. Existing
 captured memories are preserved, but watchers are not restarted automatically. Reattaching
 a connector with missing polling state can import duplicate source chunks; do so only
 after reviewing its source and scope. Import deduplication entries within SQLite survive.

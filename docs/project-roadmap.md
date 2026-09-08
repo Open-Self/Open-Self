@@ -43,15 +43,16 @@ requires an available OS key provider. Archives are capped at 256 MiB and exclud
 connector polling state and legacy application files; copying SQLite alone is not
 a portable encrypted backup.
 
-## Phase 4: Agent permissions and accountability — planned
+## Phase 4: Agent permissions and accountability - v0.11.0
 
 - Owner-configured scope and sensitivity ceilings that agents cannot raise themselves.
 - Explicit read/write capabilities per MCP client configuration.
 - Local access audit with retention controls and no unnecessary payload duplication.
 - Adversarial permission tests and documented trust boundaries.
 
-The current stdio server inherits the launching client's local permissions. Per-call
-sensitivity filters are not a multi-user authorization system.
+Implemented at the MCP tool boundary, with [policy and audit documentation](./agent-permissions.md).
+A process with direct filesystem or shell access under the owner account can bypass this boundary;
+OS isolation is still required for untrusted agents. Policy changes require a server restart.
 
 ## Phase 5: Stable public API — v1.0 candidate
 
