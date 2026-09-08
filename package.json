@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "0.13.2",
+  "version": "1.0.0-rc.1",
   "description": "Private, persistent personal context and memory for every AI you use.",
   "type": "module",
   "sideEffects": false,

@@ -5,6 +5,18 @@ Audit date: 2026-09-09. Runtime baseline:
 This is a point-in-time evidence record, not a declaration of 1.0 stability. Update the
 evidence and remaining work when changes ship; a green build alone does not close every item.
 
+## v1.0.0-rc.1 candidate
+
+The first 1.0 release candidate retains the v0.13.2 runtime contracts and schema 2, adds the
+native-provider gate to release verification, and separates prerelease distribution from
+stable channels. Local verification passed 527 tests in 56 files with 88.95% line coverage;
+the same coverage exclusions and local timeout qualification below apply. The 16 additional
+tests cover release-channel selection, rejected tags/versions and Actions output generation.
+
+Candidate platform CI, released artifact verification and registry publication must be
+recorded after they finish. The verified v0.13.2 distribution below remains the installation
+baseline until those results are available. A candidate does not close the stable 1.0 gate.
+
 ## Evidence by requirement
 
 | Requirement | Evidence | Assessment |

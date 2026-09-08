@@ -79,6 +79,9 @@ Follow the [release process](./docs/project-roadmap.md#release-process):
 3. Commit and push. Verify all CI jobs for the exact commit before creating its version tag.
 4. Push the matching `vX.Y.Z` tag. The release workflow repeats CI, checks the tag version,
    creates one tarball and publishes it as a GitHub release asset.
+   Candidate tags such as `v1.0.0-rc.1` create GitHub prereleases without replacing Latest;
+   their npm artifact uses `next`. Versions without a prerelease suffix use npm `latest`.
+   Tags must exactly match the manifest; build metadata is not accepted for releases.
 5. The npm job publishes that same artifact with provenance. Configure `NPM_TOKEN` in
    repository Actions secrets; never put the token in a file, issue, PR or chat message.
 6. Verify the downloaded artifact digest and the exact version's registry metadata separately.

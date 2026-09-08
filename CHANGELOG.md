@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-09-09
+
+This is an opt-in release candidate, not the stable 1.0 release. It retains the v0.13.2
+runtime API and schema 2. Registry publication remains a separate gate; consult the
+release-readiness audit for verified distribution status.
+
+### Release engineering
+
+- Validate release tags and route prerelease versions to GitHub prereleases and npm `next`, preserving the stable distribution channel.
+- Reject mismatched tags, noncanonical versions and build metadata before packaging.
+
 ### Verification
 
 - Added a real OS key-provider integration gate: synthetic-key roundtrip, encrypted vault reopen in a fresh process, unavailable-provider failure and missing-key refusal.

@@ -93,6 +93,11 @@ and refusal on missing keys or unavailable provider commands. See the
 
 ## Release process
 
+Release candidates such as `v1.0.0-rc.1` run the same gates as stable releases. They are
+marked as GitHub prereleases without replacing Latest and use the opt-in npm `next` tag.
+Versions without a prerelease suffix use npm `latest`. Exact tag/manifest agreement and
+canonical versions without build metadata are required before packaging.
+
 1. Finish the phase with task-relevant source, tests, and documentation.
 2. Update the manifest and lockfile version, plus dated changelog and migration notes.
 3. Run lint, formatting, tests with coverage, context evaluations, and strict publint.

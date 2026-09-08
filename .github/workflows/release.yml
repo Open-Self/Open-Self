@@ -15,6 +15,8 @@ jobs:
   package:
     needs: verify
     runs-on: ubuntu-latest
+    outputs:
+      npm_tag: ${{ steps.channel.outputs.npm_tag }}
     permissions:
       contents: write
     steps:
@@ -24,8 +26,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Verify release tag matches package
-        run: node --input-type=module -e "import { packageVersion } from './src/version.js'; if (process.env.GITHUB_REF_NAME !== 'v' + packageVersion) process.exit(1)"
+      - name: Verify release tag and select channel
+        id: channel
+        run: node scripts/release-channel.js
       - name: Package verified source
         run: npm pack --ignore-scripts
       - uses: actions/upload-artifact@v4
@@ -36,9 +39,14 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
         run: |
           node --input-type=module -e "import fs from 'node:fs'; const text = fs.readFileSync('CHANGELOG.md', 'utf8'); const version = process.env.GITHUB_REF_NAME.slice(1); const notes = text.split('## [' + version + ']')[1]?.split('\n## [')[0]; if (!notes) process.exit(1); fs.writeFileSync('release-notes.md', notes.slice(notes.indexOf('\n')).trim());"
-          gh release create "$GITHUB_REF_NAME" openself-*.tgz --verify-tag --title "$GITHUB_REF_NAME — Context Vault" --notes-file release-notes.md
+          release_flags=()
+          if [ "$PRERELEASE" = true ]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$GITHUB_REF_NAME" openself-*.tgz --verify-tag --title "$GITHUB_REF_NAME — Context Vault" --notes-file release-notes.md "${release_flags[@]}"
 
   publish:
     needs: package
@@ -57,9 +65,14 @@ jobs:
       - name: Publish verified package to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ needs.package.outputs.npm_tag }}
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "::error::GitHub release is available, but npm publication requires the NPM_TOKEN repository secret. Configure it and rerun failed jobs."
             exit 1
           fi
-          npm publish openself-*.tgz --provenance --access public
+          case "$NPM_TAG" in
+            next|latest) ;;
+            *) echo "::error::Missing or invalid verified npm release channel"; exit 1 ;;
+          esac
+          npm publish openself-*.tgz --provenance --access public --tag "$NPM_TAG"

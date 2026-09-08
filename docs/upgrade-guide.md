@@ -3,6 +3,18 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v0.13.2 to v1.0.0-rc.1
+
+This opt-in candidate keeps the same runtime API, 50 root value exports, Node >=22.13.0
+requirement and SQLite schema 2. No additional data migration is introduced. It adds real
+OS key-provider release checks and separate prerelease distribution channels. Test against
+a copied vault or restore into a separate directory before using it with your primary vault.
+Earlier upgrades still require the migration notes below.
+
+The candidate is not the stable 1.0 compatibility promise. Its GitHub release is marked
+prerelease; npm uses `next` only when publication succeeds. Do not infer registry availability
+from the version number or a GitHub asset. See the [readiness audit](./release-readiness.md).
+
 ## From v0.13.1 to v0.13.2
 
 Conflict detection now considers the full proposed validity interval, so future or historical
