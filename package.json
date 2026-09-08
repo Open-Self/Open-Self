@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Private, persistent personal context and memory for every AI you use.",
   "type": "module",
   "sideEffects": false,
@@ -41,7 +41,8 @@
     "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\"",
     "test:types": "tsc -p tsconfig.types.json",
     "test:package": "node scripts/test-package.js",
-    "test:native-key": "node scripts/test-native-key.js"
+    "test:native-key": "node scripts/test-native-key.js",
+    "test:dashboard": "playwright test --config tests/browser/playwright.config.js"
   },
   "keywords": [
     "ai",
@@ -119,6 +120,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",

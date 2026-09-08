@@ -33,6 +33,16 @@ The README offers this candidate separately from the v0.13.2 installation baseli
 Registry publication and the final stable-version gates remain open. A candidate does not
 close the stable 1.0 gate; external provider mocks and dashboard audit limits still apply.
 
+## Dashboard date correction for v1.0.0-rc.2
+
+Real Chromium tests reproduced two RC.1 defects: saving content truncated date fields to
+minutes, and clearing a date retained the previous stored value. The correction preserves
+unchanged timestamps and sends explicit nulls for cleared dates. All 12 local browser cases
+pass across UTC, Ho Chi Minh City and New York, including the later repeated DST instant.
+See [browser regressions](../tests/browser/dashboard.spec.js) and the
+[upgrade notes](./upgrade-guide.md#from-v100-rc1-to-v100-rc2). The new browser job is required
+alongside the six platform jobs. RC.2 release evidence must be recorded after publication.
+
 ## Evidence by requirement
 
 | Requirement | Evidence | Assessment |

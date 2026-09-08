@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-09-09
+
+### Fixed
+
+- Dashboard content edits preserve unchanged timestamps exactly, including seconds, milliseconds, original offsets and repeated daylight-saving hours.
+- Clearing an optional date now removes its stored value; edited dates support millisecond precision.
+
+### Verification
+
+- Added real Chromium dashboard regressions in UTC, Ho Chi Minh City and New York timezones, exercising authenticated forms and persisted SQLite values.
+- Branch and release CI now require the browser regression job alongside the six OS/Node jobs.
+
 ## [1.0.0-rc.1] - 2026-09-09
 
 This is an opt-in release candidate, not the stable 1.0 release. It retains the v0.13.2

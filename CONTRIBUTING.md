@@ -45,6 +45,13 @@ published registry version.
 [native-key verification guide](./docs/native-key-verification.md) for platform setup and
 test-owned cleanup; CI runs it in isolated keychain/session environments.
 
+For dashboard changes, install Chromium with `npx playwright install chromium`, then run
+`npm run test:dashboard`. Linux CI uses `npx playwright install --with-deps chromium`.
+The browser tests use an isolated in-memory vault with synthetic records and exercise the
+real authenticated server in UTC, Ho Chi Minh City and New York timezones. Browser artifacts
+under `test-results/` are temporary and must not be committed. These regressions cover date
+editing and persistence; they are not a full accessibility or cross-browser audit.
+
 Source uses ESM, kebab-case filenames and four-space formatting enforced by Prettier.
 Keep changes focused and explain non-obvious decisions. Put regression tests under
 `tests/unit/` or `tests/integration/` and synthetic fixtures under `tests/fixtures/`.

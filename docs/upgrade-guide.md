@@ -3,6 +3,18 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.0.0-rc.1 to v1.0.0-rc.2
+
+Dashboard saves now preserve untouched timestamps exactly. Previously, editing unrelated
+content truncated seconds and milliseconds, and a repeated daylight-saving hour could move
+to the earlier instant. Clearing an optional date now removes it instead of retaining the old
+value. Edited dates use the browser's local timezone and retain milliseconds; untouched dates
+retain their original offset and spelling. Previously truncated values are not reconstructed
+automatically; consult memory history to recover the original timestamp when needed.
+
+This candidate keeps the same public API and schema 2. It adds a required Chromium date-edit
+regression job to the release gates; it does not declare stable 1.0 support.
+
 ## From v0.13.2 to v1.0.0-rc.1
 
 This opt-in candidate keeps the same runtime API, 50 root value exports, Node >=22.13.0

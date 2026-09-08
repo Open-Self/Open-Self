@@ -38,6 +38,11 @@ strict publint, and packaging checks before a GitHub release artifact is created
 A GitHub release and an npm registry publication are distinct outcomes. Missing npm
 credentials must fail the publish job rather than silently claim success.
 
+The shared CI also runs Chromium dashboard regressions on Linux/Node 24 in UTC,
+Ho Chi Minh City and New York timezones. They exercise authenticated forms against a real
+in-memory SQLite vault: unchanged timestamp preservation, clearing dates, millisecond edits
+and new undated records. Firefox, WebKit and a complete accessibility audit are not covered.
+
 ## Evidence and limitations
 
 The isolated consumer test installs the real tarball with production dependencies,

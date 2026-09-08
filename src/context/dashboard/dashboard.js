@@ -108,9 +108,9 @@ function fillForm(memory = {}) {
     fields.sourceKind.value = memory.source?.kind || 'manual';
     fields.sourceLocator.value = memory.source?.locator || '';
     fields.sourceTitle.value = memory.source?.title || '';
-    fields.occurredAt.value = toLocalInput(memory.occurredAt);
-    fields.validFrom.value = toLocalInput(memory.validFrom);
-    fields.validTo.value = toLocalInput(memory.validTo);
+    fillDate(fields.occurredAt, memory.occurredAt);
+    fillDate(fields.validFrom, memory.validFrom);
+    fillDate(fields.validTo, memory.validTo);
     $('forget-memory').classList.toggle('hidden', !memory.id);
     $('merge-section').classList.toggle('hidden', !memory.id);
     $('conflicts').classList.add('hidden');
@@ -134,9 +134,9 @@ function payload() {
             locator: fields.sourceLocator.value.trim(),
             title: fields.sourceTitle.value.trim(),
         },
-        occurredAt: toIso(fields.occurredAt.value),
-        validFrom: toIso(fields.validFrom.value),
-        validTo: toIso(fields.validTo.value),
+        occurredAt: toIso(fields.occurredAt),
+        validFrom: toIso(fields.validFrom),
+        validTo: toIso(fields.validTo),
     };
 }
 
@@ -253,10 +253,19 @@ function toLocalInput(value) {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
         ? ''
-        : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
 }
-function toIso(value) {
-    return value ? new Date(value).toISOString() : undefined;
+function fillDate(field, value) {
+    field.value = toLocalInput(value);
+    // Compare against the browser's normalized value, preserving original offsets,
+    // sub-millisecond spelling and the later instant in a repeated DST hour.
+    field.dataset.originalInput = field.value;
+    field.dataset.originalValue = value || '';
+}
+function toIso(field) {
+    if (!field.value) return null;
+    if (field.value === field.dataset.originalInput) return field.dataset.originalValue || null;
+    return new Date(field.value).toISOString();
 }
 
 $('memory-form').addEventListener('submit', save);
