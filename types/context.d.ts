@@ -87,8 +87,11 @@ export interface MemoryVersion {
 }
 export interface ContextBlock {
     query: string;
+    /** Complete records with attribution; bounded by maxChars (UTF-16 code units). */
     context: string;
+    /** Only the records included in context, in retrieval order. */
     memories: SearchMemory[];
+    /** Exactly context.length, including separators. */
     usedChars: number;
 }
 export type VaultKey = string | Buffer;

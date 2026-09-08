@@ -74,6 +74,25 @@ try {
         JSON.parse(result.content[0].text).memories.map((memory) => memory.id),
         [remembered.id],
     );
+    store.remember({
+        content: 'Large database decision '.repeat(100),
+        scope: 'project/fixture',
+        sensitivity: 'public',
+        occurredAt: '2099-01-01T00:00:00.000Z',
+    });
+    const contextResult = await client.callTool({
+        name: 'openself_get_context',
+        arguments: { query: '!!!', maxChars: 500, maxSensitivity: 'restricted' },
+    });
+    assert.equal(contextResult.isError, undefined);
+    const block = JSON.parse(contextResult.content[0].text);
+    assert.deepEqual(
+        block.memories.map((memory) => memory.id),
+        [remembered.id],
+    );
+    assert.equal(block.usedChars, block.context.length);
+    assert.ok(block.usedChars <= 500);
+    assert.ok(block.context.includes(remembered.content));
     const dashboard = api.createContextServer({ store });
     await new Promise((resolve) => {
         http = dashboard.app.listen(0, '127.0.0.1', resolve);

@@ -642,9 +642,10 @@ export class ContextStore {
 
         for (const memory of memories) {
             const rendered = renderMemory(memory);
-            if (selected.length > 0 && usedChars + rendered.length > maxChars) break;
+            const addedChars = rendered.length + (selected.length > 0 ? 2 : 0);
+            if (usedChars + addedChars > maxChars) continue;
             selected.push({ ...memory, rendered });
-            usedChars += rendered.length;
+            usedChars += addedChars;
         }
 
         return {

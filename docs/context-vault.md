@@ -42,9 +42,9 @@ Scopes are hierarchical. Asking for `project/acme` can return `project/acme/bill
 return `project/other` or `personal` memories. Callers should always request the narrowest useful
 scope.
 
-Scope is currently a retrieval boundary, not an operating-system access control list. Any local
-process with direct access to `context.db` can read the database. Filesystem protection and a future
-encrypted vault remain separate concerns.
+Scope is a retrieval boundary, not an operating-system access control list. Payload encryption
+protects configured vaults at rest, but a process running under the owner account may also access
+the key provider. Filesystem protection and OS isolation remain separate concerns.
 
 ## Sensitivity semantics
 
@@ -75,6 +75,14 @@ for debugging and evaluation.
 The local vector is not presented as a neural embedding: it improves aliases, spelling variation,
 and fuzzy retrieval while remaining small, deterministic, inspectable, and offline. SQLite remains
 the canonical store. Existing databases are backfilled with vectors when opened after an upgrade.
+
+Context blocks use an 8,000-character default budget, configurable from 500 to 50,000.
+The complete rendered string, including source attribution and separators, must fit.
+Records that exceed the remaining budget are skipped and later candidates are still considered;
+records are never cut mid-content or detached from their source. `usedChars` equals the returned
+string's JavaScript `.length`, not a token or byte count. Only included records appear in the
+block's `memories`; a block can be empty if no complete record fits. The budget applies to the
+context string, not the entire MCP JSON response.
 
 ## Potential conflict detection
 

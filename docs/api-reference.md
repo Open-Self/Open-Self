@@ -52,7 +52,7 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `history(id)` | Newest-first version snapshots; `[]` for unknown IDs |
 | `merge(primaryId, duplicateIds, changes?)` | `{ memory, mergedIds }`; throws for missing active records or self-merge |
 | `forget(id)` | `true` for the first successful soft-delete, `false` for missing/already-forgotten records |
-| `search(query, options?)` | Ranked active records; empty query returns `[]` |
+| `search(query, options?)` | Ranked active records; queries without indexable terms return filtered, unranked list results |
 | `list(options?)` | Records ordered by event/creation time with pagination, without relevance ranking |
 | `findPotentialConflicts(input, options?)` | Similar current facts/preferences/decisions; punctuation-only proposals return `[]` |
 | `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string |
@@ -77,6 +77,16 @@ List only applies sensitivity/time filters when those options are provided. Filt
 ranking, and character budgets are described in [Context Vault](./context-vault.md).
 Ranking scores are relative heuristics, not calibrated probabilities or stable ordering
 across model/version changes. Do not persist them as identifiers.
+
+`buildContext` defaults to 8,000 characters and clamps the requested `maxChars` to
+500–50,000. The budget includes headers, full memory content, source attribution and
+two-newline separators, measured using JavaScript string length (UTF-16 code units).
+Starting with v0.12.1, `usedChars === context.length` and the entire string fits that
+budget. Oversized records are skipped, preserving candidate order among records that
+fit; content and provenance are never truncated. The returned `memories` contains only
+included records. If none fit, the block and memory list are empty. The budget does not
+limit JSON metadata size or model tokens; increase it or retrieve individual memories
+when complete long records are needed.
 
 ## Other Context Vault exports
 

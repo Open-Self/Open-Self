@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-08
+
+### Fixed
+
+- Context character budgets now cover the first record, source attribution, headers and separators; `usedChars` equals the full returned context length.
+- Oversized records are skipped without truncation, allowing later complete candidates to fit. Returned memory metadata includes only the records in the context block.
+- API documentation now describes the existing filtered-list fallback for empty and punctuation-only searches accurately.
+
+### Added
+
+- Boundary, oversized-record, Unicode and attribution regression checks in plaintext and encrypted vaults, plus an installed-package MCP budget and policy check.
+
 ## [0.12.0] - 2026-09-08
 
 ### Added

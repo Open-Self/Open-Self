@@ -3,6 +3,15 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v0.12.0 to v0.12.1
+
+Context building now enforces the complete rendered character budget, including the first
+record and separators. A record too large to fit is skipped and later candidates are still
+considered. This can yield fewer records or an empty block; callers must handle that case.
+Increase `maxChars` within the supported range or fetch an individual record when needed.
+`usedChars` now exactly equals `context.length`. No data is modified or truncated by retrieval,
+and this patch does not change the database schema or public exports.
+
 ## From v0.11 to v0.12
 
 No public root value export is removed. TypeScript declarations are now shipped and
