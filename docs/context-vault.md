@@ -36,6 +36,13 @@ relevant context for a task without handing the AI an unfiltered transcript of t
 Dates use ISO 8601 with an explicit offset. A memory whose validity window does not contain the
 requested `asOf` time is excluded from search.
 
+Temporal comparisons use instants at JavaScript millisecond precision, not the text spelling
+of a timestamp. `Z` and numeric offsets are interchangeable; start and end boundaries are
+inclusive. Fractional seconds beyond three digits are truncated to milliseconds for comparison.
+Stored date strings and historical snapshots retain their original spelling. This also applies
+to existing vault rows, chronological list ordering, retrieval tie-breaking and conflict overlap.
+Invalid `asOf` values (including dates without an explicit timezone) are rejected.
+
 ## Scope semantics
 
 Scopes are hierarchical. Asking for `project/acme` can return `project/acme/billing`, but it cannot

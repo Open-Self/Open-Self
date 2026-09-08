@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-09
+
+### Fixed
+
+- Temporal interval validation, filtering, chronological ordering and conflict overlap now compare instants rather than ISO timestamp strings.
+- Existing memories with numeric timezone offsets or differing fractional-second spellings return consistent results without a data rewrite.
+- Invalid `asOf` timestamps are rejected before retrieval, including empty/punctuation fallback paths.
+
+### Added
+
+- UTC/offset equivalence, inclusive millisecond boundaries, reversed interval and ordering regressions for plaintext and encrypted stores across all retrieval paths.
+- An installed-package MCP regression using a mixed-offset validity interval.
+
 ## [0.13.0] - 2026-09-08
 
 ### Added

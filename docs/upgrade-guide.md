@@ -3,6 +3,17 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v0.13.0 to v0.13.1
+
+Temporal validation, retrieval and sorting now compare instants instead of ISO strings.
+Results can change for memories using non-UTC offsets or different fractional-second
+spellings: valid intervals previously rejected are accepted, and chronologically reversed
+intervals previously accepted are rejected on new writes or updates. Existing records and
+history are not rewritten. Correct an existing reversed interval by updating its date fields.
+`asOf` now requires a valid ISO datetime with an explicit timezone; informal date strings
+and timezone-free values are rejected. Precision is milliseconds, with inclusive bounds.
+This patch keeps schema 2 and the same public exports.
+
 ## From v0.12 to v0.13
 
 Opening a vault migrates it to SQLite schema 2, adding transactional capture checkpoints.

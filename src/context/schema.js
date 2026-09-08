@@ -13,7 +13,11 @@ export const MEMORY_TYPES = [
 
 export const SENSITIVITY_LEVELS = ['public', 'personal', 'private', 'restricted'];
 
-const optionalDate = z.string().datetime({ offset: true }).optional().nullable();
+export const contextDateSchema = z
+    .string()
+    .datetime({ offset: true })
+    .refine((value) => Number.isFinite(Date.parse(value)), 'Date must identify a valid instant');
+const optionalDate = contextDateSchema.optional().nullable();
 
 export const memoryInputSchema = z.object({
     id: z.string().uuid().optional(),
@@ -41,7 +45,11 @@ export function normalizeMemory(input, now = new Date()) {
     const parsed = memoryInputSchema.parse(input);
     const timestamp = now.toISOString();
 
-    if (parsed.validFrom && parsed.validTo && parsed.validFrom > parsed.validTo) {
+    if (
+        parsed.validFrom &&
+        parsed.validTo &&
+        Date.parse(parsed.validFrom) > Date.parse(parsed.validTo)
+    ) {
         throw new Error('validFrom must be before validTo');
     }
 

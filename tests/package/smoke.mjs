@@ -79,6 +79,21 @@ try {
         JSON.parse(result.content[0].text).memories.map((memory) => memory.id),
         [remembered.id],
     );
+    const temporal = store.remember({
+        content: 'Temporal offset fixture',
+        scope: 'project/fixture',
+        sensitivity: 'public',
+        validFrom: '2026-01-01T15:00:00+07:00',
+        validTo: '2026-01-01T04:00:00-05:00',
+    });
+    const temporalResult = await client.callTool({
+        name: 'openself_search_memory',
+        arguments: { query: 'Temporal', retrieval: 'lexical', asOf: '2026-01-01T08:00:00Z' },
+    });
+    assert.deepEqual(
+        JSON.parse(temporalResult.content[0].text).memories.map((memory) => memory.id),
+        [temporal.id],
+    );
     store.remember({
         content: 'Large database decision '.repeat(100),
         scope: 'project/fixture',

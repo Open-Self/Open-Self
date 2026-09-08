@@ -65,6 +65,11 @@ with defaults. Validation is performed by the exported Zod `memoryInputSchema`;
 `normalizeMemory(input, now?)` additionally supplies identity/lifecycle fields and validates
 temporal ordering without writing to storage.
 
+Date ordering and validity checks compare instants at millisecond precision. Equivalent ISO
+offsets and fractional-second spellings compare equally; validity boundaries are inclusive.
+Inputs and stored history retain their original date spelling. `asOf` must be an ISO datetime
+with an explicit offset, just like memory dates, and invalid values throw validation errors.
+
 Stored date fields can be absent on freshly normalized objects and `null` when read
 from SQLite. `forgottenAt` is optional/nullable. Retrieval results have optional `match`
 and `relevance`: punctuation-only fallback results are ordinary listed records and do

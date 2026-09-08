@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { normalizeMemory } from './schema.js';
+import { contextDateSchema, normalizeMemory } from './schema.js';
 import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
@@ -150,6 +150,12 @@ export class ContextStore {
     }
 
     _prepare() {
+        // Use the same millisecond clock as input validation, including historical
+        // offset/fraction spellings. Stored strings and history remain untouched.
+        this.db.function('context_timestamp', { deterministic: true }, (value) => {
+            const timestamp = typeof value === 'string' ? Date.parse(value) : NaN;
+            return Number.isFinite(timestamp) ? timestamp : null;
+        });
         this.statements = {
             insert: this.db.prepare(`
                 INSERT INTO memories (
@@ -471,6 +477,12 @@ export class ContextStore {
     }
 
     search(query, options = {}) {
+        options = {
+            ...options,
+            asOf: contextDateSchema.parse(
+                options.asOf === undefined ? new Date().toISOString() : options.asOf,
+            ),
+        };
         const limit = clamp(options.limit ?? 10, 1, 100);
         const ftsQuery = this.codec.indexQuery(query);
         if (!ftsQuery)
@@ -515,9 +527,9 @@ export class ContextStore {
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
                        WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
-                   AND (memories.valid_from IS NULL OR memories.valid_from <= @asOf)
-                   AND (memories.valid_to IS NULL OR memories.valid_to >= @asOf)
-                 ORDER BY rank ASC, confidence DESC, COALESCE(occurred_at, created_at) DESC
+                   AND (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf))
+                   AND (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf))
+                 ORDER BY rank ASC, confidence DESC, context_timestamp(COALESCE(occurred_at, created_at)) DESC
                  LIMIT @limit`,
             )
             .all({ ...params, query: ftsQuery });
@@ -547,9 +559,9 @@ export class ContextStore {
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
                        WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
-                   AND (memories.valid_from IS NULL OR memories.valid_from <= @asOf)
-                   AND (memories.valid_to IS NULL OR memories.valid_to >= @asOf)
-                 ORDER BY COALESCE(memories.occurred_at, memories.created_at) DESC
+                   AND (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf))
+                   AND (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf))
+                 ORDER BY context_timestamp(COALESCE(memories.occurred_at, memories.created_at)) DESC
                  LIMIT @limit`,
             )
             .all(params);
@@ -629,10 +641,10 @@ export class ContextStore {
                 "CASE sensitivity WHEN 'public' THEN 0 WHEN 'personal' THEN 1 WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank",
             );
         }
-        if (options.asOf) {
-            params.asOf = options.asOf;
+        if (options.asOf !== undefined) {
+            params.asOf = contextDateSchema.parse(options.asOf);
             clauses.push(
-                '(valid_from IS NULL OR valid_from <= @asOf) AND (valid_to IS NULL OR valid_to >= @asOf)',
+                '(valid_from IS NULL OR context_timestamp(valid_from) <= context_timestamp(@asOf)) AND (valid_to IS NULL OR context_timestamp(valid_to) >= context_timestamp(@asOf))',
             );
         }
         if (options.type) {
@@ -644,7 +656,7 @@ export class ContextStore {
             .prepare(
                 `SELECT ${SELECT_COLUMNS} FROM memories
                  WHERE ${clauses.join(' AND ')}
-                 ORDER BY COALESCE(occurred_at, created_at) DESC
+                 ORDER BY context_timestamp(COALESCE(occurred_at, created_at)) DESC
                  LIMIT @limit OFFSET @offset`,
             )
             .all(params);
@@ -823,10 +835,10 @@ function fuseRankings(lexical, vector, limit) {
 }
 
 function validityOverlaps(left, right) {
-    const leftStart = left.validFrom || '0000-01-01T00:00:00.000Z';
-    const leftEnd = left.validTo || '9999-12-31T23:59:59.999Z';
-    const rightStart = right.validFrom || '0000-01-01T00:00:00.000Z';
-    const rightEnd = right.validTo || '9999-12-31T23:59:59.999Z';
+    const leftStart = left.validFrom ? Date.parse(left.validFrom) : -Infinity;
+    const leftEnd = left.validTo ? Date.parse(left.validTo) : Infinity;
+    const rightStart = right.validFrom ? Date.parse(right.validFrom) : -Infinity;
+    const rightEnd = right.validTo ? Date.parse(right.validTo) : Infinity;
     return leftStart <= rightEnd && rightStart <= leftEnd;
 }
 
