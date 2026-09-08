@@ -81,6 +81,26 @@ describe('RecordCapture', () => {
         expect(createCapture().scan().discovered).toBe(1);
         expect(store.list()).toHaveLength(1);
     });
+
+    it('rolls back earlier records when a later record is invalid', () => {
+        records = [draft('one', 'Valid record'), draft('two', '')];
+        expect(() => createCapture().scan()).toThrow();
+        expect(store.stats().total).toBe(0);
+        records[1] = draft('two', 'Fixed record');
+        expect(createCapture().scan()).toMatchObject({ added: 2 });
+        expect(createCapture().scan()).toMatchObject({ unchanged: 2 });
+        expect(store.stats().total).toBe(2);
+    });
+
+    it('treats prototype property names as ordinary source keys', () => {
+        records = [
+            draft('__proto__', 'Prototype record'),
+            draft('constructor', 'Constructor record'),
+        ];
+        expect(createCapture().scan()).toMatchObject({ added: 2 });
+        expect(createCapture().scan()).toMatchObject({ unchanged: 2 });
+        expect(store.stats().total).toBe(2);
+    });
 });
 
 function draft(key, content) {

@@ -8,6 +8,7 @@ import { ContextStore } from '../../../src/context/store.js';
 import { backupVault, restoreVault } from '../../../src/context/backup.js';
 import { openBackup, sealBackup } from '../../../src/context/backup-format.js';
 import { VaultKeyManager } from '../../../src/context/vault-key-manager.js';
+import { ProjectFolderCapture } from '../../../src/context/project-capture.js';
 
 vi.mock('node:fs', async (importOriginal) => {
     const actual = await importOriginal();
@@ -186,7 +187,7 @@ describe('portable vault recovery', () => {
         source = new ContextStore({ dbPath: ':memory:' });
         const file = join(directory, 'backup');
         const metadata = {
-            schemaVersion: 1,
+            schemaVersion: source.db.pragma('user_version', { simple: true }),
             createdAt: new Date().toISOString(),
             payloadKey: null,
         };
@@ -208,4 +209,75 @@ describe('portable vault recovery', () => {
         );
         expect(source.db.pragma('user_version', { simple: true })).toBe(99);
     });
+
+    it('restores a released schema-1 backup and migrates it to the current schema', async () => {
+        const db = new Database(':memory:');
+        db.exec(
+            fs.readFileSync(
+                new URL('../../fixtures/migrations/v0.11.0.sql', import.meta.url),
+                'utf8',
+            ),
+        );
+        const file = join(directory, 'old-backup');
+        fs.writeFileSync(
+            file,
+            await sealBackup(
+                db.serialize(),
+                {
+                    schemaVersion: 1,
+                    createdAt: '2026-09-01T00:00:00.000Z',
+                    payloadKey: null,
+                },
+                passphrase,
+            ),
+        );
+        db.close();
+        const destination = join(directory, 'restored');
+        await restoreVault(file, destination, { passphrase, keyBackend: backend });
+        source = new ContextStore({
+            dataDir: destination,
+            encryptionKey: new VaultKeyManager(destination, { backend }).loadKey(),
+        });
+        expect(source.stats().total).toBe(2);
+        expect(source.history('00000000-0000-4000-8000-000000000001')).toHaveLength(2);
+        expect(source.db.pragma('user_version', { simple: true })).toBe(2);
+        expect(
+            source.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
+        ).toBe(0);
+    });
+
+    it.each([false, true])(
+        'restores capture checkpoints without duplicates (encrypted source: %s)',
+        async (encrypted) => {
+            const project = join(directory, 'project');
+            fs.mkdirSync(project);
+            fs.writeFileSync(join(project, 'notes.md'), 'Checkpoint recovery content');
+            source = new ContextStore({
+                dbPath: ':memory:',
+                ...(encrypted ? { encryptionKey: randomBytes(32) } : {}),
+            });
+            new ProjectFolderCapture(source, project).scan();
+            const original = source.list()[0];
+            const file = join(directory, 'backup');
+            await backupVault(source, file, { passphrase });
+            const destination = join(directory, 'restored');
+            await restoreVault(file, destination, { passphrase, keyBackend: backend });
+            const restored = new ContextStore({
+                dataDir: destination,
+                encryptionKey: new VaultKeyManager(destination, { backend }).loadKey(),
+            });
+            try {
+                expect(new ProjectFolderCapture(restored, project).scan()).toMatchObject({
+                    unchanged: 1,
+                });
+                expect(restored.stats().total).toBe(1);
+                expect(restored.get(original.id).content).toBe(original.content);
+                const row = restored.db.prepare('SELECT snapshot FROM capture_checkpoints').get();
+                expect(restored.codec.isEncrypted(row.snapshot)).toBe(true);
+                expect(row.snapshot).not.toContain(project);
+            } finally {
+                restored.close();
+            }
+        },
+    );
 });

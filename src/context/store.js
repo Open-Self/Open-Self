@@ -6,7 +6,7 @@ import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
 
-export const VAULT_SCHEMA_VERSION = 1;
+export const VAULT_SCHEMA_VERSION = 2;
 
 const SELECT_COLUMNS = `
     memories.id, memories.type, memories.content, memories.summary,
@@ -126,6 +126,11 @@ export class ContextStore {
             CREATE TABLE IF NOT EXISTS vault_metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS capture_checkpoints (
+                checkpoint_key TEXT PRIMARY KEY,
+                snapshot TEXT NOT NULL
             );
         `);
         if (this.db.pragma('user_version', { simple: true }) !== VAULT_SCHEMA_VERSION) {
@@ -283,6 +288,10 @@ export class ContextStore {
         if (marker === 'aes-256-gcm-v1') {
             const sample = this.db.prepare('SELECT content FROM memories LIMIT 1').get();
             if (sample) this.codec.decode(sample.content, 'content');
+            const checkpoint = this.db
+                .prepare('SELECT snapshot FROM capture_checkpoints LIMIT 1')
+                .get();
+            if (checkpoint) this.codec.decode(checkpoint.snapshot, 'capture-state');
             return;
         }
 
@@ -290,6 +299,9 @@ export class ContextStore {
         const memories = this.db.prepare(`SELECT ${SELECT_COLUMNS} FROM memories`).all();
         const vectors = this.db.prepare('SELECT memory_id, vector FROM memory_vectors').all();
         const versions = this.db.prepare('SELECT id, snapshot FROM memory_versions').all();
+        const checkpoints = this.db
+            .prepare('SELECT checkpoint_key, snapshot FROM capture_checkpoints')
+            .all();
         const migrateMemory = this.db.prepare(`
             UPDATE memories SET
                 type = @type, content = @content, summary = @summary,
@@ -330,6 +342,11 @@ export class ContextStore {
                 if (!this.codec.isEncrypted(row.snapshot)) {
                     updateVersion.run(this.codec.encode(row.snapshot, 'version'), row.id);
                 }
+            }
+            for (const row of checkpoints) {
+                this.db
+                    .prepare('UPDATE capture_checkpoints SET snapshot = ? WHERE checkpoint_key = ?')
+                    .run(this.codec.encode(row.snapshot, 'capture-state'), row.checkpoint_key);
             }
             setMarker.run();
         })();

@@ -109,6 +109,12 @@ use message strings. Record parsers can throw on malformed/unavailable sources. 
 report counters and errors rather than assuming a resolved call means every source was
 imported. An injected evaluation store is modified by the evaluation dataset.
 
+From v0.13, captures commit SQLite checkpoints with memories. Record scan failures roll
+back the whole scan; project per-file failures roll back that file and appear in the report.
+Checkpoint/removal failures roll back the scan. `statePath` identifies a legacy JSON input
+and optionally a capture identity; new JSON state files are not written. Dry runs do not
+migrate checkpoints. Invalid state is an error, not a request to start over.
+
 Factories close only resources they own. `createContextServer().close()` closes an owned
 store, not an HTTP listener created by the caller. Close that listener separately.
 `createContextMcpServer().close()` closes its internally created audit database; the

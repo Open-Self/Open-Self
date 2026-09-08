@@ -168,14 +168,33 @@ openself capture project ./atlas --watch --interval 5
 ```
 
 The default scope is `project/<folder-name>`. Each captured chunk has `project-file` provenance with
-a path relative to the selected root. The connector state file, stored under
-`<data-dir>/connectors/`, contains a SHA-256 content hash and memory IDs for each source file. A scan
+a path relative to the selected root. Since v0.13, SQLite capture checkpoints contain
+SHA-256 content hashes and memory IDs for each source file. A scan
 uses that state to apply the following lifecycle:
 
-- unchanged file: no database write or new version
+- unchanged file: no memory update or new version
 - new file: create bounded source-attributed note chunks
 - changed file: update existing chunk IDs where possible, producing lifecycle versions
 - fewer chunks or deleted file: soft-forget obsolete memory IDs immediately
+
+Memories, versions, indexes and checkpoints commit together. Record scans roll back entirely
+on failure. Project scans isolate each file: a failed file keeps its previous memories and is
+reported in `errors`, while successful files can commit. Checkpoint or removal failures roll
+back the scan. A process exit before commit leaves the previous committed state available.
+Scans use an immediate SQLite write transaction; other writers wait up to the vault busy timeout.
+Keep captures bounded because synchronous source reads occur while this transaction is held.
+
+Existing JSON checkpoints under `<data-dir>/connectors/` (or an explicit `statePath`) are
+read only when no SQLite checkpoint exists. A successful non-dry scan imports that state;
+the old JSON is left untouched and is no longer authoritative. Invalid checkpoints cause
+an error before writes rather than silently restarting capture. Dry runs do not migrate state.
+Checkpoint payloads use vault encryption when enabled. In-memory vault checkpoints are also
+in memory and do not write a `.openself` directory into the source tree.
+
+Checkpoint identity uses the connector and absolute source path, plus an explicit `statePath`
+when supplied. Default identity is independent of the vault directory, allowing restored vaults
+to resume the same source. Moving a source or changing an explicit state path starts a separate
+capture; review the old memories before doing so. Watchers are not restarted by restore.
 
 `--watch` is a polling loop rather than an operating-system file watcher, which makes its behavior
 consistent across Linux, macOS, and Windows. It performs an initial scan and then scans at the

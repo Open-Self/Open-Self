@@ -81,7 +81,9 @@ export async function backupVault(store, outputPath, options = {}) {
 
 function validateSnapshot(database, metadata) {
     if (
-        metadata?.schemaVersion !== VAULT_SCHEMA_VERSION ||
+        !Number.isInteger(metadata?.schemaVersion) ||
+        metadata.schemaVersion < 1 ||
+        metadata.schemaVersion > VAULT_SCHEMA_VERSION ||
         typeof metadata.createdAt !== 'string' ||
         !Number.isFinite(Date.parse(metadata.createdAt)) ||
         !(metadata.payloadKey === null || /^[a-f0-9]{64}$/.test(metadata.payloadKey))
@@ -90,7 +92,7 @@ function validateSnapshot(database, metadata) {
     }
     const db = new Database(database, { readonly: true });
     try {
-        if (db.pragma('user_version', { simple: true }) !== VAULT_SCHEMA_VERSION) {
+        if (db.pragma('user_version', { simple: true }) !== metadata.schemaVersion) {
             throw new Error('Unsupported backup database schema version');
         }
         if (
@@ -106,6 +108,7 @@ function validateSnapshot(database, metadata) {
             'import_items',
             'memory_fts',
             'vault_metadata',
+            ...(metadata.schemaVersion >= 2 ? ['capture_checkpoints'] : []),
         ]) {
             if (
                 !db
@@ -153,6 +156,11 @@ export async function restoreVault(backupPath, destination, options = {}) {
             if (!Array.isArray(values) || values.some((value) => !Number.isFinite(value))) {
                 throw new Error('Backup contains an invalid retrieval vector');
             }
+        }
+        for (const { snapshot } of store.db
+            .prepare('SELECT snapshot FROM capture_checkpoints')
+            .all()) {
+            JSON.parse(store.codec.decode(snapshot, 'capture-state'));
         }
         // Rebuild in memory so obsolete plaintext cells/free pages from a plaintext
         // source cannot survive inside the restored encrypted database image.

@@ -189,6 +189,7 @@ export function cosineSimilarity(left: number[], right: number[]): number;
 export interface CaptureOptions {
     scope?: string;
     sensitivity?: Sensitivity;
+    /** Legacy JSON input and optional checkpoint identity; scans persist state in SQLite. */
     statePath?: string;
 }
 export interface CaptureReport {

@@ -1,15 +1,8 @@
 import { createHash } from 'node:crypto';
-import {
-    existsSync,
-    mkdirSync,
-    readFileSync,
-    readdirSync,
-    renameSync,
-    statSync,
-    writeFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { chunkDocument } from './importer.js';
+import { CaptureState } from './capture-state.js';
 
 const DEFAULT_EXTENSIONS = new Set([
     '.c',
@@ -97,14 +90,24 @@ export class ProjectFolderCapture {
         this.statePath =
             options.statePath ||
             join(stateDirectory, 'connectors', `project-${shortHash(this.root)}.json`);
+        this.checkpoint = new CaptureState(
+            store,
+            ['project', this.root, options.statePath ? resolve(options.statePath) : null],
+            this.statePath,
+        );
     }
 
     scan(options = {}) {
+        if (options.dryRun) return this._scan(options);
+        return this.store.db.transaction(() => this._scan(options)).immediate();
+    }
+
+    _scan(options) {
         const dryRun = Boolean(options.dryRun);
         const previous = this._loadState();
         const discovered = this._discoverFiles();
         const currentPaths = new Set(discovered.map((file) => file.relativePath));
-        const nextFiles = { ...previous.files };
+        const nextFiles = Object.assign(Object.create(null), previous.files);
         const report = {
             root: this.root,
             scope: this.scope,
@@ -126,7 +129,9 @@ export class ProjectFolderCapture {
                     continue;
                 }
                 const contentHash = hash(content);
-                const prior = previous.files[file.relativePath];
+                const prior = Object.hasOwn(previous.files, file.relativePath)
+                    ? previous.files[file.relativePath]
+                    : undefined;
                 if (prior?.hash === contentHash) {
                     report.unchanged++;
                     continue;
@@ -139,7 +144,9 @@ export class ProjectFolderCapture {
                     continue;
                 }
 
-                const memoryIds = this._syncMemories(prior?.memoryIds || [], drafts);
+                const memoryIds = this.store.db.transaction(() =>
+                    this._syncMemories(prior?.memoryIds || [], drafts),
+                )();
                 nextFiles[file.relativePath] = { hash: contentHash, memoryIds };
                 if (prior) report.updated++;
                 else report.added++;
@@ -238,31 +245,34 @@ export class ProjectFolderCapture {
     }
 
     _loadState() {
-        if (!existsSync(this.statePath)) return emptyState();
-        try {
-            const state = JSON.parse(readFileSync(this.statePath, 'utf8'));
-            if (state.version !== STATE_VERSION || state.root !== this.root || !state.files) {
-                return emptyState();
-            }
-            if (state.configHash !== this.configHash) {
-                state.files = Object.fromEntries(
-                    Object.entries(state.files).map(([path, file]) => [
-                        path,
-                        { ...file, hash: '' },
-                    ]),
-                );
-            }
-            return state;
-        } catch {
-            return emptyState();
+        const state = this.checkpoint.load();
+        if (!state) return emptyState();
+        if (state.version !== STATE_VERSION || state.root !== this.root || !state.files) {
+            throw new Error('Invalid or incompatible project capture checkpoint');
         }
+        if (typeof state.files !== 'object' || Array.isArray(state.files))
+            throw new Error('Invalid project capture checkpoint');
+        for (const file of Object.values(state.files)) {
+            if (
+                !file ||
+                typeof file.hash !== 'string' ||
+                !Array.isArray(file.memoryIds) ||
+                file.memoryIds.some((id) => typeof id !== 'string')
+            )
+                throw new Error('Invalid project capture checkpoint');
+            if (file.memoryIds.some((id) => !this.store.get(id, { includeForgotten: true })))
+                file.hash = '';
+        }
+        if (state.configHash !== this.configHash) {
+            state.files = Object.fromEntries(
+                Object.entries(state.files).map(([path, file]) => [path, { ...file, hash: '' }]),
+            );
+        }
+        return state;
     }
 
     _writeState(state) {
-        mkdirSync(dirname(this.statePath), { recursive: true });
-        const temporaryPath = `${this.statePath}.${process.pid}.tmp`;
-        writeFileSync(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
-        renameSync(temporaryPath, this.statePath);
+        this.checkpoint.save(state);
     }
 }
 

@@ -75,6 +75,13 @@ The [API reference](./api-reference.md), [support policy](./support-policy.md), 
 Before v1.0: review remaining release-blocking issues against these contracts, verify
 the final version through all release gates, and complete registry publication.
 
+### v0.13 capture recovery
+
+Capture checkpoints now share a SQLite transaction with memories and indexes. Process-exit
+regressions verify rollback and retry, per-file savepoints preserve project scan isolation,
+and backup tests verify checkpoint recovery and schema-1 compatibility. Legacy JSON checkpoint
+import and the schema-2 upgrade are documented in the upgrade guide.
+
 ## Release process
 
 1. Finish the phase with task-relevant source, tests, and documentation.

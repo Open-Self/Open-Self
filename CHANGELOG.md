@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-08
+
+### Added
+
+- Transactional SQLite capture checkpoints, encrypted with vault payloads and included in portable backups.
+- Process-exit, failed-checkpoint, partial-file, retry and legacy checkpoint migration regression checks.
+- Schema-1 backup restore compatibility with migration into schema 2.
+
+### Fixed
+
+- Failed record scans no longer leave partially committed memories; failed project files roll back all of their chunks while successful files can commit.
+- Checkpoint write failures roll back memory, history and index changes, preventing duplicate imports on retry.
+- Source keys such as `__proto__` and `constructor` remain ordinary record identities.
+
+### Changed
+
+- Vault schema is now 2; older releases refuse to open upgraded vaults.
+- Capture reads existing JSON checkpoints once, then uses SQLite. JSON files are no longer updated; `statePath` remains a legacy import path and optional identity.
+- Invalid checkpoints stop scans rather than silently resetting state. In-memory capture no longer writes checkpoint directories into source trees.
+
 ## [0.12.1] - 2026-09-08
 
 ### Fixed

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -35,6 +35,11 @@ for (const released of ['v0.9.1', 'v0.11.0']) {
             false,
         );
         assert.equal(store.stats().total, 2);
+        assert.equal(store.db.pragma('user_version', { simple: true }), 2);
+        assert.equal(
+            store.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
+            0,
+        );
     } finally {
         store.close();
     }
@@ -104,6 +109,9 @@ try {
     });
     assert.equal(response.status, 200);
     assert.ok((await response.text()).includes('/api/context'));
+    mkdirSync('capture-source');
+    writeFileSync('capture-source/notes.md', 'Installed capture recovery fixture');
+    assert.equal(new api.ProjectFolderCapture(store, 'capture-source').scan().added, 1);
     await api.backupVault(store, 'fixture.osbackup', {
         passphrase: 'synthetic recovery passphrase',
     });
@@ -125,6 +133,7 @@ try {
     });
     try {
         assert.equal(restored.get(remembered.id).content, remembered.content);
+        assert.equal(new api.ProjectFolderCapture(restored, 'capture-source').scan().unchanged, 1);
     } finally {
         restored.close();
     }

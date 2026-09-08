@@ -3,6 +3,21 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v0.12 to v0.13
+
+Opening a vault migrates it to SQLite schema 2, adding transactional capture checkpoints.
+Older OpenSelf versions cannot reopen schema 2; use a pre-upgrade backup for rollback.
+Restore continues to accept schema-1 backups, validates them before migration, and restores
+them into a new encrypted vault.
+
+Capture no longer writes JSON checkpoint files. `statePath` remains the legacy import path
+and an optional capture identity, not an output file. Preserve existing checkpoint JSON until
+the first successful scan imports it. Later scans prefer SQLite and leave the old file untouched.
+Malformed/incompatible checkpoints now stop scans instead of silently importing duplicates.
+In-memory stores keep checkpoints only in memory. Code monitoring checkpoint JSON should
+consume `scan()` reports instead. See [capture lifecycle](./context-vault.md) for transaction,
+partial-file failure and source-path semantics.
+
 ## From v0.12.0 to v0.12.1
 
 Context building now enforces the complete rendered character budget, including the first
@@ -58,8 +73,8 @@ vault to an older application version.
 
 Use the [backup/recovery guide](./backup-recovery.md) for passphrase recovery and OS-bound
 key requirements. Restore to a new directory, then verify representative memories before
-redirecting clients. Backup archives exclude policy files, access-audit records, connector
-polling state and legacy messaging/personality files; preserve needed owner configuration
+redirecting clients. Backup archives exclude policy files, access-audit records, legacy JSON
+connector state and messaging/personality files; preserve needed owner configuration
 separately. Do not overwrite the original vault as an upgrade experiment.
 
 When a newer release cannot open a copy, keep the original and report the exact version,

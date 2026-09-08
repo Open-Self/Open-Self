@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectFolderCapture } from '../../../src/context/project-capture.js';
 import { ContextStore } from '../../../src/context/store.js';
 
@@ -22,6 +22,7 @@ describe('ProjectFolderCapture', () => {
     });
 
     afterEach(() => {
+        vi.restoreAllMocks();
         store.close();
         rmSync(tempDir, { recursive: true, force: true });
     });
@@ -107,13 +108,14 @@ describe('ProjectFolderCapture', () => {
         expect(existsSync(statePath)).toBe(false);
     });
 
-    it('keeps default in-memory connector state inside the project .openself directory', () => {
+    it('keeps in-memory checkpoints inside the vault without writing into the project', () => {
         writeFileSync(join(projectDir, 'notes.txt'), 'Local connector state.');
         capture = new ProjectFolderCapture(store, projectDir);
 
         capture.scan();
 
-        expect(existsSync(join(projectDir, '.openself', 'connectors'))).toBe(true);
+        expect(capture.scan()).toMatchObject({ unchanged: 1 });
+        expect(existsSync(join(projectDir, '.openself', 'connectors'))).toBe(false);
         expect(existsSync(join(projectDir, 'connectors'))).toBe(false);
     });
 
@@ -156,5 +158,29 @@ describe('ProjectFolderCapture', () => {
         expect(() => new ProjectFolderCapture(store, join(tempDir, 'missing'))).toThrow(
             'Project folder not found',
         );
+    });
+
+    it('rolls back a failed file while allowing other files to commit', () => {
+        writeFileSync(
+            join(projectDir, 'bad.md'),
+            '# First\n\nValid first chunk.\n\n# Second\n\nBroken chunk.',
+        );
+        writeFileSync(join(projectDir, 'good.md'), 'Independent file.');
+        const encode = store.vectorEncoder.encode.bind(store.vectorEncoder);
+        const failure = vi.spyOn(store.vectorEncoder, 'encode').mockImplementation((text) => {
+            if (text.includes('Broken chunk')) throw new Error('encoder failed');
+            return encode(text);
+        });
+        expect(capture.scan()).toMatchObject({
+            added: 1,
+            skipped: 1,
+            errors: [{ file: 'bad.md', message: 'encoder failed' }],
+        });
+        expect(store.list()).toHaveLength(1);
+        expect(store.search('Valid first', { retrieval: 'lexical' })).toEqual([]);
+        failure.mockRestore();
+        expect(capture.scan()).toMatchObject({ added: 1, unchanged: 1 });
+        expect(store.stats().total).toBe(3);
+        expect(capture.scan()).toMatchObject({ unchanged: 2 });
     });
 });

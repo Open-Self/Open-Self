@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { CaptureState } from './capture-state.js';
 
 const STATE_VERSION = 1;
 
@@ -38,9 +39,24 @@ export class RecordCapture {
                 'connectors',
                 `${this.connector}-${hash(this.sourcePath).slice(0, 16)}.json`,
             );
+        this.checkpoint = new CaptureState(
+            store,
+            [
+                'record',
+                this.connector,
+                this.sourcePath,
+                options.statePath ? resolve(options.statePath) : null,
+            ],
+            this.statePath,
+        );
     }
 
     scan(options = {}) {
+        if (options.dryRun) return this._scan(options);
+        return this.store.db.transaction(() => this._scan(options)).immediate();
+    }
+
+    _scan(options) {
         const dryRun = Boolean(options.dryRun);
         const previous = this._loadState();
         const parsed = this.parser(this.sourcePath, {
@@ -50,7 +66,7 @@ export class RecordCapture {
         });
         const records = uniqueRecords(parsed);
         const currentKeys = new Set(records.map((record) => record.key));
-        const nextRecords = { ...previous.records };
+        const nextRecords = Object.assign(Object.create(null), previous.records);
         const report = {
             source: this.sourcePath,
             connector: this.connector,
@@ -66,7 +82,9 @@ export class RecordCapture {
 
         for (const record of records) {
             const recordHash = hash(stableStringify(record.memory));
-            const prior = previous.records[record.key];
+            const prior = Object.hasOwn(previous.records, record.key)
+                ? previous.records[record.key]
+                : undefined;
             if (prior?.hash === recordHash) {
                 report.unchanged++;
                 continue;
@@ -108,36 +126,36 @@ export class RecordCapture {
     }
 
     _loadState() {
-        if (!existsSync(this.statePath)) return emptyState();
-        try {
-            const state = JSON.parse(readFileSync(this.statePath, 'utf8'));
-            if (
-                state.version !== STATE_VERSION ||
-                state.connector !== this.connector ||
-                state.source !== this.sourcePath ||
-                !state.records
-            ) {
-                return emptyState();
-            }
-            if (state.configHash !== this.configHash) {
-                state.records = Object.fromEntries(
-                    Object.entries(state.records).map(([key, record]) => [
-                        key,
-                        { ...record, hash: '' },
-                    ]),
-                );
-            }
-            return state;
-        } catch {
-            return emptyState();
+        const state = this.checkpoint.load();
+        if (!state) return emptyState();
+        if (
+            state.version !== STATE_VERSION ||
+            state.connector !== this.connector ||
+            state.source !== this.sourcePath ||
+            !state.records
+        ) {
+            throw new Error('Invalid or incompatible record capture checkpoint');
         }
+        if (typeof state.records !== 'object' || Array.isArray(state.records))
+            throw new Error('Invalid record capture checkpoint');
+        for (const record of Object.values(state.records)) {
+            if (!record || typeof record.hash !== 'string' || typeof record.memoryId !== 'string')
+                throw new Error('Invalid record capture checkpoint');
+            if (!this.store.get(record.memoryId, { includeForgotten: true })) record.hash = '';
+        }
+        if (state.configHash !== this.configHash) {
+            state.records = Object.fromEntries(
+                Object.entries(state.records).map(([key, record]) => [
+                    key,
+                    { ...record, hash: '' },
+                ]),
+            );
+        }
+        return state;
     }
 
     _writeState(state) {
-        mkdirSync(dirname(this.statePath), { recursive: true });
-        const temporaryPath = `${this.statePath}.${process.pid}.tmp`;
-        writeFileSync(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
-        renameSync(temporaryPath, this.statePath);
+        this.checkpoint.save(state);
     }
 }
 

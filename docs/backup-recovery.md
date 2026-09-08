@@ -66,17 +66,20 @@ backup until recovery has been verified.
 ## What is included
 
 The complete Context Vault SQLite state: active and forgotten memories, provenance,
-version history, import deduplication ledger, lexical index, vectors, and vault metadata.
+version history, import deduplication ledger, lexical index, vectors, vault metadata, and
+SQLite capture checkpoints (v0.13+).
 The backup's outer encryption also hides operational metadata such as scopes and times.
 The restored database uses the usual payload encryption model: operational metadata is
 visible locally, as explained in [Context Vault](./context-vault.md).
 
 This is **not a whole application-directory backup**. It excludes personality profiles,
 messaging sessions, API keys, source documents, owner MCP policy files, `mcp-audit.db`,
-and `connectors/` polling state. Reapply owner policy when attaching agents to a restored vault. Existing
-captured memories are preserved, but watchers are not restarted automatically. Reattaching
-a connector with missing polling state can import duplicate source chunks; do so only
-after reviewing its source and scope. Import deduplication entries within SQLite survive.
+and legacy `connectors/` JSON state. Reapply owner policy when attaching agents to a restored
+vault. Captured memories and SQLite checkpoints are preserved, but watchers are not restarted
+automatically. Keep the source path and any explicit `statePath` unchanged to resume capture.
+Older backups without SQLite checkpoints require their matching legacy JSON state to avoid
+reimporting source chunks. Restore accepts schema-1 backups and migrates them to schema 2;
+future schemas and manifest/database version mismatches are refused.
 
 ## Failure behavior and limits
 
