@@ -1,5 +1,27 @@
 # v1.0 release verification
 
+## Current stable patch: 1.0.1
+
+On 2026-09-09, [v1.0.1](https://github.com/Open-Self/Open-Self/releases/tag/v1.0.1) replaced
+1.0.0 as npm `latest` and GitHub Latest. It corrects the README shipped to npm; runtime,
+dependencies and schema are unchanged. The npm README now shows `npm install -g openself`
+and stable 1.x, rather than the old 0.7.0 installation status. `next` remains RC.2.
+
+Commit [`94fe5c8`](https://github.com/Open-Self/Open-Self/tree/94fe5c80a1d7573ec891ca365ddba04c58692b35)
+passed all seven [branch CI jobs](https://github.com/Open-Self/Open-Self/actions/runs/34317234493)
+and all seven checks in the [release workflow](https://github.com/Open-Self/Open-Self/actions/runs/34317919884),
+followed by successful packaging and OIDC publication. npm metadata includes provenance.
+The independently downloaded GitHub and npm tarballs both contain version 1.0.1 and the
+corrected README, with the same verified SHA-256:
+
+```text
+641816a364b2e7009b5748d026fd99a0e16a70dfaf041c376929221c7bd37374
+```
+
+The foundation release evidence below is retained as the point-in-time 1.0.0 audit.
+
+## Foundation release: 1.0.0
+
 Verified on 2026-09-09 against [`856128a` / v1.0.0](https://github.com/Open-Self/Open-Self/tree/856128a75f686621ab7096346009ad846be8e59f).
 This is a point-in-time evidence record. It establishes the documented release gates and
 successful distribution, not the absence of every possible defect or vulnerability.
