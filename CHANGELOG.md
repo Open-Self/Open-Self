@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Release engineering
+
+- Publish through npm Trusted Publishing (OIDC) without a long-lived token secret.
+- Recover npm publication of existing verified GitHub tarballs through a main-branch dispatch with a required SHA-256 check, preserving release tags and prerelease channels.
+
 ## [1.0.0-rc.2] - 2026-09-09
 
 ### Fixed

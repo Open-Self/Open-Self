@@ -4,12 +4,23 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing verified GitHub release tag to publish to npm
+        required: true
+        type: string
+      sha256:
+        description: Independently verified SHA-256 of the release tarball
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   verify:
+    if: github.event_name == 'push'
     uses: ./.github/workflows/ci.yml
 
   package:
@@ -48,8 +59,38 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" openself-*.tgz --verify-tag --title "$GITHUB_REF_NAME — Context Vault" --notes-file release-notes.md "${release_flags[@]}"
 
+  recover:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      npm_tag: ${{ steps.artifact.outputs.npm_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download and verify existing release artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          node --input-type=module -e "import {releaseChannel} from './scripts/release-channel.js'; releaseChannel(process.env.RELEASE_TAG.slice(1), process.env.RELEASE_TAG); if (!/^[a-f0-9]{64}$/.test(process.env.EXPECTED_SHA256)) throw new Error('Expected a lowercase SHA-256');"
+          archive="openself-${RELEASE_TAG#v}.tgz"
+          gh release download "$RELEASE_TAG" --pattern "$archive"
+          printf '%s  %s\n' "$EXPECTED_SHA256" "$archive" | sha256sum --check
+          tar -xOf "$archive" package/package.json > recovered-package.json
+          node --input-type=module -e "import fs from 'node:fs'; import {releaseChannel} from './scripts/release-channel.js'; const pkg=JSON.parse(fs.readFileSync('recovered-package.json','utf8')); if(pkg.name !== 'openself') throw new Error('Unexpected package'); const channel=releaseChannel(pkg.version,process.env.RELEASE_TAG); fs.appendFileSync(process.env.GITHUB_OUTPUT,'npm_tag='+channel.npmTag+'\n');"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: openself-*.tgz
+          if-no-files-found: error
+
   publish:
-    needs: package
+    needs: [package, recover]
+    if: always() && (needs.package.result == 'success' || needs.recover.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,18 +100,15 @@ jobs:
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11.19.1
       - uses: actions/download-artifact@v4
         with:
           name: npm-package
       - name: Publish verified package to npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TAG: ${{ needs.package.outputs.npm_tag }}
+          NPM_TAG: ${{ needs.package.outputs.npm_tag || needs.recover.outputs.npm_tag }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::error::GitHub release is available, but npm publication requires the NPM_TOKEN repository secret. Configure it and rerun failed jobs."
-            exit 1
-          fi
           case "$NPM_TAG" in
             next|latest) ;;
             *) echo "::error::Missing or invalid verified npm release channel"; exit 1 ;;

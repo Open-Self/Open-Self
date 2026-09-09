@@ -105,10 +105,12 @@ canonical versions without build metadata are required before packaging.
 5. Commit with a conventional message, push, and verify CI for that exact commit.
 6. Push the matching `vX.Y.Z` tag. Release CI repeats the platform matrix, checks the
    tag against the manifest, packages the source, and creates a GitHub release.
-7. The publish job uploads that same tarball to npm with provenance. It requires the
-   `NPM_TOKEN` repository secret and fails explicitly if credentials are absent.
+7. The publish job uploads that same tarball to npm with provenance using OIDC. npm must
+   trust `Open-Self/Open-Self` workflow `release.yml` with direct publish permission.
 8. Verify both the GitHub artifact and the npm version. If npm authentication fails,
-   configure credentials and rerun the failed publish job; do not move the release tag.
+   correct the trusted publisher configuration and rerun the failed publish job; do not move
+   the release tag. For tags with the old token workflow, use the verified-artifact recovery
+   dispatch described in [CONTRIBUTING.md](../CONTRIBUTING.md#maintainer-releases).
 
 CLI and MCP versions are read from `package.json`. Before v1.0, breaking changes must
 have prominent migration notes. Stable 1.x releases will preserve documented contracts;

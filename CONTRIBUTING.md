@@ -89,11 +89,19 @@ Follow the [release process](./docs/project-roadmap.md#release-process):
    Candidate tags such as `v1.0.0-rc.1` create GitHub prereleases without replacing Latest;
    their npm artifact uses `next`. Versions without a prerelease suffix use npm `latest`.
    Tags must exactly match the manifest; build metadata is not accepted for releases.
-5. The npm job publishes that same artifact with provenance. Configure `NPM_TOKEN` in
-   repository Actions secrets; never put the token in a file, issue, PR or chat message.
+5. The npm job publishes that same artifact with provenance through npm Trusted Publishing
+   (OIDC). Configure GitHub Actions publisher `Open-Self/Open-Self`, workflow `release.yml`,
+   no environment, and allow direct `npm publish`. No npm token secret is required.
 6. Verify the downloaded artifact digest and the exact version's registry metadata separately.
    If npm failed, resolve its stated cause and rerun failed jobs; do not move an existing tag.
 7. Update README installation status when registry publication becomes available.
+
+If a historical tag used an older authentication workflow, rerunning it also uses the old
+workflow. Instead, dispatch `release.yml` from `main` with the existing `release_tag` and its
+independently verified lowercase `sha256`. This recovery path downloads the already verified
+GitHub release tarball, verifies its checksum, package name and version, then publishes the
+same bytes with the appropriate npm tag. It does not rebuild or move the historical tag.
+Use only releases whose original platform, browser and package verification gates passed.
 
 Hotfixes use the same gates. A successful GitHub release is not evidence that npm publication
 succeeded. Do not bypass the verified-artifact workflow with a manual `npm publish` from a checkout.
