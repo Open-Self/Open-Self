@@ -5,6 +5,14 @@ Audit date: 2026-09-09. Runtime baseline:
 This is a point-in-time evidence record, not a declaration of 1.0 stability. Update the
 evidence and remaining work when changes ship; a green build alone does not close every item.
 
+## Stable 1.0 preparation
+
+The 1.0 manifest retains the RC.2 API and schema 2. The lockfile now resolves Vitest and
+coverage-v8 4.1.11, Hono 4.13.7 and Sharp 0.35.4; local npm audit reports zero vulnerabilities.
+These updates address the later RC.2 audit findings recorded below. The API reference,
+support policy and upgrade guide define the stable 1.x contract. Full stable-version CI,
+artifact and registry evidence will be recorded after verification.
+
 ## Current npm publication status
 
 On 2026-09-09, [OIDC recovery run 34305803185](https://github.com/Open-Self/Open-Self/actions/runs/34305803185)

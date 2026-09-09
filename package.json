@@ -1,6 +1,6 @@
 {
   "name": "openself",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0",
   "description": "Private, persistent personal context and memory for every AI you use.",
   "type": "module",
   "sideEffects": false,
@@ -121,13 +121,13 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
     "prettier": "^3.9.4",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "types": "./types/index.d.ts"
 }

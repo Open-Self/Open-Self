@@ -1,7 +1,7 @@
 # JavaScript and TypeScript API
 
 OpenSelf is ESM-only. Install it in a Node.js project and import from `openself`.
-Version 0.12 includes declarations for all 50 existing root value exports; runtime
+Version 1.0 includes declarations for all 50 root value exports; runtime
 validation remains necessary because TypeScript cannot enforce lengths, UUIDs, date
 ordering, sensitivity policy, or filesystem availability.
 
@@ -160,7 +160,7 @@ Follow the existing consent and disclosure guidance before enabling messaging.
 The supported package entrypoints are `openself`, `openself/package.json`, and the
 executable `openself/cli`. Importing the CLI entrypoint executes it; it has no library
 exports. Deep `src/` imports, underscored helpers, SQLite tables, and direct `store.db`
-mutation are implementation details outside the prospective stable contract.
+mutation are implementation details outside the stable contract.
 
-v0.12 is a compatibility candidate, not a declaration that 1.x is frozen. See
+Stable 1.x preserves the documented public contracts; breaking changes require a major version. See
 [support and compatibility](./support-policy.md) and the [upgrade guide](./upgrade-guide.md).

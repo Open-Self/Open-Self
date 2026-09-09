@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-09
+
+### Stable Context Vault
+
+- Establish the documented JavaScript/TypeScript, CLI and MCP contracts as the stable 1.x surface, with support and upgrade policies.
+- Includes typed, source-attributed memories, scoped temporal retrieval, local hybrid search, incremental capture, authenticated dashboard, encrypted backup/restore and MCP owner permissions.
+- Retains the 50 public root value exports and SQLite schema 2 from RC.2; no additional vault migration is introduced.
+- Release verification includes six OS/Node combinations, real native key providers, installed-package migration/consumer checks and Chromium date-edit regressions in three timezones.
+
+### Dependency security
+
+- Update Vitest and coverage tooling to the patched 4.1.11 line, Hono to 4.13.7 and Sharp to 0.35.4, resolving the dependency audit findings that blocked stable release.
+
 ### Release engineering
 
 - Publish through npm Trusted Publishing (OIDC) without a long-lived token secret.

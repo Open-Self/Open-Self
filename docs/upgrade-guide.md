@@ -3,6 +3,17 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.0.0-rc.2 to v1.0.0
+
+The stable release retains the same 50 public root value exports and SQLite schema 2.
+No new vault migration or client configuration change is required. It updates dependencies
+to resolve the release-blocking audit findings and establishes the documented 1.x
+compatibility policy. Earlier 0.x users must also read the intervening migration notes below.
+
+Once registry publication is verified, install with `npm install openself@1.0.0` for a library
+or `npm install -g openself@1.0.0` for the CLI. `latest` selects stable releases; `next` remains
+the separate candidate channel. Retain a verified backup before upgrading a primary vault.
+
 ## From v1.0.0-rc.1 to v1.0.0-rc.2
 
 Dashboard saves now preserve untouched timestamps exactly. Previously, editing unrelated

@@ -22,13 +22,12 @@ Report security-sensitive findings using [SECURITY.md](../SECURITY.md).
 
 ## Release and maintenance policy
 
-During 0.x, the latest minor is the maintenance target. Breaking behavior changes must
+The latest stable 1.x release is the maintenance target. Breaking behavior changes must
 be explained in the changelog and upgrade guide. Security fixes take priority over
 preserving unsafe behavior. Backports to older minors are not promised.
 
-Before declaring 1.0, maintainers must review the supported public contracts, run all
-release gates, verify an actual installed package, and publish the migration/support
-notes. Stable 1.x releases will preserve documented API contracts; breaking changes
+Releases require review of the supported public contracts, all release gates, an actual
+installed-package check, and migration/support notes. Stable 1.x releases preserve documented API contracts; breaking changes
 require a major version. Internal SQL schemas and underscored methods are not public APIs.
 The full API contract is described in [API reference](./api-reference.md).
 
