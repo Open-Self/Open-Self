@@ -88,8 +88,18 @@ npm install -g ./openself-1.0.0-rc.2.tgz
 openself --version
 ```
 
-Expect `1.0.0-rc.2`. npm publication is still blocked by missing release credentials;
-`openself@next` is not yet available. This candidate does not declare stable 1.0 support.
+Expect `1.0.0-rc.2`. This candidate is also published on npm with provenance via OIDC:
+
+```bash
+npm install -g openself@1.0.0-rc.2
+# Or select the prerelease channel:
+npm install -g openself@next
+```
+
+The registry tarball matches the GitHub artifact's SHA-256 above. npm `latest` remains
+v0.7.0; use the explicit candidate version or `next` for Context Vault. This candidate does
+not declare stable 1.0 support. See [release readiness](./docs/release-readiness.md) for the
+current dependency audit and remaining stable-release gates.
 
 ## Local dashboard
 

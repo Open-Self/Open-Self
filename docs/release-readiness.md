@@ -5,6 +5,21 @@ Audit date: 2026-09-09. Runtime baseline:
 This is a point-in-time evidence record, not a declaration of 1.0 stability. Update the
 evidence and remaining work when changes ship; a green build alone does not close every item.
 
+## Current npm publication status
+
+On 2026-09-09, [OIDC recovery run 34305803185](https://github.com/Open-Self/Open-Self/actions/runs/34305803185)
+successfully published the existing RC.2 artifact using npm Trusted Publishing, without an
+`NPM_TOKEN` secret. `npm view openself dist-tags` returned `next: 1.0.0-rc.2` and
+`latest: 0.7.0`. The exact RC.2 registry metadata includes a provenance attestation. The
+tarball downloaded directly from npm has SHA-256
+`b2c4bea0758360f08b966cb416d73e8b25995b9c6119eb43205b0ebdb77ed838`, identical to the verified
+GitHub RC.2 artifact. The token failures below are historical and superseded by this result.
+
+The concurrent [main CI audit](https://github.com/Open-Self/Open-Self/actions/runs/34305794286)
+reported five dependency vulnerabilities (four moderate, one high), involving Vitest/mocker,
+Hono and Sharp. This later audit supersedes earlier clean audit results. Resolve these findings
+and rerun the complete gates before stable 1.0; OIDC publication success does not close that gate.
+
 ## v1.0.0-rc.1 candidate
 
 The first 1.0 release candidate retains the v0.13.2 runtime contracts and schema 2, adds the
@@ -30,7 +45,7 @@ credentials and generated directories. Its SHA-256 matches the GitHub asset dige
 ```
 
 This candidate was superseded by RC.2 below; the README now links the corrected candidate.
-Registry publication and the final stable-version gates remain open. A candidate does not
+At that point registry publication and the final stable-version gates remained open. A candidate does not
 close the stable 1.0 gate; external provider mocks and dashboard audit limits still apply.
 
 ## Dashboard date correction for v1.0.0-rc.2
@@ -77,7 +92,7 @@ as latest. Stable 1.0 and successful registry publication remain unverified.
 | Upgrade and installed package | [Frozen migration fixtures](../tests/fixtures/migrations/), [package test](../scripts/test-package.js), [upgrade guide](./upgrade-guide.md) | Schema 0/1 upgrade fixtures and real tarball installation checked; schema-2 fixture added in the follow-up below |
 | Platform and quality gates | [Exact-commit CI](https://github.com/Open-Self/Open-Self/actions/runs/34258836498), [release verification](https://github.com/Open-Self/Open-Self/actions/runs/34259371537) | Six OS/Node combinations passed; release workflow's overall failure is the separate npm job |
 | Support and private reporting | [Support policy](./support-policy.md), [security policy](../SECURITY.md), [contributing](../CONTRIBUTING.md) | Policies present; private vulnerability reporting enabled and read back via GitHub API on audit date |
-| Registry publication | `npm view openself version`, repository secret names, release publish log | Incomplete: npm latest is 0.7.0; no NPM_TOKEN secret is configured |
+| Registry publication | OIDC recovery run and independently downloaded registry tarball above | RC.2 published with provenance under `next`; `latest` remains 0.7.0 |
 
 The successful local suite contained 511 tests. Reported line coverage was 88.95%, with
 the exclusions listed in [vitest.config.js](../vitest.config.js). Local coverage used 30-second
@@ -103,12 +118,12 @@ gateway, provider or dashboard interaction has been exercised live.
    [Frozen v0.13.1 SQL](../tests/fixtures/migrations/v0.13.1.sql) records its historical source hash
    and synthetic checkpoint state. The installed consumer verifies its memories, versions,
    deduplication, forgotten state and checkpoint references independently of current setup code.
-4. **Complete publication configuration.** A repository maintainer must provision a valid npm
-   publishing credential as the Actions `NPM_TOKEN` secret (or implement and verify a replacement
-   trusted-publishing flow). Do not put credentials in issues, files or chat. Rerun only the
-   failed publish job for an existing verified release and confirm its exact registry version.
+4. **Closed by verified OIDC publication of RC.2.** npm trusts `Open-Self/Open-Self`, workflow
+   `release.yml`, with direct publish permission and no environment. The recovery workflow
+   checked the existing artifact's SHA-256 and published the same bytes. No token secret is needed.
 5. **Run the final stable 1.0 version through the complete gates.** The RC evidence above closes
-   the candidate platform/artifact checks, but registry publication remains incomplete. Recheck open release blockers,
+   the candidate platform/artifact checks; RC.2 registry publication is now verified. Resolve the
+   current dependency audit findings above and recheck open release blockers,
    compatibility and upgrade notes, private reporting, platform CI, artifact contents/digest,
    and actual registry publication. Current evidence proves the cited 0.x and RC artifacts, not a
    future stable 1.0 version. External provider mocks and local-dashboard scope must remain explicit.
@@ -127,6 +142,6 @@ Its downloaded SHA-256 was verified as:
 10594cb80bcf19d12f747837b4efcf7ed12137fd2946df8812090a2d0e7627c2
 ```
 
-The npm publish job failed explicitly because `NPM_TOKEN` was absent. Until publication is
-verified, the README directs Context Vault users to this tarball rather than the old registry
-version. Publishing a GitHub release and publishing to npm are distinct outcomes.
+The original npm publish job failed explicitly because `NPM_TOKEN` was absent. RC.2 has since
+been published through OIDC as documented above; the README now offers the npm candidate as
+well as the GitHub tarballs. Publishing a GitHub release and publishing to npm are distinct outcomes.

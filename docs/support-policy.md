@@ -35,8 +35,8 @@ The full API contract is described in [API reference](./api-reference.md).
 Every version tag runs platform tests, coverage thresholds, retrieval/privacy evaluations,
 a dependency audit, declaration checks, isolated package installation and consumer tests,
 strict publint, and packaging checks before a GitHub release artifact is created.
-A GitHub release and an npm registry publication are distinct outcomes. Missing npm
-credentials must fail the publish job rather than silently claim success.
+A GitHub release and an npm registry publication are distinct outcomes. npm publication uses
+OIDC Trusted Publishing; authentication failures must fail the job rather than silently claim success.
 
 The shared CI also runs Chromium dashboard regressions on Linux/Node 24 in UTC,
 Ho Chi Minh City and New York timezones. They exercise authenticated forms against a real
