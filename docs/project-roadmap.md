@@ -73,14 +73,13 @@ frozen released-schema migration fixtures, and isolated installed-package tests.
 The [API reference](./api-reference.md), [support policy](./support-policy.md), and
 [upgrade guide](./upgrade-guide.md) define the candidate surface and its boundaries.
 
-Before v1.0: review remaining release-blocking issues against these contracts, verify
-the final version through all release gates, and complete registry publication.
-The [release-readiness audit](./release-readiness.md) tracks evidence and concrete gaps.
+The [release verification](./release-readiness.md) records the completed stable-version
+platform gates, installed-package checks and registry publication.
 
 The 1.0 release retains RC.2's API and schema 2, declares the documented 1.x compatibility
 policy, and updates the dependency graph to resolve the candidate's later audit findings.
-Final CI, GitHub artifact and npm `latest` results are recorded in the readiness audit after
-verification; a version bump alone does not establish successful distribution.
+Final CI, GitHub artifact and npm `latest` results are recorded in the release verification;
+a version bump alone does not establish successful distribution.
 
 ### v0.13 capture recovery
 

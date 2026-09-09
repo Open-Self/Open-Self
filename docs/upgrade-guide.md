@@ -10,7 +10,7 @@ No new vault migration or client configuration change is required. It updates de
 to resolve the release-blocking audit findings and establishes the documented 1.x
 compatibility policy. Earlier 0.x users must also read the intervening migration notes below.
 
-Once registry publication is verified, install with `npm install openself@1.0.0` for a library
+Registry publication was verified. Install with `npm install openself@1.0.0` for a library
 or `npm install -g openself@1.0.0` for the CLI. `latest` selects stable releases; `next` remains
 the separate candidate channel. Retain a verified backup before upgrading a primary vault.
 

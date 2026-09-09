@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-09
+
+### Documentation
+
+- Correct the README shipped to npm to install the stable `latest` channel instead of the historical v0.13.2 tarball or release candidate.
+- Record the successful stable release gates, clean dependency audit, OIDC publication and matching GitHub/npm artifact digests.
+- No runtime API, dependency or SQLite schema change from 1.0.0.
+
 ## [1.0.0] - 2026-09-09
 
 ### Stable Context Vault

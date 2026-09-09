@@ -36,15 +36,11 @@ memory explicit and portable:
 
 Requires Node.js 22.13 or newer. Node.js 24 is also tested.
 
-As checked on 2026-09-09, npm `latest` is v0.7.0 and does not contain the Context Vault
-commands below. The verified Context Vault build without a prerelease suffix is
-[v0.13.2 on GitHub](https://github.com/Open-Self/Open-Self/releases/tag/v0.13.2).
-Download its [openself-0.13.2.tgz](https://github.com/Open-Self/Open-Self/releases/download/v0.13.2/openself-0.13.2.tgz)
-asset and verify SHA-256 `10594cb80bcf19d12f747837b4efcf7ed12137fd2946df8812090a2d0e7627c2`,
-then install the downloaded file:
+OpenSelf stable 1.x is available on npm under the default `latest` tag.
+See [GitHub Releases](https://github.com/Open-Self/Open-Self/releases) for version history.
 
 ```bash
-npm install -g ./openself-0.13.2.tgz
+npm install -g openself
 openself --version
 
 # Store a durable decision
@@ -69,37 +65,17 @@ openself memory stats
 ```
 
 From this repository, replace `openself` with `node src/cli/index.js`.
-See [release readiness](./docs/release-readiness.md) for publication status and remaining
-v1.0 gates. The [upgrade guide](./docs/upgrade-guide.md) covers existing vaults.
+See [release verification](./docs/release-readiness.md) for CI, audit and distribution evidence.
+The [upgrade guide](./docs/upgrade-guide.md) covers existing vaults. Stable 1.x preserves the
+[documented public contracts](./docs/api-reference.md).
 
-### Try the v1.0 release candidate
+For library use, run `npm install openself`. To pin this release, use `openself@1.0.0`.
+The `next` channel remains separate and currently points to the older `1.0.0-rc.2` candidate;
+use the default stable channel for normal installation.
 
-[v1.0.0-rc.2](https://github.com/Open-Self/Open-Self/releases/tag/v1.0.0-rc.2) is an opt-in
-prerelease with the same public API and schema 2 as v0.13.2. It fixes dashboard saves that
-truncated timestamps and date clearing that retained old values. Its release gates passed all
-six OS/Node combinations, including real OS key storage, plus Chromium date-edit regressions
-in three timezones. Read the [candidate upgrade notes](./docs/upgrade-guide.md#from-v100-rc1-to-v100-rc2)
-and test with a copied vault. Prefer this candidate for the dashboard timestamp correction.
-Download [openself-1.0.0-rc.2.tgz](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0-rc.2/openself-1.0.0-rc.2.tgz),
-verify SHA-256 `b2c4bea0758360f08b966cb416d73e8b25995b9c6119eb43205b0ebdb77ed838`, then run:
-
-```bash
-npm install -g ./openself-1.0.0-rc.2.tgz
-openself --version
-```
-
-Expect `1.0.0-rc.2`. This candidate is also published on npm with provenance via OIDC:
-
-```bash
-npm install -g openself@1.0.0-rc.2
-# Or select the prerelease channel:
-npm install -g openself@next
-```
-
-The registry tarball matches the GitHub artifact's SHA-256 above. npm `latest` remains
-v0.7.0; use the explicit candidate version or `next` for Context Vault. This candidate does
-not declare stable 1.0 support. See [release readiness](./docs/release-readiness.md) for the
-current dependency audit and remaining stable-release gates.
+For a direct download, use [openself-1.0.0.tgz](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0/openself-1.0.0.tgz)
+and verify SHA-256 `24d264272590167f333614d9cad264f209e2c86bde476f9087dffcf6af0366a6`.
+The GitHub and npm tarballs were downloaded independently and have the same digest.
 
 ## Local dashboard
 
