@@ -16,12 +16,28 @@ function captureConsole(fn) {
     const spy = vi.spyOn(console, 'log').mockImplementation((...args) => {
         logs.push(args.join(' '));
     });
+    const wrap = (result) => ({ result, logs, output: logs.join('\n') });
+    let result;
     try {
-        const result = fn();
-        return { result, logs, output: logs.join('\n') };
-    } finally {
+        result = fn();
+    } catch (error) {
         spy.mockRestore();
+        throw error;
     }
+    if (result && typeof result.then === 'function') {
+        return result.then(
+            (value) => {
+                spy.mockRestore();
+                return wrap(value);
+            },
+            (error) => {
+                spy.mockRestore();
+                throw error;
+            },
+        );
+    }
+    spy.mockRestore();
+    return wrap(result);
 }
 
 describe('new agent-era CLI commands', () => {
@@ -61,26 +77,30 @@ describe('new agent-era CLI commands', () => {
     });
 
     describe('context', () => {
-        it('returns context with a receipt when --explain is set', { timeout: 30_000 }, () => {
-            const store = new ContextStore({ dataDir: directory });
-            store.remember({
-                type: 'decision',
-                content: 'Atlas uses SQLite',
-                scope: 'project/atlas',
-            });
-            store.close();
-            const { result } = captureConsole(() =>
-                contextCommand('what database', {
-                    dataDir: directory,
+        it(
+            'returns context with a receipt when --explain is set',
+            { timeout: 30_000 },
+            async () => {
+                const store = new ContextStore({ dataDir: directory });
+                store.remember({
+                    type: 'decision',
+                    content: 'Atlas uses SQLite',
                     scope: 'project/atlas',
-                    explain: true,
-                    json: true,
-                }),
-            );
-            expect(result.context).toContain('SQLite');
-            expect(result.receipt.totals.selected).toBe(1);
-            expect(result.receipt.candidates[0].decision).toBe('selected');
-        });
+                });
+                store.close();
+                const { result } = await captureConsole(() =>
+                    contextCommand('what database', {
+                        dataDir: directory,
+                        scope: 'project/atlas',
+                        explain: true,
+                        json: true,
+                    }),
+                );
+                expect(result.context).toContain('SQLite');
+                expect(result.receipt.totals.selected).toBe(1);
+                expect(result.receipt.candidates[0].decision).toBe('selected');
+            },
+        );
     });
 
     describe('inbox', () => {

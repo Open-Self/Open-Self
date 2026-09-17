@@ -2,6 +2,51 @@
 
 ## [Unreleased]
 
+### Added — verifiable trust, pluggable embeddings, standards & distribution
+
+- **Tamper-evident access audit.** Completed MCP access events are hash-chained
+  (`prev_hash` → `entry_hash`, SHA-256 over prevHash + timestamp + client + tool +
+  outcome). `AccessAudit.verify()` detects edited or deleted history, interrupted
+  `attempted` rows report as `pending`, pre-chain rows report as `legacy`, and
+  retention pruning anchors the surviving suffix via `audit_meta.pruned_hash`.
+  New CLI actions: `openself audit verify` (non-zero exit on tampering) and
+  `openself audit export` (JSONL trail for archival or transparency-log anchoring).
+  The dashboard Audit view shows live chain status.
+- **Verifiable context receipts.** Every memory carries `contentHash`
+  (`sha256("openself-memory-v1\n" + content)`); explain receipts gain `contextHash`
+  (`sha256("openself-context-v1\n" + renderedContext)`), per-candidate
+  `contentHash`, and a vector-index summary — an auditable citation of exactly
+  what an agent received.
+- **Pluggable embedding providers.** `feature-hash` remains the deterministic,
+  fully-offline default. `ollama` embeds through a local Ollama server;
+  `openai-compatible` targets any `/v1/embeddings` endpoint (the only provider
+  that can leave the machine — strictly opt-in). Async providers never block
+  synchronous writes: vectors are drained by `store.indexPending()`,
+  `openself memory index`, or automatically after MCP mutations. New async APIs:
+  `searchAsync`, `buildContextAsync`, `findPotentialConflictsAsync`. Select via
+  `--embeddings` on `memory`/`context`/`mcp` or `OPENSELF_EMBEDDINGS`.
+- **Formal exchange specification.** `spec/context-exchange-format.md` specifies
+  the `openself-context` JSONL format — header/record fields, `contentHash`
+  domain separation, trust clamping, idempotent import — with a normative JSON
+  Schema (`spec/context-exchange.schema.json`) and a non-throwing
+  `validateContextExport()` for third-party tooling.
+- **MCP Registry and container distribution.** `server.json` + `mcpName` publish
+  OpenSelf as `io.github.Open-Self/openself`; a multi-stage `Dockerfile` and
+  `docker` workflow publish `ghcr.io/open-self/openself`; `.devcontainer/` gives
+  a one-click development environment.
+- **Security posture.** CodeQL (`security-and-quality`) and OpenSSF Scorecard
+  workflows run on push/PR/schedule with minimal permissions; README badges
+  surface CI, CodeQL, Scorecard, registry, and container status.
+- **New exports:** `resolveVectorProvider`, `featureHashProvider`,
+  `OllamaEmbeddingProvider`, `OpenAiCompatibleProvider`, `validateContextExport`,
+  `memoryContentHash`, `contextBlockHash`, `auditEntryHash`.
+
+### Changed
+
+- `stats()` additionally reports `vectorProvider` and `pendingVectors`.
+- Audit list results include `prevHash`/`entryHash` fields; the dashboard audit
+  endpoint returns `{ events, chain }` and opens the log read-only.
+
 ## [1.1.0] - 2026-09-17
 
 ### Added — user-owned context layer for AI agents

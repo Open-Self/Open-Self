@@ -24,17 +24,27 @@ manual/import/capture -> typed memory -> SQLite + FTS5 + local vector -> CLI/MCP
 
 - `ContextStore` owns typed memory, provenance, temporal validity, source trust, soft
   forgetting, hybrid retrieval, conflict detection, owner-reviewed proposals, explain
-  receipts, and version history.
+  receipts (with `contextHash`/`contentHash` citations), and version history.
+- Embedding providers are pluggable: `feature-hash` (offline default), `ollama`
+  (local LLM), and `openai-compatible` (opt-in remote). Async providers index
+  lazily via `indexPending()`; sync mutation paths never block on them.
 - Importers ingest documents and chat exports; polling connectors maintain project, ICS calendar,
-  EML/MBOX email, and browser bookmark/history sources with stable record IDs. A versioned
-  JSONL interchange format (`openself memory export/import`) ports context between vaults.
+  EML/MBOX email, and browser bookmark/history sources with stable record IDs. The versioned
+  JSONL interchange format (`openself memory export/import`) is specified in
+  `spec/context-exchange-format.md` with a normative JSON Schema; content-hash dedupe
+  makes re-imports idempotent.
 - Optional AES-256-GCM protects payload fields, local vectors, and versions. HMAC blind tokens
   replace plaintext FTS terms. Filter metadata remains plaintext.
 - `VaultKeyManager` binds the random key to Windows DPAPI, macOS Keychain, or Linux Secret Service.
+- `AccessAudit` records MCP calls in a SHA-256 hash chain (`prev_hash` → `entry_hash`);
+  `verify()` detects edited or deleted history, `toJSONL()` exports the trail for
+  external anchoring, and pruning anchors the surviving suffix via `audit_meta`.
 - CLI, authenticated localhost dashboard, JavaScript exports, and MCP (stdio or authenticated
   Streamable HTTP) are separate access surfaces over the same store.
 - `eval:context` gates recall/MRR, temporal correctness, sensitivity leakage, and provenance against
   a versioned offline dataset.
+- Distribution: npm (`openself`), MCP Registry (`io.github.Open-Self/openself` via
+  `server.json` + `mcpName`), and OCI image (`ghcr.io/open-self/openself`).
 
 ## Message Processing Pipeline
 

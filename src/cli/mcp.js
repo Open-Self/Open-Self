@@ -17,7 +17,7 @@ export async function mcpCommand(options = {}) {
 
     if (options.http) {
         const { runContextMcpHttpServer } = await import('../context/mcp-http.js');
-        const store = new ContextStore({ dataDir });
+        const store = new ContextStore({ dataDir, embeddings: options.embeddings });
         const audit = new AccessAudit({
             dbPath:
                 store.dbPath === ':memory:'

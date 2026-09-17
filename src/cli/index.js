@@ -75,7 +75,7 @@ ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 program
     .command('memory')
     .description('Import, store, search, list, and forget personal context')
-    .argument('[action]', 'add/import/export/search/conflicts/list/forget/stats', 'list')
+    .argument('[action]', 'add/import/export/index/search/conflicts/list/forget/stats', 'list')
     .option('--file <paths...>', 'Files to import (or the export destination for export)')
     .option(
         '--format <format>',
@@ -105,6 +105,7 @@ program
     .option('--dry-run', 'Inspect an import without writing memories')
     .option('--limit <number>', 'Maximum results')
     .option('--include-forgotten', 'Include forgotten memories when listing')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction((action, options) => memoryCommand(action, options)));
 
@@ -136,6 +137,7 @@ program
     .option('--max-sensitivity <level>', 'public/personal/private/restricted')
     .option('--limit <number>', 'Maximum candidate memories')
     .option('--explain', 'Include a context receipt explaining selection')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
     .option('--json', 'Emit JSON')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction((query, options) => contextCommand(query, options)));
@@ -206,18 +208,21 @@ program
     .option('--allow-remote', 'Permit non-loopback HTTP binds; requires --token')
     .option('--audit-retention-days <days>', 'Audit retention in days', '30')
     .option('--audit-max-entries <count>', 'Maximum retained audit entries', '10000')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction(mcpCommand));
 
 program
     .command('audit')
-    .description('Inspect or prune local MCP access metadata')
-    .argument('[action]', 'list/prune/clear', 'list')
+    .description('Inspect, verify, export, or prune tamper-evident MCP access metadata')
+    .argument('[action]', 'list/verify/export/prune/clear', 'list')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .option('--client <id>', 'Filter by owner-configured client identity')
     .option('--limit <count>', 'Maximum results', '50')
+    .option('--file <path>', 'JSONL export destination (export action)')
     .option('--retention-days <days>', 'Retention in days', '30')
     .option('--max-entries <count>', 'Maximum retained entries', '10000')
+    .option('--json', 'Emit JSON')
     .action(wrapAction(auditCommand));
 
 program

@@ -2,9 +2,10 @@
 
 async function refreshAudit() {
     const response = await fetch('/api/context/audit');
-    const { events } = await response.json().catch(() => ({ events: [] }));
+    const { events, chain } = await response.json().catch(() => ({ events: [], chain: null }));
     const list = document.getElementById('audit-list');
     list.replaceChildren();
+    renderChainStatus(list, chain);
     if (!events || !events.length) {
         const empty = document.createElement('p');
         empty.className = 'empty-list';
@@ -28,8 +29,21 @@ async function refreshAudit() {
         outcome.className = `audit-outcome ${event.outcome}`;
         outcome.textContent = event.outcome;
         row.append(time, client, tool, outcome);
+        if (event.entryHash) row.title = `chain ${event.entryHash.slice(0, 16)}…`;
         list.append(row);
     }
+}
+
+function renderChainStatus(list, chain) {
+    if (!chain) return;
+    const status = document.createElement('p');
+    status.className = `audit-chain ${chain.ok ? 'chain-ok' : 'chain-broken'}`;
+    status.textContent = chain.ok
+        ? `Tamper-evident chain verified — ${chain.checked} event(s)` +
+          (chain.legacy ? ` · ${chain.legacy} legacy` : '') +
+          (chain.pending ? ` · ${chain.pending} pending` : '')
+        : `Audit chain broken at event #${chain.brokenAt}`;
+    list.append(status);
 }
 
 // dashboard.js tab switching calls this after this script has loaded.

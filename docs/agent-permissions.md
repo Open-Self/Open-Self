@@ -118,6 +118,8 @@ registered tool stores only:
 | `client` | Owner-configured alias |
 | `tool` | Registered tool name |
 | `outcome` | `attempted`, `allowed`, `denied`, or `error` |
+| `prevHash` | Hash of the previous completed event (chain link) |
+| `entryHash` | SHA-256 over `prevHash + occurredAt + client + tool + outcome` |
 
 It does not store query text, memory content, memory IDs, scopes, passphrases, raw errors,
 client-handshake names, or response payloads. Unknown tools and requests rejected by
@@ -125,9 +127,26 @@ MCP schema validation do not reach the audited handler.
 
 A durable `attempted` event is written before access checks or memory operations. If
 that write fails, the tool does not run. Memory writes roll back if terminal audit
-recording fails. A crash may leave `attempted` records. `allowed` indicates that the
-policy check and handler succeeded; it is not a transaction commit receipt, proof of
-response delivery, or a tamper-evident log. Both databases remain owned by the local user.
+recording fails. A crash may leave `attempted` records, which verification reports as
+`pending` rather than tampering. `allowed` indicates that the policy check and handler
+succeeded; it is not a transaction commit receipt or proof of response delivery.
+
+### Tamper evidence
+
+Completed events form a hash chain (`prev_hash` → `entry_hash`): editing a historical
+row, deleting a mid-chain row, or rewriting outcomes breaks the chain:
+
+```bash
+openself audit verify --data-dir /absolute/vault     # non-zero exit on tampering
+openself audit list --data-dir /absolute/vault       # events + chain status
+openself audit export --file audit.jsonl             # JSONL trail for archival
+```
+
+`verify` walks the full chain and reports `{ ok, checked, legacy, pending, brokenAt }`.
+Events recorded by pre-chain versions verify as `legacy`. Retention pruning stores a
+`pruned_hash` anchor so the surviving suffix still verifies — pruning old history does
+not look like tampering. To anchor the trail externally (e.g. a transparency log or a
+signed timestamp), export the JSONL and pin its tail hash elsewhere.
 
 ```bash
 openself audit list --data-dir /absolute/vault --client atlas-reader --limit 50

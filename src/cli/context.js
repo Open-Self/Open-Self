@@ -5,13 +5,15 @@ import { ContextStore } from '../context/store.js';
  * Build a bounded context block for a query — the same call agents make
  * through `openself_get_context`, plus an optional context receipt.
  */
-export function contextCommand(query, options = {}) {
+export async function contextCommand(query, options = {}) {
     if (!query || !query.trim()) throw new Error('A context query is required');
     const store = new ContextStore({
         dataDir: options.dataDir || process.env.DATA_DIR || './data',
+        embeddings: options.embeddings,
     });
     try {
-        const result = store.buildContext(query.trim(), {
+        if (!store.vectorSync) await store.indexPending();
+        const result = await store.buildContextAsync(query.trim(), {
             scope: options.scope,
             type: options.type,
             maxSensitivity: options.maxSensitivity || 'restricted',
@@ -42,7 +44,8 @@ function printReceipt(receipt) {
         chalk.gray(
             `asOf ${receipt.asOf} · retrieval ${receipt.retrieval} · ` +
                 `${receipt.totals.selected}/${receipt.totals.candidates} selected · ` +
-                `${receipt.totals.usedChars} chars`,
+                `${receipt.totals.usedChars} chars` +
+                (receipt.contextHash ? ` · hash ${receipt.contextHash.slice(0, 16)}…` : ''),
         ),
     );
     for (const candidate of receipt.candidates) {
