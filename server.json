@@ -1,0 +1,83 @@
+{
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name": "io.github.Open-Self/openself",
+    "title": "OpenSelf",
+    "description": "The user-owned context layer for AI agents: private, portable, provenance-aware memory with policy-controlled access, tamper-evident audit, and verifiable context receipts.",
+    "version": "1.1.0",
+    "repository": {
+        "url": "https://github.com/Open-Self/Open-Self",
+        "source": "github"
+    },
+    "websiteUrl": "https://github.com/Open-Self/Open-Self#readme",
+    "icons": [],
+    "packages": [
+        {
+            "registryType": "npm",
+            "identifier": "openself",
+            "version": "1.1.0",
+            "runtimeHint": "npx",
+            "runtimeArguments": [
+                {
+                    "type": "positional",
+                    "value": "-y"
+                }
+            ],
+            "packageArguments": [
+                {
+                    "type": "positional",
+                    "value": "mcp"
+                }
+            ],
+            "transport": {
+                "type": "stdio"
+            },
+            "environmentVariables": [
+                {
+                    "name": "DATA_DIR",
+                    "description": "Directory holding the encrypted context vault (default ./data)",
+                    "isRequired": false
+                },
+                {
+                    "name": "OPENSELF_EMBEDDINGS",
+                    "description": "Embedding provider: feature-hash (default, offline), ollama, or openai-compatible",
+                    "isRequired": false,
+                    "choices": ["feature-hash", "ollama", "openai-compatible"]
+                },
+                {
+                    "name": "OPENSELF_OLLAMA_URL",
+                    "description": "Ollama base URL when OPENSELF_EMBEDDINGS=ollama (default http://127.0.0.1:11434)",
+                    "isRequired": false
+                },
+                {
+                    "name": "OPENSELF_EMBEDDINGS_MODEL",
+                    "description": "Embedding model name for ollama/openai-compatible providers",
+                    "isRequired": false
+                },
+                {
+                    "name": "OPENSELF_EMBEDDINGS_BASE_URL",
+                    "description": "Base URL of an OpenAI-compatible /v1 endpoint when OPENSELF_EMBEDDINGS=openai-compatible",
+                    "isRequired": false
+                },
+                {
+                    "name": "OPENSELF_EMBEDDINGS_API_KEY",
+                    "description": "API key for the openai-compatible provider (falls back to OPENAI_API_KEY)",
+                    "isRequired": false,
+                    "isSecret": true
+                }
+            ]
+        },
+        {
+            "registryType": "oci",
+            "identifier": "ghcr.io/open-self/openself:1.1.0",
+            "transport": {
+                "type": "stdio"
+            },
+            "packageArguments": [
+                {
+                    "type": "positional",
+                    "value": "mcp"
+                }
+            ]
+        }
+    ]
+}

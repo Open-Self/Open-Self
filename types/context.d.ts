@@ -41,6 +41,8 @@ export interface MemoryInput {
 export interface MemoryRecord extends MemoryInput {
     id: string;
     type: MemoryType;
+    /** sha256("openself-memory-v1\n" + content) — stable content address. */
+    contentHash: string;
     summary: string;
     source: MemorySource;
     scope: string;
@@ -111,6 +113,8 @@ export interface ContextBlock {
 }
 export interface ContextReceiptCandidate {
     id: string;
+    /** sha256 content address of the candidate record. */
+    contentHash: string;
     type: MemoryType;
     scope: string;
     sensitivity: Sensitivity;
@@ -128,7 +132,16 @@ export interface ContextReceiptCandidate {
 export interface ContextReceipt {
     version: 1;
     query: string;
+    /** sha256("openself-context-v1\n" + context) — cites the exact rendered block. */
+    contextHash: string;
     asOf: string;
+    /** Vector index state at build time. */
+    vector: {
+        model: string;
+        provider: string;
+        indexed: number;
+        pending: number;
+    };
     retrieval: RetrievalMode;
     filters: {
         scope: string | null;
@@ -151,11 +164,30 @@ export interface VectorEncoder {
     model: string;
     encode(text: string): number[];
 }
+/**
+ * Pluggable embedding provider. Synchronous providers expose `encodeSync`;
+ * async providers expose `encode`/`batchEncode` and index lazily through
+ * `store.indexPending()`. `model` is recorded per-vector — changing it
+ * re-indexes pending rows.
+ */
+export interface VectorProvider {
+    name?: string;
+    model: string;
+    encode?(text: string): Promise<number[]>;
+    encodeSync?(text: string): number[];
+    batchEncode?(texts: string[]): Promise<number[][]>;
+}
+export type EmbeddingProviderName = 'feature-hash' | 'ollama' | 'openai-compatible';
 export interface ContextStoreOptions {
     dataDir?: string;
     dbPath?: string | Buffer;
     encryptionKey?: VaultKey;
+    /** Back-compat alias: a synchronous vector encoder. */
     vectorEncoder?: VectorEncoder;
+    /** Provider name ('feature-hash'|'ollama'|'openai-compatible') or a custom provider object. */
+    embeddings?: EmbeddingProviderName | VectorProvider;
+    /** Alias for `embeddings` when passing a provider object. */
+    vectorProvider?: VectorProvider;
 }
 export interface VaultStats {
     total: number;
@@ -163,6 +195,9 @@ export interface VaultStats {
     forgotten: number;
     vectors: number;
     vectorModel: string;
+    vectorProvider: string;
+    /** Memories whose vectors are not yet indexed under the current model. */
+    pendingVectors: number;
     encrypted: boolean;
     byType: Partial<Record<MemoryType, number>>;
     /** Memory Inbox counts keyed by proposal status. */
@@ -188,13 +223,30 @@ export class ContextStore {
         duplicateIds: readonly string[],
         changes?: Partial<MemoryInput>,
     ): { memory: MemoryRecord; mergedIds: string[] };
+    /** True when the embedding provider encodes synchronously. */
+    readonly vectorSync: boolean;
     search(query: string, options?: SearchOptions): SearchMemory[];
+    searchAsync(query: string, options?: SearchOptions): Promise<SearchMemory[]>;
     list(options?: ListOptions): MemoryRecord[];
     findPotentialConflicts(input: MemoryInput, options?: ConflictOptions): ConflictMemory[];
+    findPotentialConflictsAsync(
+        input: MemoryInput,
+        options?: ConflictOptions,
+    ): Promise<ConflictMemory[]>;
     buildContext(
         query: string,
         options?: SearchOptions & { maxChars?: number; explain?: boolean },
     ): ContextBlock;
+    buildContextAsync(
+        query: string,
+        options?: SearchOptions & { maxChars?: number; explain?: boolean },
+    ): Promise<ContextBlock>;
+    /** Drain pending vector rows through the configured provider. */
+    indexPending(options?: { limit?: number }): Promise<{
+        model: string;
+        indexed: number;
+        pending: number;
+    }>;
     /**
      * Submit a memory for owner review instead of writing it directly.
      * The proposal is persisted in the Memory Inbox until approved or rejected.
@@ -304,6 +356,14 @@ export function parseContextExport(text: string): {
     records: { memory: MemoryInput; dedupeKey: string }[];
     errors: string[];
 };
+export interface ContextExportValidation {
+    ok: boolean;
+    errors: string[];
+    records: number;
+    header: Record<string, unknown> | null;
+}
+/** Non-throwing spec validator for openself-context JSONL payloads. */
+export function validateContextExport(text: string): ContextExportValidation;
 export function chunkDocument(
     content: string,
     maxChars?: number,
@@ -315,6 +375,42 @@ export class LocalVectorEncoder implements VectorEncoder {
     encode(text: string): number[];
 }
 export function cosineSimilarity(left: number[], right: number[]): number;
+/** sha256("openself-memory-v1\n" + utf8(content)) — stable content address. */
+export function memoryContentHash(content: string): string;
+/** sha256("openself-context-v1\n" + renderedContext) — receipt citation. */
+export function contextBlockHash(renderedContext: string): string;
+export function resolveVectorProvider(
+    spec?: EmbeddingProviderName | VectorProvider,
+    env?: Record<string, string | undefined>,
+): VectorProvider;
+export function featureHashProvider(options?: { dimensions?: number }): VectorProvider;
+export class OllamaEmbeddingProvider implements VectorProvider {
+    constructor(options?: {
+        baseUrl?: string;
+        model?: string;
+        timeoutMs?: number;
+        fetch?: typeof globalThis.fetch;
+    });
+    name: 'ollama';
+    baseUrl: string;
+    model: string;
+    encode(text: string): Promise<number[]>;
+    batchEncode(texts: string[]): Promise<number[][]>;
+}
+export class OpenAiCompatibleProvider implements VectorProvider {
+    constructor(options: {
+        baseUrl: string;
+        model: string;
+        apiKey?: string;
+        timeoutMs?: number;
+        fetch?: typeof globalThis.fetch;
+    });
+    name: 'openai-compatible';
+    baseUrl: string;
+    model: string;
+    encode(text: string): Promise<number[]>;
+    batchEncode(texts: string[]): Promise<number[][]>;
+}
 
 export interface CaptureOptions {
     scope?: string;
@@ -472,16 +568,50 @@ export interface AuditEvent {
     client: string;
     tool: string;
     outcome: AuditOutcome;
+    /** Hash of the previous completed event; absent on legacy/pending rows. */
+    prevHash?: string | null;
+    /** SHA-256 over `prevHash + occurredAt + client + tool + outcome`. */
+    entryHash?: string | null;
+}
+export interface AuditChainVerification {
+    /** False when a completed event's hash or link was tampered with. */
+    ok: boolean;
+    /** Completed events that verified against the chain. */
+    checked: number;
+    /** Pre-chain rows (written before hash chaining existed). */
+    legacy: number;
+    /** Interrupted `attempted` rows that never joined the chain. */
+    pending: number;
+    /** First row where verification failed, or null. */
+    brokenAt: number | null;
+    /** Hash of the newest verified event, or null. */
+    tip: string | null;
+    genesis: string;
 }
 export class AccessAudit {
-    constructor(options?: { dbPath?: string; retentionDays?: number; maxEntries?: number });
+    constructor(options?: {
+        dbPath?: string;
+        retentionDays?: number;
+        maxEntries?: number;
+        /** Open without creating/mutating; legacy databases stay unmigrated. */
+        readonly?: boolean;
+    });
     begin(client: string, tool: string): number;
     finish(id: number, outcome: AuditOutcome): void;
     list(options?: { client?: string; limit?: number }): AuditEvent[];
+    /** Walk the hash chain; detects edited/deleted history. */
+    verify(): AuditChainVerification;
+    /** JSONL export for archival or transparency-log anchoring. */
+    toJSONL(options?: { client?: string; limit?: number }): string;
     prune(): number;
     clear(): number;
     close(): void;
 }
+export function auditEntryHash(
+    prevHash: string | null,
+    event: { occurred_at?: string; occurredAt?: string; client: string; tool: string },
+    outcome: string,
+): string;
 export interface McpServerOptions {
     version?: string;
     policy?: McpPolicy;
@@ -496,6 +626,7 @@ export function runContextMcpServer(
         dataDir?: string;
         policyFile?: string;
         clientId?: string;
+        embeddings?: EmbeddingProviderName | VectorProvider;
     },
 ): Promise<{ server: McpServer; store: ContextStore }>;
 /**

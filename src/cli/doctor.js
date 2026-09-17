@@ -4,6 +4,7 @@ import { accessSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:f
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { ContextStore, VAULT_SCHEMA_VERSION } from '../context/store.js';
+import { AccessAudit } from '../context/access-audit.js';
 import { VaultKeyManager } from '../context/vault-key-manager.js';
 import { packageVersion } from '../version.js';
 
@@ -102,12 +103,23 @@ export function doctorCommand(options = {}) {
     check('audit-log', () => {
         const auditDb = join(dataDir, 'mcp-audit.db');
         if (!existsSync(auditDb)) return 'no MCP audit database yet';
-        const db = new Database(auditDb, { readonly: true });
+        const audit = new AccessAudit({ dbPath: auditDb, readonly: true });
         try {
-            const count = db.prepare('SELECT COUNT(*) AS n FROM access_events').get().n;
-            return `${count} events`;
+            const chain = audit.verify();
+            if (!chain.ok) {
+                throw Object.assign(new Error(`audit chain broken at event #${chain.brokenAt}`), {
+                    fix: 'Inspect with openself audit verify --data-dir ' + dataDir,
+                });
+            }
+            return (
+                `${chain.checked + chain.legacy + chain.pending} events · chain verified ` +
+                `(${chain.checked} chained` +
+                (chain.legacy ? `, ${chain.legacy} legacy` : '') +
+                (chain.pending ? `, ${chain.pending} pending` : '') +
+                ')'
+            );
         } finally {
-            db.close();
+            audit.close();
         }
     });
 

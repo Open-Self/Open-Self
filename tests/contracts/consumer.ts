@@ -89,6 +89,49 @@ const audit = new api.AccessAudit();
 const event = audit.begin('reader', 'openself_search_memory');
 audit.finish(event, 'allowed');
 const pending: api.AuditOutcome | undefined = audit.list()[0]?.outcome;
+const chain: api.AuditChainVerification = audit.verify();
+const auditJsonl: string = audit.toJSONL();
+const roAudit = new api.AccessAudit({ readonly: true });
+roAudit.close();
+// Wave-2 fixtures: content/context hashes, async providers, export validation.
+const contentHash: string = memory.contentHash;
+const contextHash: string | undefined = explained.receipt?.contextHash;
+const candidateHash: string | undefined = receipt?.candidates[0]?.contentHash;
+const provider: api.VectorProvider = api.resolveVectorProvider('feature-hash', {});
+const ollama = new api.OllamaEmbeddingProvider({ fetch: globalThis.fetch });
+const openaiProvider = new api.OpenAiCompatibleProvider({
+    baseUrl: 'http://localhost:1234/v1',
+    model: 'm',
+});
+const asyncStore = new api.ContextStore({
+    dbPath: ':memory:',
+    embeddings: { model: 'x', encode: async () => [1, 2, 3] },
+});
+const pendingIndex: Promise<{ indexed: number; pending: number }> = asyncStore.indexPending();
+const asyncSearch: Promise<SearchMemory[]> = asyncStore.searchAsync('q');
+const asyncContext: Promise<api.ContextBlock> = asyncStore.buildContextAsync('q');
+const asyncConflicts: Promise<api.ConflictMemory[]> = asyncStore.findPotentialConflictsAsync({
+    content: 'x',
+});
+const validation: api.ContextExportValidation = api.validateContextExport('');
+const hashFns: [string, string] = [api.memoryContentHash('c'), api.contextBlockHash('ctx')];
+void [
+    chain,
+    auditJsonl,
+    contentHash,
+    contextHash,
+    candidateHash,
+    provider,
+    ollama,
+    openaiProvider,
+    asyncStore,
+    pendingIndex,
+    asyncSearch,
+    asyncContext,
+    asyncConflicts,
+    validation,
+    hashFns,
+];
 const parsed: api.MemoryInput = api.memoryInputSchema.parse({ content: 'runtime validated' });
 const messages = api.parseWhatsApp('fixture.txt');
 const pairs = api.splitBySender(messages, 'Fixture');

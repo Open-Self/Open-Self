@@ -3,20 +3,23 @@ import { ContextImporter } from '../context/importer.js';
 import { ContextStore } from '../context/store.js';
 import { exportMemories } from '../context/exporter.js';
 
-export function memoryCommand(action, options = {}) {
+export async function memoryCommand(action, options = {}) {
     const store = new ContextStore({
         dataDir: options.dataDir || process.env.DATA_DIR || './data',
+        embeddings: options.embeddings,
     });
     try {
         switch (action) {
             case 'add':
-                return addMemory(store, options);
+                return await addMemory(store, options);
             case 'import':
                 return importMemories(store, options);
             case 'search':
-                return searchMemory(store, options);
+                return await searchMemory(store, options);
             case 'conflicts':
-                return findConflicts(store, options);
+                return await findConflicts(store, options);
+            case 'index':
+                return await indexMemories(store, options);
             case 'list':
                 return listMemories(store, options);
             case 'forget':
@@ -27,12 +30,31 @@ export function memoryCommand(action, options = {}) {
                 return printJson(store.stats());
             default:
                 throw new Error(
-                    `Unknown memory action: ${action}. Use add, import, search, conflicts, list, forget, or stats.`,
+                    `Unknown memory action: ${action}. Use add, import, index, search, conflicts, list, forget, or stats.`,
                 );
         }
     } finally {
         store.close();
     }
+}
+
+async function indexMemories(store, options) {
+    const result = await store.indexPending({
+        limit: options.limit ? Number(options.limit) : 10_000,
+    });
+    if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return result;
+    }
+    console.log(
+        result.indexed
+            ? chalk.green(
+                  `✓ Indexed ${result.indexed} memories with ${result.model}` +
+                      (result.pending ? ` · ${result.pending} still pending` : ''),
+              )
+            : chalk.gray(`Vector index current — ${result.model}`),
+    );
+    return result;
 }
 
 function importMemories(store, options) {
@@ -52,7 +74,7 @@ function importMemories(store, options) {
     printJson(reports);
 }
 
-function addMemory(store, options) {
+async function addMemory(store, options) {
     if (!options.content) throw new Error('--content is required for memory add');
     const draft = {
         content: options.content,
@@ -71,8 +93,9 @@ function addMemory(store, options) {
         validTo: options.validTo,
         tags: splitTags(options.tags),
     };
-    const potentialConflicts = store.findPotentialConflicts(draft);
+    const potentialConflicts = await store.findPotentialConflictsAsync(draft);
     const memory = store.remember(draft);
+    if (!store.vectorSync) await store.indexPending();
     console.log(chalk.green(`✓ Remembered ${memory.type} ${memory.id}`));
     if (potentialConflicts.length) {
         console.log(chalk.yellow(`⚠ ${potentialConflicts.length} potential conflict(s) found`));
@@ -107,10 +130,11 @@ function exportMemoriesCli(store, options) {
     printJson({ ...report, memories: undefined });
 }
 
-function searchMemory(store, options) {
+async function searchMemory(store, options) {
     if (!options.query) throw new Error('--query is required for memory search');
+    if (!store.vectorSync) await store.indexPending();
     printJson(
-        store.search(options.query, {
+        await store.searchAsync(options.query, {
             scope: options.scope,
             type: options.type,
             limit: Number(options.limit || 10),
@@ -121,11 +145,12 @@ function searchMemory(store, options) {
     );
 }
 
-function findConflicts(store, options) {
+async function findConflicts(store, options) {
     if (!options.content) throw new Error('--content is required for memory conflicts');
     if (!options.type) throw new Error('--type is required for memory conflicts');
+    if (!store.vectorSync) await store.indexPending();
     printJson(
-        store.findPotentialConflicts(
+        await store.findPotentialConflictsAsync(
             {
                 content: options.content,
                 type: options.type,

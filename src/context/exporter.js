@@ -1,6 +1,6 @@
 import { existsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { SENSITIVITY_LEVELS, SOURCE_TRUST_LEVELS } from './schema.js';
+import { memoryContentHash, SENSITIVITY_LEVELS, SOURCE_TRUST_LEVELS } from './schema.js';
 import { packageVersion } from '../version.js';
 
 export const CONTEXT_EXPORT_FORMAT = 'openself-context';
@@ -69,6 +69,7 @@ export function serializeMemory(memory) {
         id: memory.id,
         type: memory.type,
         content: memory.content,
+        contentHash: memory.contentHash || memoryContentHash(memory.content),
         summary: memory.summary,
         source: memory.source,
         scope: memory.scope,
@@ -135,6 +136,70 @@ export function parseContextExport(text) {
         }
     }
     return { header, records, errors };
+}
+
+/**
+ * Non-throwing validator for spec/consumers: returns a structured report
+ * instead of raising. Verifies header shape, per-record JSON, required
+ * fields, and contentHash integrity (when present).
+ */
+export function validateContextExport(text) {
+    const report = { ok: true, errors: [], records: 0, header: null };
+    const lines = String(text)
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    if (!lines.length) {
+        report.ok = false;
+        report.errors.push('empty file');
+        return report;
+    }
+    try {
+        report.header = JSON.parse(lines[0]);
+    } catch {
+        report.ok = false;
+        report.errors.push('line 1: header is not valid JSON');
+        return report;
+    }
+    if (report.header.format !== CONTEXT_EXPORT_FORMAT) {
+        report.ok = false;
+        report.errors.push(`line 1: unsupported format "${report.header.format}"`);
+    }
+    if (report.header.version !== CONTEXT_EXPORT_VERSION) {
+        report.ok = false;
+        report.errors.push(`line 1: unsupported version ${report.header.version}`);
+    }
+    for (let index = 1; index < lines.length; index++) {
+        let raw;
+        try {
+            raw = JSON.parse(lines[index]);
+        } catch {
+            report.ok = false;
+            report.errors.push(`line ${index + 1}: invalid JSON`);
+            continue;
+        }
+        const missing = [
+            'id',
+            'type',
+            'content',
+            'contentHash',
+            'scope',
+            'sensitivity',
+            'sourceTrust',
+        ].filter((field) => raw[field] === undefined);
+        if (missing.length) {
+            report.ok = false;
+            report.errors.push(`line ${index + 1}: missing ${missing.join(', ')}`);
+            continue;
+        }
+        if (memoryContentHash(raw.content) !== raw.contentHash) {
+            report.ok = false;
+            report.errors.push(`line ${index + 1}: contentHash mismatch`);
+            continue;
+        }
+        report.records += 1;
+    }
+    return report;
 }
 
 function clampImportedTrust(value) {

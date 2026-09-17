@@ -533,6 +533,21 @@ summary {
 .audit-outcome.denied {
     color: var(--danger);
 }
+.audit-chain {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin: 0 0 10px;
+}
+.audit-chain.chain-ok {
+    color: var(--accent);
+    background: rgba(122, 224, 159, 0.08);
+}
+.audit-chain.chain-broken {
+    color: var(--danger);
+    background: rgba(224, 122, 122, 0.1);
+}
 
 @media (max-width: 780px) {
     .topbar {

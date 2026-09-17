@@ -2,6 +2,10 @@
 
 [![npm version](https://img.shields.io/npm/v/openself?color=blue)](https://www.npmjs.com/package/openself)
 [![CI](https://github.com/Open-Self/Open-Self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions)
+[![CodeQL](https://github.com/Open-Self/Open-Self/actions/workflows/codeql.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Open-Self/Open-Self/badge)](https://scorecard.dev/viewer/?uri=github.com/Open-Self/Open-Self)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.github.Open--Self%2Fopenself-purple)](./server.json)
+[![Docker](https://img.shields.io/badge/ghcr.io-open--self%2Fopenself-blue?logo=docker)](https://github.com/Open-Self/Open-Self/pkgs/container/openself)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 ### Your context. Your memory. Your rules.
@@ -33,11 +37,18 @@ memory explicit and portable:
 - **Owner-approved writes:** agents can only *propose* memories; nothing enters the vault
   without your approval in the inbox.
 - **Explainable retrieval:** every context build can return a receipt showing which
-  memories were selected or skipped and why.
+  memories were selected or skipped and why — with a `contextHash` over the exact
+  block an agent received and a `contentHash` for each cited memory.
+- **Tamper-evident audit:** MCP access events are hash-chained; `openself audit verify`
+  detects modified or deleted history, and `openself audit export` produces a JSONL
+  trail for archival.
 - **Recoverable forgetting:** forgotten memories disappear from retrieval without destroying the audit trail.
-- **Hybrid retrieval:** FTS5 and deterministic local vectors are fused without an embedding API.
+- **Pluggable embeddings:** the default feature-hash encoder is fully offline and
+  deterministic; Ollama and OpenAI-compatible providers are opt-in via one flag.
+- **Hybrid retrieval:** FTS5 and vectors are fused with reciprocal-rank fusion.
 - **Conflict-aware:** similar active facts, preferences, and decisions are surfaced before storage.
-- **Portable:** export the vault to a versioned JSONL interchange format and import it elsewhere.
+- **Portable:** export the vault to the versioned [context exchange format](./spec/context-exchange-format.md)
+  (JSONL + JSON Schema) and import it elsewhere — content-hash dedupe makes re-imports idempotent.
 - **Agent-native:** MCP tools, resources, and prompts work with compatible AI clients over
   stdio or an authenticated HTTP transport; the core is also a normal Node.js library.
 - **Local-first:** SQLite and FTS5 run on your machine with no account or server required.
@@ -100,6 +111,17 @@ use the default stable channel for normal installation.
 For a direct download, use [openself-1.0.0.tgz](https://github.com/Open-Self/Open-Self/releases/download/v1.0.0/openself-1.0.0.tgz)
 and verify SHA-256 `24d264272590167f333614d9cad264f209e2c86bde476f9087dffcf6af0366a6`.
 The GitHub and npm tarballs were downloaded independently and have the same digest.
+
+Or run the published container — the vault lives in a mounted volume:
+
+```bash
+docker run -i --rm -v openself-data:/data ghcr.io/open-self/openself mcp
+docker run -p 3211:3211 -v openself-data:/data ghcr.io/open-self/openself mcp --http
+```
+
+OpenSelf is also listed on the MCP Registry as `io.github.Open-Self/openself`
+(see [`server.json`](./server.json)), so registry-aware clients can discover it
+directly.
 
 ## Local dashboard
 
@@ -264,7 +286,47 @@ For per-agent scope, sensitivity, trust ceilings, and read/write/propose permiss
 with `--policy /protected/mcp-policy.json --client atlas-reader`. Policy is fixed by the
 owner at startup; agent tool arguments cannot expand it.
 [Agent permissions and audit](./docs/agent-permissions.md) covers configuration,
-trust boundaries, and `openself audit list/prune/clear`.
+trust boundaries, and the audit CLI.
+
+### Tamper-evident access audit
+
+Every MCP tool call is recorded in a hash-chained audit log (`mcp-audit.db`). Each
+completed event's hash commits to the previous event, so edits to historical rows —
+or deleting them — are detectable:
+
+```bash
+openself audit list                 # recent events + chain status
+openself audit verify               # exits non-zero if the chain was tampered
+openself audit export --file audit.jsonl   # JSONL trail for archival/anchoring
+openself audit prune --retention-days 90   # anchored retention (chain stays verifiable)
+```
+
+Interrupted attempts appear as `pending` rather than tampering; retention pruning
+anchors the surviving suffix so the chain stays verifiable. The dashboard's Audit
+view shows the same chain status.
+
+### Pluggable embeddings
+
+Semantic retrieval works out of the box with a deterministic, fully-offline
+feature-hash encoder — no model download, no network. To use a real embedding
+model instead:
+
+```bash
+# Local LLM embeddings through Ollama (still local-first)
+openself memory add --embeddings ollama --content "..."
+OPENSELF_EMBEDDINGS=ollama OPENSELF_EMBEDDINGS_MODEL=nomic-embed-text openself mcp
+
+# Any OpenAI-compatible /v1/embeddings endpoint (the only provider that can
+# leave the machine — strictly opt-in)
+OPENSELF_EMBEDDINGS=openai-compatible \
+OPENSELF_EMBEDDINGS_BASE_URL=https://api.openai.com/v1 \
+OPENSELF_EMBEDDINGS_API_KEY=... openself mcp
+```
+
+Async providers never block synchronous writes: memories are stored immediately
+and their vectors are drained by `openself memory index` (or automatically after
+each MCP mutation). `openself memory stats` reports the provider, model, and
+pending count. See [docs/embeddings.md](./docs/embeddings.md).
 
 To expose the vault over HTTP instead of stdio (e.g. for a shared workstation setup):
 

@@ -117,6 +117,13 @@ The local vector is not presented as a neural embedding: it improves aliases, sp
 and fuzzy retrieval while remaining small, deterministic, inspectable, and offline. SQLite remains
 the canonical store. Existing databases are backfilled with vectors when opened after an upgrade.
 
+The vector leg is provider-pluggable: `feature-hash` (this default), `ollama`, or any
+`openai-compatible` endpoint via `OPENSELF_EMBEDDINGS` / `--embeddings`. Async providers index
+lazily — writes never block on a network call, `indexPending()` drains pending vectors, and the
+async read APIs (`searchAsync`, `buildContextAsync`, `findPotentialConflictsAsync`) await the
+provider for the query leg. Vectors are recorded per-model, so switching models re-indexes
+automatically. See [embeddings](./embeddings.md).
+
 Context blocks use an 8,000-character default budget, configurable from 500 to 50,000.
 The complete rendered string, including source attribution and separators, must fit.
 Records that exceed the remaining budget are skipped and later candidates are still considered;

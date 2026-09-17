@@ -34,7 +34,11 @@ export class ContextImporter {
 
         for (const candidate of candidates) {
             try {
-                const result = this.store.rememberOnce(candidate.memory, candidate.dedupeKey);
+                const result = this.store.rememberOnce(candidate.memory, candidate.dedupeKey, {
+                    // Portable exports dedupe by content too — identical facts
+                    // re-imported under new ids stay a single memory.
+                    dedupeByContent: format === 'openself',
+                });
                 if (result.created) report.created++;
                 else report.duplicates++;
             } catch (error) {

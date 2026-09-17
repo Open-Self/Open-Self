@@ -3,6 +3,21 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.1.x to the next release (audit chain + embeddings)
+
+No vault migration is required — the memory schema is unchanged.
+
+- **`mcp-audit.db` upgrades itself.** The next writable open adds `prev_hash` /
+  `entry_hash` columns and the `audit_meta` table. Rows written before the
+  upgrade have no hashes and verify as `legacy`; new events chain normally.
+  `openself audit verify` reports `{ ok, checked, legacy, pending }`.
+- **Embedding providers.** Retrieval defaults to the unchanged offline
+  feature-hash encoder. To switch, set `OPENSELF_EMBEDDINGS` (or
+  `--embeddings`) to `ollama` or `openai-compatible`, then run
+  `openself memory index` — vectors are per-model, so old rows re-index lazily.
+- **Receipts and records** gain `contentHash` / `contextHash` fields; existing
+  code ignoring unknown fields is unaffected.
+
 ## From v1.0.x to v1.1.0
 
 Opening a vault migrates it to SQLite schema 3, which adds a `source_trust` column

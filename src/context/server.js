@@ -2,8 +2,8 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
 import express from 'express';
+import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -193,16 +193,17 @@ export function createContextServer(options = {}) {
         if (!existsSync(auditPath)) {
             return res.json({ events: [] });
         }
-        const auditDb = new Database(auditPath, { readonly: true });
+        let audit;
         try {
-            const events = auditDb
-                .prepare(
-                    'SELECT id, occurred_at AS occurredAt, client, tool, outcome FROM access_events ORDER BY id DESC LIMIT 200',
-                )
-                .all();
-            return res.json({ events });
+            audit = new AccessAudit({ dbPath: auditPath, readonly: true });
+        } catch {
+            return res.json({ events: [], chain: null });
+        }
+        try {
+            const events = audit.list({ limit: 200 });
+            return res.json({ events, chain: audit.verify() });
         } finally {
-            auditDb.close();
+            audit.close();
         }
     });
 

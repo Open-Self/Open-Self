@@ -23,6 +23,8 @@ export { ContextStore, VAULT_SCHEMA_VERSION } from './context/store.js';
 export {
     normalizeMemory,
     memoryInputSchema,
+    memoryContentHash,
+    contextBlockHash,
     MEMORY_TYPES,
     SENSITIVITY_LEVELS,
     SOURCE_TRUST_LEVELS,
@@ -33,10 +35,17 @@ export { ContextImporter, detectImportFormat, chunkDocument } from './context/im
 export {
     exportMemories,
     parseContextExport,
+    validateContextExport,
     serializeMemory,
     CONTEXT_EXPORT_FORMAT,
     CONTEXT_EXPORT_VERSION,
 } from './context/exporter.js';
+export {
+    resolveVectorProvider,
+    featureHashProvider,
+    OllamaEmbeddingProvider,
+    OpenAiCompatibleProvider,
+} from './context/embeddings.js';
 export { LocalVectorEncoder, cosineSimilarity } from './context/vectors.js';
 export { createContextServer } from './context/server.js';
 export { ProjectFolderCapture } from './context/project-capture.js';
@@ -51,7 +60,7 @@ export { VaultKeyManager, loadConfiguredVaultKey } from './context/vault-key-man
 export { evaluateContextVault } from './context/evaluator.js';
 export { backupVault, restoreVault } from './context/backup.js';
 export { AccessPolicy, loadMcpPolicy, MCP_CAPABILITIES } from './context/access-policy.js';
-export { AccessAudit } from './context/access-audit.js';
+export { AccessAudit, auditEntryHash } from './context/access-audit.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

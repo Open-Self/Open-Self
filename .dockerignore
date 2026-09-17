@@ -1,0 +1,13 @@
+.git
+.github
+.devcontainer
+node_modules
+data
+*.log
+.env
+.env.*
+coverage
+.tmp-*
+*.osbackup
+tests
+evals/results

@@ -53,15 +53,19 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `merge(primaryId, duplicateIds, changes?)` | `{ memory, mergedIds }`; throws for missing active records or self-merge |
 | `forget(id)` | `true` for the first successful soft-delete, `false` for missing/already-forgotten records |
 | `search(query, options?)` | Ranked active records; queries without indexable terms return filtered, unranked list results |
+| `searchAsync(query, options?)` | Async search that awaits the embedding provider for the vector leg |
 | `list(options?)` | Records ordered by event/creation time with pagination, without relevance ranking |
 | `findPotentialConflicts(input, options?)` | Similar active facts/preferences/decisions with overlapping validity intervals; punctuation-only proposals return `[]` |
+| `findPotentialConflictsAsync(input, options?)` | Async conflict check for async embedding providers |
 | `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string; `explain: true` adds a `receipt` |
+| `buildContextAsync(query, options?)` | Async context build for async embedding providers |
+| `indexPending(options?)` | Promise; batch-encodes pending vectors through the configured provider |
 | `proposeMemory(input, options?)` | Stage a pending proposal with `proposedBy`/`note`; does not write a memory |
 | `getProposal(id)` | Proposal or `null` |
 | `listProposals(options?)` | Proposals filtered by `status` (default `pending`; `null` for all), `proposedBy`, `limit`, `offset` |
 | `approveProposal(id, overrides?, options?)` | Writes the memory and marks the proposal approved; `null` for unknown IDs; throws if already resolved |
 | `rejectProposal(id, options?)` | `true` when a pending proposal was rejected |
-| `stats()` | Counts by status/type, pending proposals, vector model/count, encryption mode, and database path |
+| `stats()` | Counts by status/type, pending proposals, vector provider/model/count, pending vectors, encryption mode, and database path |
 | `close()` | Releases the SQLite handle; do not use the store afterwards |
 
 `MemoryInput` requires `content`. Type defaults to `note`, scope to `personal`, sensitivity
@@ -100,10 +104,21 @@ when complete long records are needed.
 
 With `explain: true`, the result gains a `receipt`: the applied filters (scope, type,
 sensitivity, `minSourceTrust`), the `asOf` instant, per-candidate records of lexical and
-vector ranks, recency in days, character cost, and a `selected`/`skipped` decision with
-its reason (`within-budget` or `over-character-budget`), plus totals. Receipts are
-diagnostics for the owner — they can reveal that a filtered-out candidate exists, so
-treat them as privileged output rather than agent-facing context.
+vector ranks, recency in days, character cost, each candidate's `contentHash`, and a
+`selected`/`skipped` decision with its reason (`within-budget` or
+`over-character-budget`), plus totals. The receipt's `contextHash` is
+`sha256("openself-context-v1\n" + renderedContext)` — a verifiable citation of exactly
+what the agent received. Each memory's `contentHash` is
+`sha256("openself-memory-v1\n" + content)` — recomputing it verifies a cited record
+against its content. Receipts are diagnostics for the owner — they can reveal that a
+filtered-out candidate exists, so treat them as privileged output rather than
+agent-facing context.
+
+Embedding providers are configured through `ContextStore` options (`embeddings` or a
+custom `vectorProvider` object) or `OPENSELF_EMBEDDINGS`. Synchronous providers
+(`feature-hash`, custom `encodeSync`) index eagerly; async providers index lazily via
+`indexPending()` and require the `*Async` read methods for the vector leg. See
+[embeddings](./embeddings.md).
 
 Every memory carries a `sourceTrust` level (`SOURCE_TRUST_LEVELS`: `untrusted`,
 `external`, `trusted`, `verified`, `owner`; default `owner` for direct owner writes).
@@ -123,8 +138,10 @@ until approved.
 | `createContextMcpServer`, `runContextMcpServer`, `loadMcpPolicy` | MCP factory/stdio startup and owner policy loading |
 | `createMcpHttpApp`, `runContextMcpHttpServer` | Authenticated Streamable HTTP MCP transport; loopback-only unless `allowRemote` plus an explicit `token` |
 | `AccessPolicy`, `MCP_CAPABILITIES` | Policy object with `read`/`remember`/`forget`/`propose` capabilities, scope roots, sensitivity and `maxSourceTrust` ceilings |
-| `AccessAudit` | Local metadata audit begin/finish/list/prune/clear/close |
-| `exportMemories`, `parseContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export and parsing; imported records are clamped to `external` trust |
+| `AccessAudit` | Local metadata audit begin/finish/list/verify/toJSONL/prune/clear/close; completed events form a tamper-evident hash chain |
+| `exportMemories`, `parseContextExport`, `validateContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export, parsing, and non-throwing validation per [the exchange spec](../spec/context-exchange-format.md); imported records are clamped to `external` trust |
+| `memoryContentHash`, `contextBlockHash` | Canonical SHA-256 content/context addresses used by receipts and export dedupe |
+| `resolveVectorProvider`, `featureHashProvider`, `OllamaEmbeddingProvider`, `OpenAiCompatibleProvider` | Pluggable embedding providers — see [embeddings](./embeddings.md) |
 | `SOURCE_TRUST_LEVELS` | Ordered trust levels: `untrusted`, `external`, `trusted`, `verified`, `owner` |
 | `VaultCodec`, `PlaintextCodec`, `normalizeKey` | Payload codecs and key normalization; not a full-database encryption API |
 | `VaultKeyManager`, `loadConfiguredVaultKey` | OS-bound key configuration and status |

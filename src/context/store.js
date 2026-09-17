@@ -1,8 +1,15 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { contextDateSchema, normalizeMemory, SOURCE_TRUST_LEVELS } from './schema.js';
-import { cosineSimilarity, LocalVectorEncoder } from './vectors.js';
+import {
+    contextBlockHash,
+    contextDateSchema,
+    memoryContentHash,
+    normalizeMemory,
+    SOURCE_TRUST_LEVELS,
+} from './schema.js';
+import { cosineSimilarity } from './vectors.js';
+import { resolveVectorProvider } from './embeddings.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
 
@@ -24,7 +31,20 @@ const PROPOSAL_SELECT_COLUMNS = `
 export class ContextStore {
     constructor(options = {}) {
         const dataDir = options.dataDir || './data';
-        this.vectorEncoder = options.vectorEncoder || new LocalVectorEncoder();
+        this.vectorProvider = resolveStoreVectorProvider(options);
+        this.vectorSync = typeof this.vectorProvider.encodeSync === 'function';
+        // Back-compat shim: legacy vectorEncoder injections stay synchronous.
+        this.vectorEncoder = {
+            model: this.vectorProvider.model,
+            encode: (text) => {
+                if (!this.vectorSync) {
+                    throw new Error(
+                        'The configured embeddings provider is async — use searchAsync() or indexPending()',
+                    );
+                }
+                return this.vectorProvider.encodeSync(text);
+            },
+        };
         this.dbPath = Buffer.isBuffer(options.dbPath)
             ? ':memory:'
             : options.dbPath || join(dataDir, 'context.db');
@@ -282,17 +302,32 @@ export class ContextStore {
             this._writeFts(memory);
             this._writeVector(memory);
             this._recordVersion(memory, 'created');
+            this._contentHashes = null;
         };
 
         this._insertTransaction = this.db.transaction((memory) => this._writeMemory(memory));
 
-        this._insertOnceTransaction = this.db.transaction((memory, dedupeKey) => {
+        this._insertOnceTransaction = this.db.transaction((memory, dedupeKey, dedupeByContent) => {
             const existing = this.statements.getImport.get(dedupeKey);
             if (existing) {
                 return {
                     memory: this.get(existing.memory_id, { includeForgotten: true }),
                     created: false,
+                    duplicateReason: 'dedupe-key',
                 };
+            }
+            if (dedupeByContent) {
+                const contentMatch = this._contentHashIndex().get(
+                    memoryContentHash(memory.content),
+                );
+                if (contentMatch) {
+                    this.statements.insertImport.run(dedupeKey, contentMatch, memory.createdAt);
+                    return {
+                        memory: this.get(contentMatch, { includeForgotten: true }),
+                        created: false,
+                        duplicateReason: 'content',
+                    };
+                }
             }
 
             this._writeMemory(memory);
@@ -307,6 +342,7 @@ export class ContextStore {
             this._writeFts(memory);
             this._writeVector(memory);
             this._recordVersion(memory, changeKind);
+            this._contentHashes = null;
             return memory;
         });
 
@@ -316,6 +352,7 @@ export class ContextStore {
                 this.statements.deleteFts.run(id);
                 const memory = this.get(id, { includeForgotten: true });
                 this._recordVersion(memory, changeKind);
+                this._contentHashes = null;
             }
             return result.changes > 0;
         });
@@ -441,29 +478,84 @@ export class ContextStore {
     }
 
     _writeVector(memory) {
-        const text = `${memory.content}\n${memory.summary}\n${memory.tags.join(' ')}`;
-        const vector = this.vectorEncoder.encode(text);
+        // Async providers index lazily via indexPending() — synchronous
+        // mutation paths never block on a network embedding call.
+        if (!this.vectorSync) return;
+        const vector = this.vectorEncoder.encode(vectorText(memory));
+        this._insertVector(memory.id, vector, memory.updatedAt);
+    }
+
+    _insertVector(memoryId, vector, updatedAt) {
         this.statements.insertVector.run(
-            memory.id,
+            memoryId,
             this.codec.encode(JSON.stringify(vector), 'vector'),
-            this.vectorEncoder.model,
-            memory.updatedAt,
+            this.vectorProvider.model,
+            updatedAt || new Date().toISOString(),
         );
     }
 
-    _backfillVectors() {
-        const rows = this.db
+    _pendingVectorRows(limit) {
+        return this.db
             .prepare(
                 `SELECT ${SELECT_COLUMNS}
                  FROM memories
                  LEFT JOIN memory_vectors ON memory_vectors.memory_id = memories.id
-                 WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != ?`,
+                 WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != @model
+                 ORDER BY memories.created_at ASC
+                 LIMIT @limit`,
             )
-            .all(this.vectorEncoder.model);
+            .all({ model: this.vectorProvider.model, limit });
+    }
+
+    _pendingVectorCount() {
+        return Number(
+            this.db
+                .prepare(
+                    `SELECT COUNT(*) AS count
+                     FROM memories
+                     LEFT JOIN memory_vectors ON memory_vectors.memory_id = memories.id
+                     WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != ?`,
+                )
+                .get(this.vectorProvider.model).count || 0,
+        );
+    }
+
+    _backfillVectors() {
+        if (!this.vectorSync) return;
+        const rows = this._pendingVectorRows(100_000);
         if (!rows.length) return;
         this.db.transaction((items) => {
             for (const row of items) this._writeVector(fromRow(row, this.codec));
         })(rows);
+    }
+
+    /**
+     * Drain pending embeddings through the configured provider. Synchronous
+     * providers index eagerly so this is a no-op for them; async providers
+     * (ollama, openai-compatible) batch-encode here. Called automatically after
+     * MCP mutations and by `openself index`.
+     */
+    async indexPending(options = {}) {
+        const limit = clamp(options.limit ?? 500, 1, 10_000);
+        const rows = this._pendingVectorRows(limit);
+        if (!rows.length) {
+            return { model: this.vectorProvider.model, indexed: 0, pending: 0 };
+        }
+        const memories = rows.map((row) => fromRow(row, this.codec));
+        const texts = memories.map(vectorText);
+        const vectors = this.vectorProvider.batchEncode
+            ? await this.vectorProvider.batchEncode(texts)
+            : await Promise.all(texts.map((text) => this.vectorProvider.encode(text)));
+        this.db.transaction(() => {
+            memories.forEach((memory, index) =>
+                this._insertVector(memory.id, vectors[index], memory.updatedAt),
+            );
+        })();
+        return {
+            model: this.vectorProvider.model,
+            indexed: memories.length,
+            pending: this._pendingVectorCount(),
+        };
     }
 
     _backfillVersions() {
@@ -565,12 +657,32 @@ export class ContextStore {
         return result.changes > 0;
     }
 
-    rememberOnce(input, dedupeKey) {
+    rememberOnce(input, dedupeKey, options = {}) {
         if (!dedupeKey || typeof dedupeKey !== 'string') {
             throw new Error('A non-empty dedupe key is required');
         }
         const memory = normalizeMemory(input);
-        return this._insertOnceTransaction(memory, dedupeKey);
+        return this._insertOnceTransaction(memory, dedupeKey, Boolean(options.dedupeByContent));
+    }
+
+    /**
+     * content-hash → active memory id, rebuilt lazily after writes. Used to
+     * dedupe portable imports whose original ids do not exist in this vault.
+     */
+    _contentHashIndex() {
+        if (!this._contentHashes) {
+            this._contentHashes = new Map();
+            const rows = this.db
+                .prepare("SELECT id, content FROM memories WHERE status = 'active'")
+                .all();
+            for (const row of rows) {
+                this._contentHashes.set(
+                    memoryContentHash(this.codec.decode(row.content, 'content')),
+                    row.id,
+                );
+            }
+        }
+        return this._contentHashes;
     }
 
     update(id, changes) {
@@ -644,10 +756,53 @@ export class ContextStore {
                 ? []
                 : this._searchLexical(ftsQuery, { ...options, limit: candidateLimit });
         const vector =
+            retrieval === 'lexical' || !this.vectorSync
+                ? []
+                : this._searchVectorWith(this.vectorEncoder.encode(query), {
+                      ...options,
+                      limit: candidateLimit,
+                  });
+
+        return fuseRankings(lexical, vector, limit);
+    }
+
+    /**
+     * Async-capable search — awaits the vector provider for the query
+     * embedding. Synchronous providers take the same path as search().
+     */
+    async searchAsync(query, options = {}) {
+        if (this.vectorSync) return this.search(query, options);
+        options = {
+            ...options,
+            asOf: contextDateSchema.parse(
+                options.asOf === undefined ? new Date().toISOString() : options.asOf,
+            ),
+        };
+        const limit = clamp(options.limit ?? 10, 1, 100);
+        const ftsQuery = this.codec.indexQuery(query);
+        if (!ftsQuery) {
+            return this.list({
+                ...options,
+                limit,
+                maxSensitivity: options.maxSensitivity || 'restricted',
+            });
+        }
+        const retrieval = options.retrieval || 'hybrid';
+        if (!['hybrid', 'lexical', 'vector'].includes(retrieval)) {
+            throw new Error('retrieval must be hybrid, lexical, or vector');
+        }
+        const candidateLimit = clamp(Math.max(limit * 5, 20), 20, 500);
+        const lexical =
+            retrieval === 'vector'
+                ? []
+                : this._searchLexical(ftsQuery, { ...options, limit: candidateLimit });
+        const vector =
             retrieval === 'lexical'
                 ? []
-                : this._searchVector(query, { ...options, limit: candidateLimit });
-
+                : this._searchVectorWith(await this.vectorProvider.encode(query), {
+                      ...options,
+                      limit: candidateLimit,
+                  });
         return fuseRankings(lexical, vector, limit);
     }
 
@@ -681,12 +836,11 @@ export class ContextStore {
         }));
     }
 
-    _searchVector(query, options) {
+    _searchVectorWith(queryVector, options) {
         const params = searchParams({
             ...options,
             limit: clamp(options.vectorCandidateLimit || 5_000, 100, 20_000),
         });
-        const queryVector = this.vectorEncoder.encode(query);
         const minimum = options.minVectorScore ?? 0.08;
         const rows = this.db
             .prepare(
@@ -745,11 +899,46 @@ export class ContextStore {
             throw new Error('conflict threshold must be between 0 and 1');
         }
         if (!this.codec.indexQuery(memory.content)) return [];
-        const { sensitivityRank, allowedScopes, minTrustRank } = searchParams(options);
         const limit = clamp(options.limit || 10, 1, 100);
-        // Metadata eligibility precedes the candidate budget. Unlike point-in-time
-        // search, conflicts span the entire proposed interval (null = unbounded).
-        const rows = this.db
+        const rows = this._conflictRows(memory, options);
+        if (!this.vectorSync) {
+            return this._rankConflicts(rows, null, memory, threshold, limit);
+        }
+        return this._rankConflicts(
+            rows,
+            this.vectorEncoder.encode(memory.content),
+            memory,
+            threshold,
+            limit,
+        );
+    }
+
+    /** Async conflict check — awaits the embedding provider for the input leg. */
+    async findPotentialConflictsAsync(input, options = {}) {
+        if (this.vectorSync) return this.findPotentialConflicts(input, options);
+        const memory = normalizeMemory(input);
+        if (!['fact', 'preference', 'decision'].includes(memory.type)) return [];
+        const threshold = options.threshold ?? 0.28;
+        if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+            throw new Error('conflict threshold must be between 0 and 1');
+        }
+        if (!this.codec.indexQuery(memory.content)) return [];
+        const limit = clamp(options.limit || 10, 1, 100);
+        const rows = this._conflictRows(memory, options);
+        return this._rankConflicts(
+            rows,
+            await this.vectorProvider.encode(memory.content),
+            memory,
+            threshold,
+            limit,
+        );
+    }
+
+    // Metadata eligibility precedes the candidate budget. Unlike point-in-time
+    // search, conflicts span the entire proposed interval (null = unbounded).
+    _conflictRows(memory, options) {
+        const { sensitivityRank, allowedScopes, minTrustRank } = searchParams(options);
+        return this.db
             .prepare(
                 `
             SELECT ${SELECT_COLUMNS}, memory_vectors.vector
@@ -777,9 +966,15 @@ export class ContextStore {
                 start: memory.validFrom ?? null,
                 end: memory.validTo ?? null,
             });
+    }
+
+    _rankConflicts(rows, queryVector, memory, threshold, limit) {
+        // Async providers on the synchronous path cannot score — report none
+        // rather than guessing; callers wanting them use the async variant.
+        if (!queryVector) return [];
         const vector = this._scoreVectorRows(
             rows,
-            this.vectorEncoder.encode(memory.content),
+            queryVector,
             threshold,
             limit,
             memory.content,
@@ -840,12 +1035,34 @@ export class ContextStore {
     }
 
     buildContext(query, options = {}) {
-        const explain = Boolean(options.explain);
-        const limit = options.limit || 12;
         const asOf = contextDateSchema.parse(
             options.asOf === undefined ? new Date().toISOString() : options.asOf,
         );
-        const memories = this.search(query, { ...options, asOf, limit });
+        const memories = this.search(query, {
+            ...options,
+            asOf,
+            limit: options.limit || 12,
+        });
+        return this._composeContext(query, options, memories, asOf);
+    }
+
+    /** Async buildContext — awaits async embedding providers for the query leg. */
+    async buildContextAsync(query, options = {}) {
+        if (this.vectorSync) return this.buildContext(query, options);
+        const asOf = contextDateSchema.parse(
+            options.asOf === undefined ? new Date().toISOString() : options.asOf,
+        );
+        const memories = await this.searchAsync(query, {
+            ...options,
+            asOf,
+            limit: options.limit || 12,
+        });
+        return this._composeContext(query, options, memories, asOf);
+    }
+
+    _composeContext(query, options, memories, asOf) {
+        const explain = Boolean(options.explain);
+        const limit = options.limit || 12;
         const maxChars = clamp(options.maxChars ?? 8_000, 500, 50_000);
         const selected = [];
         const skipped = [];
@@ -878,9 +1095,20 @@ export class ContextStore {
                 selected,
                 skipped,
                 usedChars,
+                contextHash: contextBlockHash(result.context),
+                vector: this._vectorIndexSummary(),
             });
         }
         return result;
+    }
+
+    _vectorIndexSummary() {
+        return {
+            model: this.vectorProvider.model,
+            provider: this.vectorProvider.name || 'custom',
+            indexed: Number(this.statements.stats.get().vectors || 0),
+            pending: this._pendingVectorCount(),
+        };
     }
 
     forget(id) {
@@ -899,7 +1127,9 @@ export class ContextStore {
             active: Number(row.active || 0),
             forgotten: Number(row.forgotten || 0),
             vectors: Number(row.vectors || 0),
-            vectorModel: this.vectorEncoder.model,
+            pendingVectors: this._pendingVectorCount(),
+            vectorModel: this.vectorProvider.model,
+            vectorProvider: this.vectorProvider.name || 'custom',
             encrypted: this.encryptionEnabled,
             byType: Object.fromEntries(byType.map((item) => [item.type, item.count])),
             proposals: Object.fromEntries(
@@ -940,10 +1170,12 @@ function toRow(memory, codec) {
 }
 
 function fromRow(row, codec) {
+    const content = codec.decode(row.content, 'content');
     return {
         id: row.id,
         type: row.type,
-        content: codec.decode(row.content, 'content'),
+        content,
+        contentHash: memoryContentHash(content),
         summary: codec.decode(row.summary, 'summary'),
         source: {
             kind: codec.decode(row.source_kind, 'source-kind'),
@@ -977,6 +1209,10 @@ function proposalFromRow(row, codec) {
         reviewNote: row.review_note,
         memoryId: row.memory_id,
     };
+}
+
+function vectorText(memory) {
+    return `${memory.content}\n${memory.summary}\n${memory.tags.join(' ')}`;
 }
 
 function renderMemory(memory) {
@@ -1018,6 +1254,24 @@ function searchParams(options) {
 const TRUST_RANK_SQL = `CASE memories.source_trust
     WHEN 'untrusted' THEN 0 WHEN 'external' THEN 1 WHEN 'trusted' THEN 2
     WHEN 'verified' THEN 3 ELSE 4 END`;
+
+function resolveStoreVectorProvider(options) {
+    if (options.vectorProvider || options.embeddings) {
+        return resolveVectorProvider(options.vectorProvider || options.embeddings);
+    }
+    if (options.vectorEncoder) {
+        // Legacy injection contract: synchronous encode() + model name.
+        const encoder = options.vectorEncoder;
+        return {
+            name: 'custom',
+            model: encoder.model || 'custom',
+            encodeSync: (text) => encoder.encode(text),
+            encode: async (text) => encoder.encode(text),
+            batchEncode: async (texts) => texts.map((text) => encoder.encode(text)),
+        };
+    }
+    return resolveVectorProvider();
+}
 
 function parseStoredVector(value) {
     try {
@@ -1077,7 +1331,18 @@ function trustRank(value) {
     return rank < 0 ? SOURCE_TRUST_LEVELS.indexOf('owner') : rank;
 }
 
-function contextReceipt({ query, options, asOf, maxChars, limit, selected, skipped, usedChars }) {
+function contextReceipt({
+    query,
+    options,
+    asOf,
+    maxChars,
+    limit,
+    selected,
+    skipped,
+    usedChars,
+    contextHash,
+    vector,
+}) {
     const asOfMs = Date.parse(asOf);
     const entry = (memory, decision, reason, addedChars) => {
         const eventTime = Date.parse(
@@ -1085,6 +1350,7 @@ function contextReceipt({ query, options, asOf, maxChars, limit, selected, skipp
         );
         return {
             id: memory.id,
+            contentHash: memory.contentHash || memoryContentHash(memory.content),
             type: memory.type,
             scope: memory.scope,
             sensitivity: memory.sensitivity,
@@ -1109,6 +1375,8 @@ function contextReceipt({ query, options, asOf, maxChars, limit, selected, skipp
         version: 1,
         query,
         asOf,
+        contextHash,
+        vector,
         retrieval: options.retrieval || 'hybrid',
         filters: {
             scope: options.scope || null,

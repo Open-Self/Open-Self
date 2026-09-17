@@ -26,6 +26,7 @@ const memoryRecordSchema = z
         id: z.string(),
         type: z.enum(MEMORY_TYPES),
         content: z.string(),
+        contentHash: z.string().optional(),
         summary: z.string(),
         source: memorySourceSchema,
         scope: z.string(),
@@ -146,13 +147,7 @@ export function createContextMcpServer(store, options = {}) {
 
     function runAudited(operation, capability, handler) {
         let event;
-        try {
-            event = audit.begin(policy.clientId, operation);
-            policy.require(capability);
-            const result = handler();
-            audit.finish(event, 'allowed');
-            return result;
-        } catch (error) {
+        const fail = (error) => {
             const denied = error.code === 'ACCESS_DENIED';
             if (event !== undefined) {
                 try {
@@ -164,6 +159,26 @@ export function createContextMcpServer(store, options = {}) {
             throw Object.assign(denied ? error : new Error('MCP operation failed'), {
                 auditDenied: denied,
             });
+        };
+        try {
+            event = audit.begin(policy.clientId, operation);
+            policy.require(capability);
+            const result = handler();
+            // Async handlers (awaited embedding providers) settle the audit
+            // event on resolution rather than at dispatch.
+            if (result && typeof result.then === 'function') {
+                return result.then(
+                    (value) => {
+                        audit.finish(event, 'allowed');
+                        return value;
+                    },
+                    (error) => fail(error),
+                );
+            }
+            audit.finish(event, 'allowed');
+            return result;
+        } catch (error) {
+            return fail(error);
         }
     }
 
@@ -173,8 +188,24 @@ export function createContextMcpServer(store, options = {}) {
             try {
                 const execute = () => runAudited(name, capability, () => handler(input));
                 // Memory mutations roll back if terminal audit recording fails.
-                const result =
+                const pending =
                     capability === 'read' ? execute() : store.db.transaction(execute).immediate();
+                const result =
+                    pending && typeof pending.then === 'function' ? await pending : pending;
+                // Async embedding providers index lazily — drain after each
+                // mutation so the next search sees the new memory.
+                if (capability !== 'read' && !store.vectorSync && store.indexPending) {
+                    await store.indexPending().catch(() => {});
+                    if (name === 'openself_remember' && result?.structuredContent?.memory) {
+                        const memory = result.structuredContent.memory;
+                        result.structuredContent.potentialConflicts = await store
+                            .findPotentialConflictsAsync(
+                                memory,
+                                policy.readOptions({ scope: memory.scope }),
+                            )
+                            .catch(() => []);
+                    }
+                }
                 return result;
             } catch (error) {
                 return {
@@ -286,8 +317,10 @@ export function createContextMcpServer(store, options = {}) {
             },
             outputSchema: { memories: z.array(memoryRecordSchema) },
         },
-        (input) =>
-            structuredResult({ memories: store.search(input.query, policy.readOptions(input)) }),
+        async (input) =>
+            structuredResult({
+                memories: await store.searchAsync(input.query, policy.readOptions(input)),
+            }),
     );
 
     register(
@@ -306,9 +339,12 @@ export function createContextMcpServer(store, options = {}) {
             },
             outputSchema: { potentialConflicts: z.array(z.record(z.string(), z.unknown())) },
         },
-        (input) =>
+        async (input) =>
             structuredResult({
-                potentialConflicts: store.findPotentialConflicts(input, policy.readOptions(input)),
+                potentialConflicts: await store.findPotentialConflictsAsync(
+                    input,
+                    policy.readOptions(input),
+                ),
             }),
     );
 
@@ -338,7 +374,8 @@ export function createContextMcpServer(store, options = {}) {
                 receipt: z.record(z.string(), z.unknown()).optional(),
             },
         },
-        (input) => structuredResult(store.buildContext(input.query, policy.readOptions(input))),
+        async (input) =>
+            structuredResult(await store.buildContextAsync(input.query, policy.readOptions(input))),
     );
 
     register(
@@ -526,7 +563,9 @@ export async function runContextMcpServer(options = {}) {
         : options.policy;
     // Validate owner policy before creating or migrating any vault files.
     new AccessPolicy(policy);
-    const store = options.store || new ContextStore({ dataDir: options.dataDir });
+    const store =
+        options.store ||
+        new ContextStore({ dataDir: options.dataDir, embeddings: options.embeddings });
     let server;
     try {
         server = createContextMcpServer(store, { ...options, policy });
