@@ -1,7 +1,7 @@
 # JavaScript and TypeScript API
 
 OpenSelf is ESM-only. Install it in a Node.js project and import from `openself`.
-Version 1.0 includes declarations for all 50 root value exports; runtime
+Version 1.1 includes declarations for all root value exports; runtime
 validation remains necessary because TypeScript cannot enforce lengths, UUIDs, date
 ordering, sensitivity policy, or filesystem availability.
 
@@ -55,8 +55,13 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `search(query, options?)` | Ranked active records; queries without indexable terms return filtered, unranked list results |
 | `list(options?)` | Records ordered by event/creation time with pagination, without relevance ranking |
 | `findPotentialConflicts(input, options?)` | Similar active facts/preferences/decisions with overlapping validity intervals; punctuation-only proposals return `[]` |
-| `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string |
-| `stats()` | Counts by status/type, vector model/count, encryption mode, and database path |
+| `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string; `explain: true` adds a `receipt` |
+| `proposeMemory(input, options?)` | Stage a pending proposal with `proposedBy`/`note`; does not write a memory |
+| `getProposal(id)` | Proposal or `null` |
+| `listProposals(options?)` | Proposals filtered by `status` (default `pending`; `null` for all), `proposedBy`, `limit`, `offset` |
+| `approveProposal(id, overrides?, options?)` | Writes the memory and marks the proposal approved; `null` for unknown IDs; throws if already resolved |
+| `rejectProposal(id, options?)` | `true` when a pending proposal was rejected |
+| `stats()` | Counts by status/type, pending proposals, vector model/count, encryption mode, and database path |
 | `close()` | Releases the SQLite handle; do not use the store afterwards |
 
 `MemoryInput` requires `content`. Type defaults to `note`, scope to `personal`, sensitivity
@@ -93,6 +98,19 @@ included records. If none fit, the block and memory list are empty. The budget d
 limit JSON metadata size or model tokens; increase it or retrieve individual memories
 when complete long records are needed.
 
+With `explain: true`, the result gains a `receipt`: the applied filters (scope, type,
+sensitivity, `minSourceTrust`), the `asOf` instant, per-candidate records of lexical and
+vector ranks, recency in days, character cost, and a `selected`/`skipped` decision with
+its reason (`within-budget` or `over-character-budget`), plus totals. Receipts are
+diagnostics for the owner — they can reveal that a filtered-out candidate exists, so
+treat them as privileged output rather than agent-facing context.
+
+Every memory carries a `sourceTrust` level (`SOURCE_TRUST_LEVELS`: `untrusted`,
+`external`, `trusted`, `verified`, `owner`; default `owner` for direct owner writes).
+Search, list, and buildContext accept `minSourceTrust` to floor the trust of returned
+records. Proposals staged via `proposeMemory` never appear in search, list, or context
+until approved.
+
 ## Other Context Vault exports
 
 | Exports | Supported use |
@@ -103,7 +121,11 @@ when complete long records are needed.
 | `parseCalendarSource`, `parseEmailSource`, `parseBrowserSource` | Produce source-keyed memory candidates; supply scope, sensitivity and limit |
 | `createContextServer` | Returns Express app, token, host/port metadata, store, and close; **does not start listening** |
 | `createContextMcpServer`, `runContextMcpServer`, `loadMcpPolicy` | MCP factory/stdio startup and owner policy loading |
+| `createMcpHttpApp`, `runContextMcpHttpServer` | Authenticated Streamable HTTP MCP transport; loopback-only unless `allowRemote` plus an explicit `token` |
+| `AccessPolicy`, `MCP_CAPABILITIES` | Policy object with `read`/`remember`/`forget`/`propose` capabilities, scope roots, sensitivity and `maxSourceTrust` ceilings |
 | `AccessAudit` | Local metadata audit begin/finish/list/prune/clear/close |
+| `exportMemories`, `parseContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export and parsing; imported records are clamped to `external` trust |
+| `SOURCE_TRUST_LEVELS` | Ordered trust levels: `untrusted`, `external`, `trusted`, `verified`, `owner` |
 | `VaultCodec`, `PlaintextCodec`, `normalizeKey` | Payload codecs and key normalization; not a full-database encryption API |
 | `VaultKeyManager`, `loadConfiguredVaultKey` | OS-bound key configuration and status |
 | `backupVault`, `restoreVault` | Promise-returning portable backup and restore to a new directory |

@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContextStore } from '../../../src/context/store.js';
+import { ContextStore, VAULT_SCHEMA_VERSION } from '../../../src/context/store.js';
 import { backupVault, restoreVault } from '../../../src/context/backup.js';
 import { openBackup, sealBackup } from '../../../src/context/backup-format.js';
 import { VaultKeyManager } from '../../../src/context/vault-key-manager.js';
@@ -240,7 +240,7 @@ describe('portable vault recovery', () => {
         });
         expect(source.stats().total).toBe(2);
         expect(source.history('00000000-0000-4000-8000-000000000001')).toHaveLength(2);
-        expect(source.db.pragma('user_version', { simple: true })).toBe(2);
+        expect(source.db.pragma('user_version', { simple: true })).toBe(VAULT_SCHEMA_VERSION);
         expect(
             source.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
         ).toBe(0);

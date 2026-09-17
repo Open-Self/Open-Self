@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { SENSITIVITY_LEVELS } from './schema.js';
+import { SENSITIVITY_LEVELS, SOURCE_TRUST_LEVELS } from './schema.js';
+
+export const MCP_CAPABILITIES = ['read', 'remember', 'forget', 'propose'];
 
 const clientId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const scope = z
@@ -16,7 +18,10 @@ const clientPolicy = z
     .object({
         scopes: z.array(scope).min(1).max(50),
         maxSensitivity: z.enum(SENSITIVITY_LEVELS),
-        capabilities: z.array(z.enum(['read', 'remember', 'forget'])).max(3),
+        capabilities: z.array(z.enum(MCP_CAPABILITIES)).max(MCP_CAPABILITIES.length),
+        // Highest source trust this client's writes may claim. Agent-supplied
+        // memories default to `external`; an owner can raise this deliberately.
+        maxSourceTrust: z.enum(SOURCE_TRUST_LEVELS).default('external'),
     })
     .strict();
 const fileSchema = z
@@ -55,11 +60,13 @@ export class AccessPolicy {
                       clientId: 'trusted-local',
                       scopes: undefined,
                       maxSensitivity: 'private',
-                      capabilities: ['read', 'remember', 'forget'],
+                      capabilities: ['read', 'remember', 'forget', 'propose'],
+                      maxSourceTrust: 'external',
                   };
         this.clientId = policy.clientId;
         this.scopes = policy.scopes ? Object.freeze([...policy.scopes]) : undefined;
         this.maxSensitivity = policy.maxSensitivity;
+        this.maxSourceTrust = policy.maxSourceTrust;
         this.capabilities = Object.freeze([...policy.capabilities]);
         Object.freeze(this);
     }
@@ -99,6 +106,20 @@ export class AccessPolicy {
             ];
         if (input.scope && !this.contains(input.scope)) this.deny();
         return { ...input, maxSensitivity: maximum, allowedScopes: this.scopes };
+    }
+
+    /**
+     * Clamp a requested source-trust claim to this client's ceiling. A client
+     * can always write lower-trust memories; it can never claim more trust
+     * than the owner granted.
+     */
+    clampSourceTrust(requested) {
+        const value = requested || 'external';
+        if (!SOURCE_TRUST_LEVELS.includes(value)) this.deny();
+        const ceiling = this.maxSourceTrust || 'external';
+        return SOURCE_TRUST_LEVELS.indexOf(value) <= SOURCE_TRUST_LEVELS.indexOf(ceiling)
+            ? value
+            : ceiling;
     }
 
     deny() {

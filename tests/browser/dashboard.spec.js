@@ -16,6 +16,9 @@ const test = base.extend({
             await use({ store, baseUrl });
         } finally {
             await page.goto('about:blank');
+            // Chromium pools keep-alive sockets briefly after navigation;
+            // without this, server.close() can wait past the test timeout.
+            server.closeAllConnections?.();
             await new Promise((resolve) => server.close(resolve));
             store.close();
         }
@@ -99,4 +102,37 @@ test('new memories can leave all optional dates empty', async ({ page, vault }) 
     expect(memory.occurredAt).toBeNull();
     expect(memory.validFrom).toBeNull();
     expect(memory.validTo).toBeNull();
+});
+
+test('memory inbox approves and rejects agent proposals', async ({ page, vault }) => {
+    const proposal = vault.store.proposeMemory(
+        { content: 'Agent-observed preference: dark theme', type: 'preference' },
+        { proposedBy: 'mcp-client:test-agent' },
+    );
+    await page.getByRole('button', { name: /Inbox/ }).click();
+    const card = page.locator('.proposal-card', { hasText: 'dark theme' });
+    await expect(card).toBeVisible();
+    await card.getByRole('button', { name: 'Approve', exact: true }).click();
+    await expect(page.locator('#proposal-list')).toContainText('No pending proposals');
+    expect(vault.store.getProposal(proposal.id).status).toBe('approved');
+    const [approved] = vault.store.list();
+    expect(approved.content).toContain('dark theme');
+});
+
+test('context debugger renders the explain receipt', async ({ page, vault }) => {
+    vault.store.remember({ content: 'Project Atlas runs on PostgreSQL', type: 'decision' });
+    await page.getByRole('button', { name: 'Context Debugger' }).click();
+    await page.locator('#debug-query').fill('postgres');
+    await page.getByRole('button', { name: 'Build context' }).click();
+    await expect(page.locator('#debug-context')).toContainText('PostgreSQL');
+    await expect(page.locator('#receipt-rows')).toContainText('selected');
+    await expect(page.locator('#receipt-rows')).toContainText('within-budget');
+});
+
+test('audit view renders empty state without an audit database', async ({
+    page,
+    vault: _vault,
+}) => {
+    await page.getByRole('button', { name: 'Audit' }).click();
+    await expect(page.locator('#audit-list')).toContainText('No MCP access events yet.');
 });

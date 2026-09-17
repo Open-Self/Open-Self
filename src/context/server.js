@@ -1,6 +1,8 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
 import express from 'express';
 import { ContextStore } from './store.js';
 
@@ -43,6 +45,11 @@ export function createContextServer(options = {}) {
     app.get('/dashboard.js', requireAuth(token), (_req, res) => {
         res.type('application/javascript').sendFile(join(__dirname, 'dashboard', 'dashboard.js'));
     });
+    for (const script of ['debugger.js', 'inbox.js', 'audit.js']) {
+        app.get(`/${script}`, requireAuth(token), (_req, res) => {
+            res.type('application/javascript').sendFile(join(__dirname, 'dashboard', script));
+        });
+    }
     app.get('/dashboard.css', requireAuth(token), (_req, res) => {
         res.type('text/css').sendFile(join(__dirname, 'dashboard', 'dashboard.css'));
     });
@@ -122,6 +129,81 @@ export function createContextServer(options = {}) {
 
     api.post('/conflicts', requireLocalMutation, (req, res) => {
         res.json({ potentialConflicts: store.findPotentialConflicts(req.body, req.body) });
+    });
+
+    // Context Debugger: buildContext with an explain receipt. Read-only —
+    // mirrors what an agent would receive for the same query.
+    api.get('/debug', (req, res) => {
+        const query = optionalString(req.query.q);
+        if (!query) return res.status(400).json({ error: 'q query parameter is required' });
+        const result = store.buildContext(query, {
+            scope: optionalString(req.query.scope),
+            retrieval: optionalString(req.query.retrieval) || 'hybrid',
+            maxChars: numberParam(req.query.maxChars, 8_000),
+            minSourceTrust: optionalString(req.query.minSourceTrust),
+            asOf: optionalString(req.query.asOf),
+            explain: true,
+        });
+        return res.json(result);
+    });
+
+    api.get('/proposals', (req, res) => {
+        const status = optionalString(req.query.status);
+        res.json({
+            proposals: store.listProposals({
+                status: status === 'all' ? null : status || 'pending',
+                limit: numberParam(req.query.limit, 100),
+            }),
+        });
+    });
+
+    api.post('/proposals/:id/approve', requireLocalMutation, (req, res) => {
+        const existing = store.getProposal(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Proposal not found' });
+        if (existing.status !== 'pending') {
+            return res.status(409).json({ error: `Already ${existing.status}` });
+        }
+        const memory = store.approveProposal(req.params.id, req.body?.overrides || {}, {
+            reviewNote: req.body?.reviewNote,
+        });
+        return res.json({ approved: true, memory });
+    });
+
+    api.post('/proposals/:id/reject', requireLocalMutation, (req, res) => {
+        const rejected = store.rejectProposal(req.params.id, {
+            reviewNote: req.body?.reviewNote,
+        });
+        if (!rejected) {
+            const existing = store.getProposal(req.params.id);
+            return res
+                .status(existing ? 409 : 404)
+                .json({ error: existing ? `Already ${existing.status}` : 'Proposal not found' });
+        }
+        return res.json({ rejected: true, id: req.params.id });
+    });
+
+    // Read-only view over the MCP access audit, when the vault has one. The
+    // audit database lives beside context.db and is opened read-only so the
+    // dashboard never creates or mutates it.
+    api.get('/audit', (_req, res) => {
+        if (typeof store.dbPath !== 'string' || store.dbPath === ':memory:') {
+            return res.json({ events: [] });
+        }
+        const auditPath = join(dirname(store.dbPath), 'mcp-audit.db');
+        if (!existsSync(auditPath)) {
+            return res.json({ events: [] });
+        }
+        const auditDb = new Database(auditPath, { readonly: true });
+        try {
+            const events = auditDb
+                .prepare(
+                    'SELECT id, occurred_at AS occurredAt, client, tool, outcome FROM access_events ORDER BY id DESC LIMIT 200',
+                )
+                .all();
+            return res.json({ events });
+        } finally {
+            auditDb.close();
+        }
     });
 
     app.use('/api/context', api);

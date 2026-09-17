@@ -2,6 +2,60 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-17
+
+### Added — user-owned context layer for AI agents
+
+- **Source trust levels** on every memory: `untrusted` → `external` → `trusted` →
+  `verified` → `owner`. Agent-written and imported records are clamped to `external`
+  by default; retrieval accepts a `minSourceTrust` floor. Vault schema is now 3 and
+  migrates schema-1/2 vaults in place, preserving existing memories, history, and
+  import deduplication.
+- **Owner-approved memory proposals.** `ContextStore.proposeMemory`,
+  `listProposals`, `approveProposal`, and `rejectProposal` stage agent writes in a
+  pending inbox instead of the vault. Approvals support field overrides and review
+  notes; approved memories carry the proposal ID for provenance.
+- **Explainable context.** `store.buildContext(query, { explain: true })` returns a
+  receipt recording the query, filters, candidate set, lexical/vector ranks, recency,
+  character costs, and per-candidate selected/skipped reasons.
+- **MCP upgrades.** Two new tools (`openself_propose_memory`,
+  `openself_list_memory_proposals`) gated by a new `propose` capability and a
+  per-client `maxSourceTrust` ceiling; structured tool output on every tool;
+  `openself://recent` and `openself://memory/{id}` resources; and a
+  `prepare_task_context` prompt.
+- **Streamable HTTP MCP transport** (`openself mcp --http`): localhost-first bind,
+  bearer authentication, Host/Origin validation against DNS-rebinding and browser
+  cross-origin access, stateless `/mcp` endpoint, `/healthz`, and a hard refusal to
+  bind remotely without `--allow-remote` and an explicit token.
+- **CLI commands:** `openself init` (one-step vault setup with optional encryption),
+  `openself doctor` (vault health report), `openself context` (build context with an
+  optional explain receipt), `openself inbox` (list/approve/reject proposals),
+  `openself demo` (offline two-agent MCP walkthrough with a denial and audit trail),
+  `openself connect` (idempotent config writers for Claude Code, Cursor, VS Code,
+  Windsurf, Codex TOML, and generic clients with backups, `--project`, `--dry-run`,
+  and `--remove`), and `openself skill` (path/validate/install/uninstall for the
+  bundled Agent Skill).
+- **Portable context export/import.** `openself memory export` writes a versioned
+  `openself-context` JSONL interchange format preserving provenance, scope,
+  sensitivity, trust, and temporal bounds; `openself memory import` detects it and
+  clamps imported records to `external` trust. Plaintext export, not an encrypted
+  backup — restricted records excluded unless `--include-restricted`.
+- **Dashboard views:** Context Debugger (query + explain receipt table), Inbox
+  (proposal review with approve/approve-as-verified/reject), and Audit (MCP access
+  metadata) alongside the existing memory editor. New endpoints: `GET /debug`,
+  `GET/POST /proposals`, `GET /audit`.
+- **Bundled Agent Skill** at `skills/openself-context` teaching agents the
+  propose/review workflow, scope and sensitivity rules, and receipt interpretation.
+- **Benchmark tooling:** `benchmark:context --out=file.json` records reproducible
+  JSON results; `benchmark:table` renders reports as Markdown.
+
+### Changed
+
+- Package version is 1.1.0; description and keywords now reflect the agent context
+  layer positioning. The `skills/` bundle ships in the npm tarball.
+- The Playwright dashboard suite gains three-view coverage and a keep-alive
+  teardown fix; per-test timeout raised to 60s for slow machines.
+
 ## [1.0.1] - 2026-09-09
 
 ### Documentation

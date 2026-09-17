@@ -121,7 +121,80 @@ describe('Context dashboard server', () => {
         const page = await request('/');
         expect(page.status).toBe(200);
         expect(await page.text()).toContain('Context Vault');
-        expect((await request('/dashboard.js')).status).toBe(200);
+        for (const asset of ['/dashboard.js', '/debugger.js', '/inbox.js', '/audit.js'])
+            expect((await request(asset)).status).toBe(200);
+    });
+
+    it('returns a context debug receipt for a query', async () => {
+        store.remember({ content: 'The Atlas service uses PostgreSQL', type: 'decision' });
+        store.remember({ content: 'Batch 47 is an Ethiopian coffee', type: 'note' });
+
+        const missingQuery = await request('/api/context/debug');
+        expect(missingQuery.status).toBe(400);
+
+        const response = await request('/api/context/debug?q=postgres+database');
+        const body = await response.json();
+        expect(response.status).toBe(200);
+        expect(body.context).toContain('PostgreSQL');
+        expect(body.receipt.query).toBe('postgres database');
+        expect(body.receipt.totals.selected).toBeGreaterThan(0);
+        const postgres = body.receipt.candidates.find(
+            (c) => c.chars > 0 && c.decision === 'selected',
+        );
+        expect(postgres).toBeDefined();
+        expect(postgres.reason).toBe('within-budget');
+    });
+
+    it('lists, approves, and rejects proposals through the inbox endpoints', async () => {
+        const proposal = store.proposeMemory(
+            { content: 'The owner prefers dark mode', type: 'preference' },
+            { proposedBy: 'mcp-client:claude' },
+        );
+
+        const list = await (await request('/api/context/proposals')).json();
+        expect(list.proposals).toHaveLength(1);
+        expect(list.proposals[0].proposedBy).toBe('mcp-client:claude');
+
+        const approved = await (
+            await request(`/api/context/proposals/${proposal.id}/approve`, {
+                method: 'POST',
+                body: JSON.stringify({ reviewNote: 'accurate' }),
+            })
+        ).json();
+        expect(approved.approved).toBe(true);
+        expect(approved.memory.id).toBe(proposal.id);
+        expect(store.get(proposal.id).content).toContain('dark mode');
+
+        const again = await request(`/api/context/proposals/${proposal.id}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+        expect(again.status).toBe(409);
+
+        const rejected = store.proposeMemory(
+            { content: 'Speculative claim' },
+            { proposedBy: 'mcp-client:codex' },
+        );
+        const rejectResponse = await request(`/api/context/proposals/${rejected.id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reviewNote: 'not verified' }),
+        });
+        expect(rejectResponse.status).toBe(200);
+        expect(store.get(rejected.id)).toBeNull();
+        expect(store.getProposal(rejected.id).status).toBe('rejected');
+        expect(store.getProposal(rejected.id).reviewNote).toBe('not verified');
+
+        const missing = await request('/api/context/proposals/nope/approve', {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+        expect(missing.status).toBe(404);
+    });
+
+    it('returns an empty audit list when no audit database exists', async () => {
+        const response = await request('/api/context/audit');
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ events: [] });
     });
 
     function request(path, options = {}) {

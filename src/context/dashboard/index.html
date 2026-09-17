@@ -19,7 +19,16 @@
             </div>
         </header>
 
-        <main class="workspace">
+        <nav class="tabs" aria-label="Dashboard views">
+            <button class="tab active" data-view="view-memories" type="button">Memories</button>
+            <button class="tab" data-view="view-debugger" type="button">Context Debugger</button>
+            <button class="tab" data-view="view-inbox" type="button">
+                Inbox <span id="inbox-count" class="tab-badge hidden">0</span>
+            </button>
+            <button class="tab" data-view="view-audit" type="button">Audit</button>
+        </nav>
+
+        <main id="view-memories" class="workspace view">
             <aside class="memory-panel">
                 <div class="toolbar">
                     <input id="search" type="search" placeholder="Search your context…" />
@@ -143,6 +152,108 @@
                 </form>
             </section>
         </main>
+
+        <section id="view-debugger" class="view hidden">
+            <div class="pane">
+                <div class="pane-heading">
+                    <h2>Context Debugger</h2>
+                    <p class="hint">
+                        Preview exactly what an agent receives — and why each memory was selected.
+                    </p>
+                </div>
+                <div class="debugger-form">
+                    <input
+                        id="debug-query"
+                        type="search"
+                        placeholder="Ask as an agent would… e.g. What database does Atlas use?"
+                    />
+                    <div class="debugger-params">
+                        <input id="debug-scope" type="text" placeholder="Scope (optional)" />
+                        <select id="debug-retrieval" aria-label="Retrieval mode">
+                            <option value="hybrid">hybrid</option>
+                            <option value="lexical">lexical</option>
+                            <option value="vector">vector</option>
+                        </select>
+                        <select id="debug-trust" aria-label="Minimum source trust">
+                            <option value="">any trust</option>
+                            <option value="untrusted">≥ untrusted</option>
+                            <option value="external">≥ external</option>
+                            <option value="trusted">≥ trusted</option>
+                            <option value="verified">≥ verified</option>
+                            <option value="owner">owner only</option>
+                        </select>
+                        <input
+                            id="debug-chars"
+                            type="number"
+                            min="500"
+                            max="50000"
+                            value="8000"
+                            aria-label="Character budget"
+                        />
+                        <button id="debug-run" class="primary" type="button">Build context</button>
+                    </div>
+                </div>
+                <div id="debug-results" class="hidden">
+                    <h3>Context block</h3>
+                    <pre id="debug-context" class="context-block"></pre>
+                    <h3>Receipt</h3>
+                    <p id="debug-meta" class="hint"></p>
+                    <table class="receipt-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>type</th>
+                                <th>scope</th>
+                                <th>sensitivity / trust</th>
+                                <th>match</th>
+                                <th>recency</th>
+                                <th>chars</th>
+                                <th>decision</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receipt-rows"></tbody>
+                    </table>
+                </div>
+                <p id="debug-empty" class="empty-list">Run a query to inspect the receipt.</p>
+            </div>
+        </section>
+
+        <section id="view-inbox" class="view hidden">
+            <div class="pane">
+                <div class="pane-heading">
+                    <h2>Memory Inbox</h2>
+                    <p class="hint">
+                        Memories proposed by agents stay pending until you approve or reject them.
+                    </p>
+                    <div class="inbox-filters">
+                        <select id="inbox-status" aria-label="Proposal status">
+                            <option value="pending">pending</option>
+                            <option value="approved">approved</option>
+                            <option value="rejected">rejected</option>
+                            <option value="all">all</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="proposal-list" class="proposal-list" aria-live="polite"></div>
+            </div>
+        </section>
+
+        <section id="view-audit" class="view hidden">
+            <div class="pane">
+                <div class="pane-heading">
+                    <h2>Access audit</h2>
+                    <p class="hint">
+                        Which agent called which tool and whether policy allowed it. Query text and
+                        memory content are never recorded.
+                    </p>
+                </div>
+                <div id="audit-list" class="audit-list" aria-live="polite"></div>
+            </div>
+        </section>
+
         <script src="/dashboard.js" defer></script>
+        <script src="/debugger.js" defer></script>
+        <script src="/inbox.js" defer></script>
+        <script src="/audit.js" defer></script>
     </body>
 </html>
