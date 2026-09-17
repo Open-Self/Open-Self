@@ -6,12 +6,14 @@
 
 ### Your context. Your memory. Your rules.
 
-OpenSelf is a private, persistent context layer for every AI you use. It stores decisions,
+OpenSelf is the user-owned context layer for AI agents — one private context layer for
+Claude, Codex, ChatGPT, Cursor, local agents, and whatever comes next. It stores decisions,
 preferences, commitments, relationships, events, and facts with their source, time, scope,
-confidence, and sensitivity—then exposes only the relevant context through MCP or its JavaScript API.
+confidence, sensitivity, and trust — then exposes only the relevant context through MCP,
+an authenticated dashboard, or its JavaScript API.
 
-Open source. Local-first. Bring your own model. Your existing OpenSelf personality and messaging
-tools continue to work.
+Open source. Local-first. Bring your own model. Agents propose memories; you approve them.
+Your existing OpenSelf personality and messaging tools continue to work.
 
 > A chatbot starts every conversation from zero. OpenSelf lets your agents remember without giving
 > them unrestricted access to your life.
@@ -26,10 +28,18 @@ memory explicit and portable:
 - **Time-aware:** `validFrom`, `validTo`, and `occurredAt` distinguish old beliefs from current ones.
 - **Scoped:** keep personal context separate from `project/acme` or `relationship/minh`.
 - **Sensitivity-aware:** public, personal, private, and restricted memories are filtered at retrieval.
+- **Trust-aware:** every memory carries a source trust level (`untrusted` → `owner`), so
+  imported files and agent proposals can be filtered out of retrieval until you trust them.
+- **Owner-approved writes:** agents can only *propose* memories; nothing enters the vault
+  without your approval in the inbox.
+- **Explainable retrieval:** every context build can return a receipt showing which
+  memories were selected or skipped and why.
 - **Recoverable forgetting:** forgotten memories disappear from retrieval without destroying the audit trail.
 - **Hybrid retrieval:** FTS5 and deterministic local vectors are fused without an embedding API.
 - **Conflict-aware:** similar active facts, preferences, and decisions are surfaced before storage.
-- **Agent-native:** MCP tools work with compatible AI clients; the core is also a normal Node.js library.
+- **Portable:** export the vault to a versioned JSONL interchange format and import it elsewhere.
+- **Agent-native:** MCP tools, resources, and prompts work with compatible AI clients over
+  stdio or an authenticated HTTP transport; the core is also a normal Node.js library.
 - **Local-first:** SQLite and FTS5 run on your machine with no account or server required.
 
 ## Quick start
@@ -43,6 +53,10 @@ See [GitHub Releases](https://github.com/Open-Self/Open-Self/releases) for versi
 npm install -g openself
 openself --version
 
+# Initialize a vault (optionally encrypted) in one step
+openself init --data-dir ~/.openself
+openself doctor --data-dir ~/.openself   # sanity-check vault, key, schema
+
 # Store a durable decision
 openself memory add \
   --type decision \
@@ -54,6 +68,9 @@ openself memory add \
 # Recall it later
 openself memory search --query "Which database did we choose?" --scope project/openself
 
+# Preview the exact context block an agent would receive, with a receipt
+openself context "Which database did we choose?" --scope project/openself --explain
+
 # Check a possible preference change before storing it
 openself memory conflicts \
   --type preference \
@@ -64,12 +81,19 @@ openself memory conflicts \
 openself memory stats
 ```
 
+See the whole agent workflow end-to-end — proposals, approvals, scoped reads, denials,
+and the access audit — in one offline command:
+
+```bash
+openself demo --data-dir ./demo-data
+```
+
 From this repository, replace `openself` with `node src/cli/index.js`.
 See [release verification](./docs/release-readiness.md) for CI, audit and distribution evidence.
 The [upgrade guide](./docs/upgrade-guide.md) covers existing vaults. Stable 1.x preserves the
 [documented public contracts](./docs/api-reference.md).
 
-For library use, run `npm install openself`. To pin this release, use `openself@1.0.0`.
+For library use, run `npm install openself`. To pin this release, use `openself@1.1.0`.
 The `next` channel remains separate and currently points to the older `1.0.0-rc.2` candidate;
 use the default stable channel for normal installation.
 
@@ -89,7 +113,16 @@ openself dashboard --port 3210 --data-dir /absolute/path/to/openself-data
 The CLI prints a tokenized bootstrap URL. The dashboard binds only to `127.0.0.1`, exchanges that
 token for an HttpOnly/SameSite session cookie, and protects mutations from cross-origin requests.
 It supports hybrid search, create/edit/forget, conflict review, duplicate merge, provenance fields,
-and version history. It is a local administration surface—not a public multi-user service.
+and version history, plus three agent-facing views:
+
+- **Context Debugger** — run a query as an agent would and inspect the explain receipt:
+  which candidates matched, their lexical/vector ranks, trust, and why each was selected
+  or skipped.
+- **Inbox** — review memories proposed by agents; approve (optionally promoting trust to
+  `verified`) or reject with a note.
+- **Audit** — which MCP client called which tool and whether policy allowed it.
+
+It is a local administration surface—not a public multi-user service.
 
 ## Import existing context
 
@@ -191,7 +224,21 @@ missed, making retrieval and privacy regressions suitable for CI gating.
 
 ## Connect an AI client with MCP
 
-Run the stdio server directly:
+Generate a ready-to-paste client configuration:
+
+```bash
+openself connect claude --data-dir ~/.openself            # writes ~/.claude.json
+openself connect cursor --policy ./policy.json --client atlas-reader
+openself connect codex                                    # ~/.codex/config.toml
+openself connect generic --transport http --token "$TOKEN"  # prints a config block
+```
+
+Supported targets include Claude Code, Cursor, VS Code, Windsurf, OpenAI Codex, and a
+generic MCP entry. Writing merges into the client's existing config file (with a
+timestamped backup), `--project` targets project-level config where supported,
+`--remove` uninstalls, and `--dry-run` previews.
+
+Or run the stdio server directly:
 
 ```bash
 openself mcp
@@ -213,23 +260,79 @@ Example MCP client configuration:
 }
 ```
 
-For per-agent scope, sensitivity, and read/write permissions, launch with
-`--policy /protected/mcp-policy.json --client atlas-reader`. Policy is fixed by the
+For per-agent scope, sensitivity, trust ceilings, and read/write/propose permissions, launch
+with `--policy /protected/mcp-policy.json --client atlas-reader`. Policy is fixed by the
 owner at startup; agent tool arguments cannot expand it.
 [Agent permissions and audit](./docs/agent-permissions.md) covers configuration,
 trust boundaries, and `openself audit list/prune/clear`.
 
-OpenSelf provides five tools:
+To expose the vault over HTTP instead of stdio (e.g. for a shared workstation setup):
+
+```bash
+openself mcp --http --port 3211                      # localhost, prints a bearer token
+openself mcp --http --host 0.0.0.0 --allow-remote --token "$TOKEN"
+```
+
+The HTTP transport binds `127.0.0.1` by default, requires bearer authentication, validates
+Host/Origin headers against DNS-rebinding and browser cross-origin access, and refuses
+non-localhost binds without `--allow-remote` and an explicit token.
+
+### MCP tools, resources, and prompts
 
 | Tool | Purpose |
 |---|---|
+| `openself_search_memory` | Search active memories with scope/time/sensitivity/trust filters |
+| `openself_get_context` | Build a bounded, source-attributed context block; `explain` adds a selection receipt |
 | `openself_remember` | Store typed context with provenance and permissions |
-| `openself_search_memory` | Search active memories with scope/time/sensitivity filters |
+| `openself_propose_memory` | Propose a memory for owner review; lands in the inbox, not the vault |
+| `openself_list_memory_proposals` | List pending/recent proposals and their review state |
 | `openself_find_conflicts` | Surface similar current facts/preferences/decisions before writing |
-| `openself_get_context` | Build a bounded, source-attributed context block for a task |
 | `openself_forget` | Soft-delete a memory and remove it from future retrieval |
 
-See [Context Vault & MCP](./docs/context-vault.md) for the schema, security model, and integration details.
+All tools return structured output alongside the text block. The server also exposes
+`openself://recent` and `openself://memory/{id}` resources and a `prepare_task_context`
+prompt that renders a scoped context block for a task description.
+
+## Review agent proposals
+
+Agents with only the `propose` capability cannot write directly — proposals wait for you:
+
+```bash
+openself inbox                                    # list pending proposals
+openself inbox approve --id <id> --note ok        # approve, optionally overriding fields
+openself inbox reject --id <id> --note "no"       # reject with a note
+```
+
+The same queue appears in the dashboard's Inbox tab.
+
+## Portable export and import
+
+Export the vault to a versioned JSONL interchange format and re-import it elsewhere:
+
+```bash
+openself memory export --file ./context.openself.jsonl
+openself memory export --file ./project.jsonl --scope project/atlas --max-sensitivity personal
+openself memory import --file ./context.openself.jsonl
+```
+
+The export preserves provenance, scope, sensitivity, trust, temporal bounds, and tags.
+Restricted memories are excluded unless you pass `--include-restricted`. Imported records
+are clamped to `external` source trust — a file cannot claim owner-level trust. This is a
+plaintext interoperability format, not an encrypted backup; use `openself vault backup`
+for protection at rest.
+
+## Install the Agent Skill
+
+OpenSelf ships an [Agent Skills](https://agentskills.io)-compatible skill that teaches
+compatible agents how to use the vault — propose memories, respect scope and sensitivity,
+and read explain receipts:
+
+```bash
+openself skill path        # print the bundled skill directory
+openself skill validate    # check the SKILL.md contract
+openself skill install --project   # copy into ./.agents/skills/openself-context
+openself skill install             # or ~/.agents/skills for all projects
+```
 
 ## Memory model
 
@@ -239,6 +342,7 @@ See [Context Vault & MCP](./docs/context-vault.md) for the schema, security mode
   "content": "Do not use Firebase for Project Atlas",
   "scope": "project/atlas",
   "sensitivity": "private",
+  "sourceTrust": "owner",
   "confidence": 0.95,
   "validFrom": "2026-08-13T09:00:00.000Z",
   "source": {
@@ -251,8 +355,10 @@ See [Context Vault & MCP](./docs/context-vault.md) for the schema, security mode
 ```
 
 Supported types are `fact`, `preference`, `decision`, `commitment`, `relationship`, `event`, and
-`note`. SQLite is the source of truth. Unicode FTS5 results and deterministic 256-dimensional local
-feature vectors are combined with reciprocal-rank fusion. The storage API remains model-independent.
+`note`. Source trust climbs `untrusted` → `external` → `trusted` → `verified` → `owner`; owner
+records default to `owner`, agent proposals and imports to `external`. SQLite is the source of
+truth. Unicode FTS5 results and deterministic 256-dimensional local feature vectors are combined
+with reciprocal-rank fusion. The storage API remains model-independent.
 
 ## JavaScript API
 

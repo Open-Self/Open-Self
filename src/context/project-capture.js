@@ -226,6 +226,8 @@ export class ProjectFolderCapture {
             },
             scope: this.scope,
             sensitivity: this.sensitivity,
+            // Captured file content is unverified until the owner reviews it.
+            sourceTrust: 'external',
             confidence: 1,
             tags: unique(['project', extensionTag(relativePath), chunk.heading]),
         }));

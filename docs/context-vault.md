@@ -31,6 +31,7 @@ relevant context for a task without handing the AI an unfiltered transcript of t
 | `occurredAt` | When an event happened |
 | `tags` | Normalized retrieval and organization labels |
 | `status` | active or forgotten |
+| `sourceTrust` | untrusted, external, trusted, verified, or owner |
 | lifecycle timestamps | created, updated, and forgotten timestamps |
 
 Dates use ISO 8601 with an explicit offset. A memory whose validity window does not contain the
@@ -66,6 +67,39 @@ policy ceiling, with a fixed `private` ceiling in trusted-local mode. Restricted
 an explicit owner grant. Scope filtering applies before retrieval limits, including punctuation-only
 fallback queries and conflict responses. See [Agent permissions and audit](./agent-permissions.md).
 This tool boundary does not replace OS isolation or network authentication.
+
+## Source trust
+
+Source trust is ordered:
+
+```text
+untrusted < external < trusted < verified < owner
+```
+
+It records *how much the owner relies on the channel that produced a memory*, not the memory's
+truth. Owner-authored records default to `owner`; MCP writes and file imports are clamped to
+`external` (a per-client `maxSourceTrust` policy ceiling applies). Passing `minSourceTrust` to
+search, list, or `buildContext` floors the trust of returned records, so an operator can run
+`--min-source-trust trusted` to exclude unvetted agent output from a query.
+
+Trust is a plaintext operational column like sensitivity: visible to anyone who can read the
+vault, intentionally so that filtering works without decryption.
+
+## Owner-approved proposals
+
+`proposeMemory` stages a candidate in `memory_proposals` instead of writing it. Proposals carry
+the full normalized memory plus `proposedBy`, a note, and review metadata; they never appear in
+search, list, or context until `approveProposal` writes them (with optional field overrides) and
+links the proposal to the resulting memory. `rejectProposal` marks the proposal without writing.
+Both the CLI inbox (`openself inbox`) and the dashboard review the same queue.
+
+## Explainable retrieval
+
+`buildContext(query, { explain: true })` adds a `receipt` to the result: applied filters, the
+`asOf` instant, and per-candidate diagnostics — lexical and vector ranks, recency, character
+cost, and the `selected`/`skipped` decision with its reason. Receipts are owner diagnostics; they
+may reveal that filtered-out candidates exist and are not part of the agent-facing context block.
+The same receipt powers `openself context --explain` and the dashboard's Context Debugger.
 
 ## Retrieval
 

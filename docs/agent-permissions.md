@@ -1,8 +1,9 @@
 # MCP agent permissions and local audit
 
-OpenSelf v0.11 adds owner-configured permissions to the stdio MCP interface. Each launched
+OpenSelf v0.11 adds owner-configured permissions to the MCP interface. Each launched
 server has one fixed client identity, a set of literal scope roots, a sensitivity ceiling,
-and independent `read`, `remember`, and `forget` capabilities.
+a source-trust ceiling, and independent `read`, `remember`, `forget`, and `propose`
+capabilities.
 
 ## Configure a client
 
@@ -20,7 +21,8 @@ Create a policy file that the launching application can read but the agent canno
     "atlas-writer": {
       "scopes": ["project/atlas"],
       "maxSensitivity": "private",
-      "capabilities": ["read", "remember", "forget"]
+      "maxSourceTrust": "external",
+      "capabilities": ["read", "remember", "forget", "propose"]
     }
   }
 }
@@ -67,18 +69,42 @@ through its tools.
 - `read` grants search, bounded context, and conflict review. `remember` grants storage
   only inside allowed scopes and at or below the ceiling. With no `read` capability,
   remember returns the caller's newly stored memory and no existing conflict records.
+- `propose` grants `openself_propose_memory` and `openself_list_memory_proposals`.
+  Proposed memories are staged in the owner inbox — they are not retrievable context
+  until approved through `openself inbox`, the dashboard, or `store.approveProposal`.
+- `remember` and `propose` accept a `sourceTrust` argument, but the stored value is
+  clamped to the client's `maxSourceTrust` ceiling (default `external`). An agent can
+  never label its own writes `verified` or `owner`; only the owner raises trust, e.g.
+  via `openself inbox approve --id <id> --source-trust verified`.
 - `forget` grants soft deletion only for active records inside allowed scopes and below
   the ceiling. Missing and unauthorized IDs return the same policy-denied response.
   The check and mutation share a SQLite write transaction.
-- Capabilities may be an empty list to deny all five tools. Tools remain discoverable,
+- Capabilities may be an empty list to deny all seven tools. Tools remain discoverable,
   but unauthorized calls return an MCP tool error. There is no tool for changing policy.
 
 Without a policy file, `openself mcp` uses the **trusted-local** identity: all scopes,
-all three capabilities, and a fixed `private` ceiling. This mode is for a trusted local
+all capabilities, a fixed `private` sensitivity ceiling, and an `external` trust
+ceiling. This mode is for a trusted local
 host, not isolation between agents. Compared with v0.10, requesting `restricted` alone
 no longer grants access. Configure an explicit owner policy with a `restricted` ceiling
 when that access is intentional. Existing CLI, dashboard, and direct `ContextStore`
 operations remain owner administration surfaces outside the MCP policy.
+
+## HTTP transport
+
+`openself mcp --http` serves the same tools over a stateless Streamable HTTP endpoint:
+
+- Binds `127.0.0.1` by default; `--host` values outside the loopback set require
+  `--allow-remote` plus an explicit `--token` (or `OPENSELF_MCP_TOKEN`).
+- Every `/mcp` request needs `Authorization: Bearer <token>`. With no configured token a
+  local-only server generates one at startup and prints it to stderr.
+- Host headers must be loopback and Origin headers must be absent or loopback — this
+  blocks DNS-rebinding and drive-by browser requests even on the default port.
+- `/healthz` is unauthenticated and returns only `{ ok: true }`. There are no server-side
+  sessions; each request is independent. A server process still carries one client
+  identity — run one `--http` server per client alias when you need distinct policies.
+
+The same policy file and client identity apply to both transports.
 
 ## Access audit
 

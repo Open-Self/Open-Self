@@ -7,7 +7,17 @@ import type { z } from 'zod';
 export type MemoryType =
     'fact' | 'preference' | 'decision' | 'commitment' | 'relationship' | 'event' | 'note';
 export type Sensitivity = 'public' | 'personal' | 'private' | 'restricted';
+/**
+ * Ordered trust in the entity that supplied a memory, lowest to highest.
+ * `owner` is owner-authored; `external` is imported or agent-proposed content
+ * that has not been owner-reviewed.
+ */
+export type SourceTrust = 'untrusted' | 'external' | 'trusted' | 'verified' | 'owner';
 export type RetrievalMode = 'hybrid' | 'lexical' | 'vector';
+export const MEMORY_TYPES: readonly MemoryType[];
+export const SENSITIVITY_LEVELS: readonly Sensitivity[];
+export const SOURCE_TRUST_LEVELS: readonly SourceTrust[];
+export const VAULT_SCHEMA_VERSION: number;
 export interface MemorySource {
     kind: string;
     locator: string;
@@ -21,6 +31,7 @@ export interface MemoryInput {
     source?: Partial<MemorySource>;
     scope?: string;
     sensitivity?: Sensitivity;
+    sourceTrust?: SourceTrust;
     confidence?: number;
     validFrom?: string | null;
     validTo?: string | null;
@@ -34,6 +45,7 @@ export interface MemoryRecord extends MemoryInput {
     source: MemorySource;
     scope: string;
     sensitivity: Sensitivity;
+    sourceTrust: SourceTrust;
     confidence: number;
     tags: string[];
     status: 'active' | 'forgotten';
@@ -55,6 +67,7 @@ export interface SearchOptions {
     allowedScopes?: readonly string[];
     type?: MemoryType;
     maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
     asOf?: string;
     retrieval?: RetrievalMode;
     limit?: number;
@@ -63,7 +76,7 @@ export interface SearchOptions {
 }
 export interface ListOptions extends Pick<
     SearchOptions,
-    'scope' | 'allowedScopes' | 'type' | 'maxSensitivity' | 'asOf' | 'limit'
+    'scope' | 'allowedScopes' | 'type' | 'maxSensitivity' | 'minSourceTrust' | 'asOf' | 'limit'
 > {
     offset?: number;
     includeForgotten?: boolean;
@@ -93,6 +106,45 @@ export interface ContextBlock {
     memories: SearchMemory[];
     /** Exactly context.length, including separators. */
     usedChars: number;
+    /** Present when built with `explain: true`. */
+    receipt?: ContextReceipt;
+}
+export interface ContextReceiptCandidate {
+    id: string;
+    type: MemoryType;
+    scope: string;
+    sensitivity: Sensitivity;
+    sourceTrust: SourceTrust;
+    confidence: number;
+    source: MemorySource;
+    relevance: number | null;
+    match: RetrievalMatch | null;
+    /** Days between the memory's effective timestamp and the receipt's asOf. */
+    recencyDays: number | null;
+    decision: 'selected' | 'skipped';
+    reason: string;
+    chars: number;
+}
+export interface ContextReceipt {
+    version: 1;
+    query: string;
+    asOf: string;
+    retrieval: RetrievalMode;
+    filters: {
+        scope: string | null;
+        allowedScopes: string[] | null;
+        type: MemoryType | null;
+        maxSensitivity: Sensitivity | null;
+        minSourceTrust: SourceTrust | null;
+    };
+    limits: { maxChars: number; limit: number };
+    candidates: ContextReceiptCandidate[];
+    totals: {
+        candidates: number;
+        selected: number;
+        skipped: number;
+        usedChars: number;
+    };
 }
 export type VaultKey = string | Buffer;
 export interface VectorEncoder {
@@ -113,6 +165,8 @@ export interface VaultStats {
     vectorModel: string;
     encrypted: boolean;
     byType: Partial<Record<MemoryType, number>>;
+    /** Memory Inbox counts keyed by proposal status. */
+    proposals: Partial<Record<ProposalStatus, number>>;
     dbPath: string;
 }
 export class ContextStore {
@@ -137,10 +191,51 @@ export class ContextStore {
     search(query: string, options?: SearchOptions): SearchMemory[];
     list(options?: ListOptions): MemoryRecord[];
     findPotentialConflicts(input: MemoryInput, options?: ConflictOptions): ConflictMemory[];
-    buildContext(query: string, options?: SearchOptions & { maxChars?: number }): ContextBlock;
+    buildContext(
+        query: string,
+        options?: SearchOptions & { maxChars?: number; explain?: boolean },
+    ): ContextBlock;
+    /**
+     * Submit a memory for owner review instead of writing it directly.
+     * The proposal is persisted in the Memory Inbox until approved or rejected.
+     */
+    proposeMemory(input: MemoryInput, options?: ProposeOptions): MemoryProposal;
+    getProposal(id: string): MemoryProposal | null;
+    listProposals(options?: ListProposalsOptions): MemoryProposal[];
+    /** Approve a pending proposal into a durable memory; `overrides` edit before commit. */
+    approveProposal(
+        id: string,
+        overrides?: Partial<MemoryInput>,
+        options?: { reviewNote?: string },
+    ): MemoryRecord | null;
+    rejectProposal(id: string, options?: { reviewNote?: string }): boolean;
     forget(id: string): boolean;
     stats(): VaultStats;
     close(): void;
+}
+export type ProposalStatus = 'pending' | 'approved' | 'rejected';
+export interface MemoryProposal {
+    id: string;
+    /** The normalized memory payload awaiting review. */
+    memory: MemoryRecord;
+    status: ProposalStatus;
+    proposedBy: string;
+    note: string;
+    proposedAt: string;
+    reviewedAt?: string | null;
+    reviewNote?: string;
+    memoryId?: string | null;
+}
+export interface ProposeOptions {
+    proposedBy?: string;
+    note?: string;
+}
+export interface ListProposalsOptions {
+    /** `undefined` defaults to pending; pass `null` to list every status. */
+    status?: ProposalStatus | null;
+    proposedBy?: string;
+    limit?: number;
+    offset?: number;
 }
 export function normalizeMemory(input: MemoryInput, now?: Date): MemoryRecord;
 export const memoryInputSchema: z.ZodType<
@@ -150,7 +245,7 @@ export const memoryInputSchema: z.ZodType<
     MemoryInput
 >;
 
-export type ImportFormat = 'markdown' | 'text' | 'whatsapp' | 'telegram';
+export type ImportFormat = 'markdown' | 'text' | 'whatsapp' | 'telegram' | 'openself';
 export interface ImportOptions extends Pick<
     MemoryInput,
     'scope' | 'sensitivity' | 'type' | 'confidence' | 'tags'
@@ -174,6 +269,41 @@ export class ContextImporter {
     importFile(filePath: string, options?: ImportOptions): ImportReport;
 }
 export function detectImportFormat(filePath: string): ImportFormat;
+/**
+ * Human-readable interoperability export (JSONL). Plaintext — this is NOT the
+ * encrypted `.osbackup` vault backup. `restricted` memories require
+ * `includeRestricted: true`.
+ */
+export interface ContextExportOptions {
+    file?: string;
+    scope?: string;
+    maxSensitivity?: Sensitivity;
+    includeRestricted?: boolean;
+    dryRun?: boolean;
+}
+export interface ContextExportReport {
+    format: 'openself-context';
+    version: 1;
+    count: number;
+    scope: string | null;
+    includeRestricted: boolean;
+    bytes: number;
+    dryRun: boolean;
+    file?: string;
+    memories?: MemoryRecord[];
+}
+export function exportMemories(
+    store: ContextStore,
+    options?: ContextExportOptions,
+): ContextExportReport;
+export function serializeMemory(memory: MemoryRecord): Record<string, unknown>;
+export const CONTEXT_EXPORT_FORMAT: 'openself-context';
+export const CONTEXT_EXPORT_VERSION: 1;
+export function parseContextExport(text: string): {
+    header: Record<string, unknown>;
+    records: { memory: MemoryInput; dedupeKey: string }[];
+    errors: string[];
+};
 export function chunkDocument(
     content: string,
     maxChars?: number,
@@ -301,12 +431,38 @@ export function restoreVault(
     options: { passphrase: string; keyBackend?: KeyBackend },
 ): Promise<{ dataDir: string; createdAt: string; encrypted: true }>;
 
-export type McpCapability = 'read' | 'remember' | 'forget';
+export type McpCapability = 'read' | 'remember' | 'forget' | 'propose';
+export const MCP_CAPABILITIES: readonly McpCapability[];
 export interface McpPolicy {
     clientId: string;
-    scopes: readonly string[];
+    /** Omit to grant all scopes. */
+    scopes?: readonly string[];
     maxSensitivity: Sensitivity;
     capabilities: readonly McpCapability[];
+    /**
+     * Highest source trust this client's writes may claim. Agent writes
+     * default to `external`; owners may raise this deliberately.
+     */
+    maxSourceTrust?: SourceTrust;
+}
+export class AccessPolicy {
+    constructor(input?: McpPolicy);
+    readonly clientId: string;
+    readonly scopes?: readonly string[];
+    readonly maxSensitivity: Sensitivity;
+    readonly maxSourceTrust: SourceTrust;
+    readonly capabilities: readonly McpCapability[];
+    require(capability: McpCapability): void;
+    contains(scope: string): boolean;
+    requireMemory(memory: { scope?: string; sensitivity?: string } | null): void;
+    readOptions<T extends { maxSensitivity?: Sensitivity; scope?: string }>(
+        input: T,
+    ): T & {
+        maxSensitivity: Sensitivity;
+        allowedScopes?: readonly string[];
+    };
+    clampSourceTrust(requested?: SourceTrust): SourceTrust;
+    deny(): never;
 }
 export function loadMcpPolicy(path: string, id: string): McpPolicy;
 export type AuditOutcome = 'attempted' | 'allowed' | 'denied' | 'error';
@@ -342,6 +498,38 @@ export function runContextMcpServer(
         clientId?: string;
     },
 ): Promise<{ server: McpServer; store: ContextStore }>;
+/**
+ * Authenticated, localhost-first Streamable HTTP transport. Stateless request
+ * handling: every POST creates a short-lived MCP session server-side.
+ *
+ * Threat model: the bearer token authorizes requests; Host/Origin checks plus
+ * the loopback default defend against DNS rebinding and browser cross-origin
+ * reads. `allowRemote` only removes the loopback expectation — never auth.
+ */
+export interface McpHttpOptions extends McpServerOptions {
+    store: ContextStore;
+    host?: string;
+    port?: number;
+    token?: string;
+    allowRemote?: boolean;
+}
+export interface McpHttpApp {
+    app: Express;
+    /** The effective bearer token (generated when not supplied). */
+    token: string;
+    generatedToken: boolean;
+    host: string;
+    allowRemote: boolean;
+}
+export function createMcpHttpApp(options: McpHttpOptions): McpHttpApp;
+export function runContextMcpHttpServer(options?: McpHttpOptions): Promise<
+    McpHttpApp & {
+        listener: import('node:http').Server;
+        port: number;
+        url: string;
+        close(): Promise<void>;
+    }
+>;
 export function createContextServer(options?: {
     token?: string;
     host?: string;

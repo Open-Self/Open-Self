@@ -3,6 +3,25 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.0.x to v1.1.0
+
+Opening a vault migrates it to SQLite schema 3, which adds a `source_trust` column
+(existing owner records become `owner`) and the `memory_proposals` inbox table. The
+migration is additive — content, history, vectors, and import deduplication are
+preserved — but **OpenSelf ≤1.0 cannot reopen a schema-3 vault**. Take a verified
+`openself vault backup` before upgrading a primary vault; restore it into a fresh
+directory for rollback.
+
+All 1.0 public contracts are preserved. New surface area is additive: proposal methods
+on `ContextStore`, `buildContext` explain receipts, `minSourceTrust` filters, two
+additional MCP tools plus resources and a prompt, an authenticated HTTP transport, the
+JSONL export format, and the CLI commands `init`, `doctor`, `context`, `inbox`, `demo`,
+`connect`, and `skill`. The stable 1.x compatibility promise applies to the whole
+surface from this release forward.
+
+Encrypted vaults keep their OS-bound key; `source_trust` is an operational filter
+column (like sensitivity) and is intentionally not payload-encrypted.
+
 ## From v1.0.0-rc.2 to v1.0.0
 
 The stable release retains the same 50 public root value exports and SQLite schema 2.

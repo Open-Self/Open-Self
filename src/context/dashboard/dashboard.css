@@ -355,6 +355,185 @@ summary {
     margin-top: 3px;
 }
 
+/* Tab navigation */
+.tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(11, 13, 12, 0.92);
+    position: sticky;
+    top: 88px;
+    z-index: 9;
+}
+.tab {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    padding: 11px 14px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.tab:hover {
+    color: var(--text);
+}
+.tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+.tab-badge {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 1px 7px;
+}
+
+/* Secondary views */
+.pane {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px clamp(18px, 4vw, 48px) 70px;
+}
+.pane-heading {
+    margin-bottom: 20px;
+}
+.pane-heading h2 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+}
+.pane-heading .hint {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Context Debugger */
+.debugger-form {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.debugger-params {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto auto;
+    gap: 10px;
+}
+.context-block {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    white-space: pre-wrap;
+    font:
+        12px/1.55 ui-monospace,
+        SFMono-Regular,
+        Consolas,
+        monospace;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.receipt-table th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--line);
+}
+.receipt-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+    color: #cdd4cf;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.receipt-table tr.row-selected td:first-child {
+    color: var(--accent);
+    font-weight: 800;
+}
+.receipt-table tr.row-skipped td {
+    color: var(--muted);
+}
+
+/* Memory Inbox */
+.inbox-filters {
+    margin-top: 14px;
+    max-width: 200px;
+}
+.proposal-list {
+    display: grid;
+    gap: 14px;
+}
+.proposal-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+}
+.proposal-content {
+    margin: 4px 0 8px;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.review-note {
+    margin-bottom: 10px;
+}
+
+/* Audit */
+.audit-list {
+    display: grid;
+    gap: 6px;
+}
+.audit-row {
+    display: grid;
+    grid-template-columns: 170px minmax(140px, 1fr) 170px 90px;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 12px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+}
+.audit-time {
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.audit-client {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.audit-tool {
+    color: #cdd4cf;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.audit-outcome {
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+.audit-outcome.allowed {
+    color: var(--accent);
+}
+.audit-outcome.denied {
+    color: var(--danger);
+}
+
 @media (max-width: 780px) {
     .topbar {
         align-items: flex-start;
@@ -375,5 +554,18 @@ summary {
     }
     .wide {
         grid-column: auto;
+    }
+    .debugger-params {
+        grid-template-columns: 1fr 1fr;
+    }
+    .audit-row {
+        grid-template-columns: 1fr 90px;
+    }
+    .audit-time,
+    .audit-client {
+        grid-column: auto;
+    }
+    .receipt-table {
+        font-size: 11px;
     }
 }

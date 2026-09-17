@@ -19,10 +19,24 @@ export { HumanMimicry } from './mimicry/humanlike.js';
 export { SafetyGuard } from './safety/guard.js';
 export { ReviewQueue } from './safety/review-queue.js';
 export { loadConfig } from './config/loader.js';
-export { ContextStore } from './context/store.js';
-export { normalizeMemory, memoryInputSchema } from './context/schema.js';
+export { ContextStore, VAULT_SCHEMA_VERSION } from './context/store.js';
+export {
+    normalizeMemory,
+    memoryInputSchema,
+    MEMORY_TYPES,
+    SENSITIVITY_LEVELS,
+    SOURCE_TRUST_LEVELS,
+} from './context/schema.js';
 export { createContextMcpServer, runContextMcpServer } from './context/mcp.js';
+export { createMcpHttpApp, runContextMcpHttpServer } from './context/mcp-http.js';
 export { ContextImporter, detectImportFormat, chunkDocument } from './context/importer.js';
+export {
+    exportMemories,
+    parseContextExport,
+    serializeMemory,
+    CONTEXT_EXPORT_FORMAT,
+    CONTEXT_EXPORT_VERSION,
+} from './context/exporter.js';
 export { LocalVectorEncoder, cosineSimilarity } from './context/vectors.js';
 export { createContextServer } from './context/server.js';
 export { ProjectFolderCapture } from './context/project-capture.js';
@@ -36,7 +50,7 @@ export { VaultCodec, PlaintextCodec, normalizeKey } from './context/vault-crypto
 export { VaultKeyManager, loadConfiguredVaultKey } from './context/vault-key-manager.js';
 export { evaluateContextVault } from './context/evaluator.js';
 export { backupVault, restoreVault } from './context/backup.js';
-export { loadMcpPolicy } from './context/access-policy.js';
+export { AccessPolicy, loadMcpPolicy, MCP_CAPABILITIES } from './context/access-policy.js';
 export { AccessAudit } from './context/access-audit.js';
 
 // Week 3

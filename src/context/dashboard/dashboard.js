@@ -287,4 +287,18 @@ for (const id of ['search', 'scope-filter', 'type-filter'])
             180,
         );
     });
+
+// Tab navigation — lazily refresh secondary views on first visit.
+for (const tab of document.querySelectorAll('.tab')) {
+    tab.addEventListener('click', () => {
+        for (const item of document.querySelectorAll('.tab'))
+            item.classList.toggle('active', item === tab);
+        for (const view of document.querySelectorAll('.view')) view.classList.add('hidden');
+        document.getElementById(tab.dataset.view).classList.remove('hidden');
+        // Provided by inbox.js / audit.js, which load after this script.
+        if (tab.dataset.view === 'view-inbox') window.refreshInbox?.().catch(() => {});
+        if (tab.dataset.view === 'view-audit') window.refreshAudit?.().catch(() => {});
+    });
+}
+
 refresh().catch((error) => showMessage(error.message, true));

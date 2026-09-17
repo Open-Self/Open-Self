@@ -51,6 +51,40 @@ const restore = api.restoreVault('backup', 'new-vault', {
     passphrase: 'test passphrase',
     keyBackend: backend,
 });
+// Agent-era API fixtures: trust, proposals, receipts, export, HTTP transport.
+const trust: api.SourceTrust = memory.sourceTrust;
+const proposal: api.MemoryProposal = store.proposeMemory(
+    { content: 'proposed fixture', sourceTrust: 'external' },
+    { proposedBy: 'fixture-agent', note: 'why' },
+);
+const pendingProposals: api.MemoryProposal[] = store.listProposals({ status: 'pending' });
+const allProposals: api.MemoryProposal[] = store.listProposals({ status: null });
+const approved: MemoryRecord | null = store.approveProposal(proposal.id, {
+    sourceTrust: 'verified',
+});
+const rejected: boolean = store.rejectProposal(proposal.id, { reviewNote: 'n/a' });
+const explained = store.buildContext('database', { explain: true, minSourceTrust: 'external' });
+const receipt: api.ContextReceipt | undefined = explained.receipt;
+const exportReport: api.ContextExportReport = api.exportMemories(store, { dryRun: true });
+const httpApp: api.McpHttpApp = api.createMcpHttpApp({ store });
+const policy = new api.AccessPolicy(config);
+const clamped: api.SourceTrust = policy.clampSourceTrust('owner');
+const parsedExport = api.parseContextExport('{"format":"openself-context","version":1}\n');
+const _proposalChecks: [typeof pendingProposals, typeof allProposals] = [
+    pendingProposals,
+    allProposals,
+];
+void [
+    trust,
+    approved,
+    rejected,
+    receipt,
+    exportReport,
+    httpApp,
+    clamped,
+    parsedExport,
+    _proposalChecks,
+];
 const audit = new api.AccessAudit();
 const event = audit.begin('reader', 'openself_search_memory');
 audit.finish(event, 'allowed');

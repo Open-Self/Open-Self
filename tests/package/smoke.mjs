@@ -35,7 +35,7 @@ for (const released of ['v0.9.1', 'v0.11.0', 'v0.13.1']) {
             false,
         );
         assert.equal(store.stats().total, 2);
-        assert.equal(store.db.pragma('user_version', { simple: true }), 2);
+        assert.equal(store.db.pragma('user_version', { simple: true }), api.VAULT_SCHEMA_VERSION);
         assert.equal(
             store.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
             released === 'v0.13.1' ? 1 : 0,
