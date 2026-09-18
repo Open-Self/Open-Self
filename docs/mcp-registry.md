@@ -20,21 +20,21 @@ verifies against the published npm package.
 
 1. Bump `version` in `package.json` **and** `server.json` (keep them equal —
    the registry rejects mismatches).
-2. Publish to npm (`npm publish` — the release workflow handles provenance).
-3. Publish to the MCP Registry with the official CLI:
-
-   ```bash
-   npm install -g @modelcontextprotocol/mcp-publisher   # or: mcp-publisher
-   mcp-publisher login github                           # io.github.* namespace
-   mcp-publisher publish                                # reads ./server.json
-   ```
-
-   GitHub auth is sufficient for the `io.github.Open-Self/*` namespace — the
-   publisher proves repository ownership through your GitHub login.
-
-4. The `docker` workflow builds and pushes `ghcr.io/open-self/openself` on
+2. Push a `v*` tag. The `release` workflow verifies the tag, runs CI, packs the
+   tarball, publishes to npm with provenance, then the `registry` job publishes
+   `server.json` to the MCP Registry via `mcp-publisher` + GitHub OIDC — no
+   registry secrets are needed.
+3. The `docker` workflow builds and pushes `ghcr.io/open-self/openself` on
    every `v*` tag and `main` push; verify the new tag appears under
    [packages](https://github.com/Open-Self/Open-Self/pkgs/container/openself).
+
+Manual fallback (from a maintainer machine):
+
+```bash
+npm install -g @modelcontextprotocol/mcp-publisher   # or: mcp-publisher
+mcp-publisher login github                           # io.github.* namespace
+mcp-publisher publish                                # reads ./server.json
+```
 
 ## Running the container
 

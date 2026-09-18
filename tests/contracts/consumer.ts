@@ -114,7 +114,21 @@ const asyncConflicts: Promise<api.ConflictMemory[]> = asyncStore.findPotentialCo
     content: 'x',
 });
 const validation: api.ContextExportValidation = api.validateContextExport('');
+const sigValid: boolean | undefined = validation.signature?.valid;
 const hashFns: [string, string] = [api.memoryContentHash('c'), api.contextBlockHash('ctx')];
+// Wave-3 fixtures: signing identity, export signing, secret scanning, sweep.
+const identity: api.SigningIdentity | null = api.loadSigningIdentity(null);
+const sig: string = api.signPayload('aGk=', 'payload');
+const verified: boolean = api.verifyPayload('aGk=', 'payload', sig);
+const fingerprint: string = api.signingFingerprint('aGk=');
+const payloadHash: string = api.exportPayloadHash(['{}']);
+const secretHits: api.SecretFinding[] = api.scanForSecrets('text');
+const redacted: { text: string; findings: api.SecretFinding[] } = api.redactSecrets('text');
+const swept: { swept: number; expired: number; ids: string[] } = store.sweepExpired({
+    dryRun: true,
+});
+const receiptSigner: string | undefined = explained.receipt?.signer;
+const domain: 'openself-sign-v1' = api.SIGNING_DOMAIN;
 void [
     chain,
     auditJsonl,
@@ -130,7 +144,18 @@ void [
     asyncContext,
     asyncConflicts,
     validation,
+    sigValid,
     hashFns,
+    identity,
+    sig,
+    verified,
+    fingerprint,
+    payloadHash,
+    secretHits,
+    redacted,
+    swept,
+    receiptSigner,
+    domain,
 ];
 const parsed: api.MemoryInput = api.memoryInputSchema.parse({ content: 'runtime validated' });
 const messages = api.parseWhatsApp('fixture.txt');

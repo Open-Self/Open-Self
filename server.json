@@ -3,7 +3,7 @@
     "name": "io.github.Open-Self/openself",
     "title": "OpenSelf",
     "description": "The user-owned context layer for AI agents: private, portable, provenance-aware memory with policy-controlled access, tamper-evident audit, and verifiable context receipts.",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "repository": {
         "url": "https://github.com/Open-Self/Open-Self",
         "source": "github"
@@ -14,7 +14,7 @@
         {
             "registryType": "npm",
             "identifier": "openself",
-            "version": "1.1.0",
+            "version": "1.2.0",
             "runtimeHint": "npx",
             "runtimeArguments": [
                 {
@@ -68,7 +68,7 @@
         },
         {
             "registryType": "oci",
-            "identifier": "ghcr.io/open-self/openself:1.1.0",
+            "identifier": "ghcr.io/open-self/openself:1.2.0",
             "transport": {
                 "type": "stdio"
             },

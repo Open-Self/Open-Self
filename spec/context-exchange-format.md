@@ -96,7 +96,26 @@ content hash already exists, even if the incoming `id` differs.
 Consumers SHOULD recompute `contentHash` and treat a mismatch as a corrupt
 record.
 
-## 4. Idempotent import
+## 4. Signatures (optional)
+
+A producing vault MAY sign an export with its Ed25519 identity. When it does,
+the header carries four additional fields:
+
+| Field        | Type   | Description                                            |
+| ------------ | ------ | ------------------------------------------------------ |
+| `exportHash` | string | `sha256("openself-export-v1\n" + join(recordLines,"\n"))` |
+| `signer`     | string | `sha256("openself-sign-v1\n" + publicKey)` fingerprint   |
+| `publicKey`  | string | base64 DER (SPKI) Ed25519 public key                    |
+| `signature`  | string | base64 Ed25519 signature over `exportHash`             |
+
+The signed payload is `openself-sign-v1\n` + `exportHash` (hex string).
+Consumers verify by recomputing `exportHash` from the record lines, checking
+`signer` against `publicKey`, and verifying the signature. Verification proves
+the payload was produced by the holder of the vault key and was not modified —
+it does **not** raise trust (§2 still applies). A file whose signature block is
+present but fails verification MUST be treated as tampered.
+
+## 5. Idempotent import
 
 Importing the same export twice is safe. OpenSelf dedupes on:
 
@@ -105,7 +124,7 @@ Importing the same export twice is safe. OpenSelf dedupes on:
 
 A second import reports `duplicates` for every record and creates nothing.
 
-## 5. Sensitivity and scope
+## 6. Sensitivity and scope
 
 - Exports exclude `restricted` memories unless produced with
   `includeRestricted: true`.
@@ -115,7 +134,7 @@ A second import reports `duplicates` for every record and creates nothing.
 - `sensitivity` is a disclosure label; enforcement is the consumer's
   responsibility. `restricted` content SHOULD NOT be sent to remote models.
 
-## 6. Validation
+## 7. Validation
 
 A normative JSON Schema for both record types lives at
 [`context-exchange.schema.json`](./context-exchange.schema.json).
@@ -123,7 +142,7 @@ A normative JSON Schema for both record types lives at
 any JSON Schema implementation or with
 `parseContextExport()` / `validateContextExport()` from `openself`.
 
-## 7. Compatibility
+## 8. Compatibility
 
 - New minor fields may be added in place; parsers MUST ignore unknown fields.
 - Any breaking change increments `version`; parsers MUST reject unknown

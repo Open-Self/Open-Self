@@ -34,12 +34,21 @@ export { createMcpHttpApp, runContextMcpHttpServer } from './context/mcp-http.js
 export { ContextImporter, detectImportFormat, chunkDocument } from './context/importer.js';
 export {
     exportMemories,
+    exportPayloadHash,
     parseContextExport,
     validateContextExport,
     serializeMemory,
     CONTEXT_EXPORT_FORMAT,
     CONTEXT_EXPORT_VERSION,
 } from './context/exporter.js';
+export {
+    loadSigningIdentity,
+    signPayload,
+    verifyPayload,
+    signingFingerprint,
+    SIGNING_DOMAIN,
+} from './context/signing.js';
+export { scanForSecrets, redactSecrets } from './context/secrets.js';
 export {
     resolveVectorProvider,
     featureHashProvider,

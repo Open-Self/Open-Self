@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { parseTelegram } from '../parsers/telegram.js';
 import { parseWhatsApp } from '../parsers/whatsapp.js';
-import { parseContextExport } from './exporter.js';
+import { parseContextExport, validateContextExport } from './exporter.js';
 
 const WHATSAPP_HEADER = /^\d{1,2}\/\d{1,2}\/\d{2,4},?\s\d{1,2}:\d{2}\s-\s[^:]+:\s/m;
 
@@ -29,6 +29,19 @@ export class ContextImporter {
             dryRun: Boolean(options.dryRun),
             errors: [],
         };
+
+        // Signed exports that fail verification are refused outright — a
+        // bad signature means the file was modified after it left a vault.
+        if (format === 'openself') {
+            const validation = validateContextExport(readFileSync(absolutePath, 'utf8'));
+            report.signature = validation.signature;
+            if (validation.signature?.present && !validation.signature.valid) {
+                throw new Error(
+                    `Refusing to import ${absolutePath}: signature verification failed ` +
+                        `(${validation.errors.join('; ') || 'signature invalid'})`,
+                );
+            }
+        }
 
         if (options.dryRun) return report;
 

@@ -1,10 +1,24 @@
+import { createHash } from 'node:crypto';
 import { existsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { memoryContentHash, SENSITIVITY_LEVELS, SOURCE_TRUST_LEVELS } from './schema.js';
+import { signingFingerprint, verifyPayload } from './signing.js';
+import { redactSecrets, scanForSecrets, summarizeFindings } from './secrets.js';
 import { packageVersion } from '../version.js';
 
 export const CONTEXT_EXPORT_FORMAT = 'openself-context';
 export const CONTEXT_EXPORT_VERSION = 1;
+
+/**
+ * Domain-separated digest over the record lines of an export — this is the
+ * payload the vault signature covers. Spec §4.
+ */
+export function exportPayloadHash(recordLines) {
+    return createHash('sha256')
+        .update('openself-export-v1\n')
+        .update(recordLines.join('\n'), 'utf8')
+        .digest('hex');
+}
 
 /**
  * Human-readable, versioned context export (JSONL). This is an
@@ -28,18 +42,50 @@ export function exportMemories(store, options = {}) {
         sensitivityRestrictedSkipped: !includeRestricted,
     });
 
-    const lines = [
-        JSON.stringify({
-            format: CONTEXT_EXPORT_FORMAT,
-            version: CONTEXT_EXPORT_VERSION,
-            exportedAt: new Date().toISOString(),
-            generator: `openself ${packageVersion}`,
-            scope: scope || null,
-            includeRestricted,
-            count: memories.length,
-        }),
-        ...memories.map((memory) => JSON.stringify(serializeMemory(memory))),
-    ];
+    // Secret hygiene: always scan; --redact strips matches before hashing so
+    // contentHash/ signature cover the redacted bytes actually written.
+    const redact = Boolean(options.redact);
+    const findings = [];
+    const exportable = memories.map((memory) => {
+        if (!redact) {
+            const found = scanMemory(memory);
+            if (found.length) findings.push({ id: memory.id, findings: found });
+            return memory;
+        }
+        const content = redactSecrets(memory.content);
+        const summary = redactSecrets(memory.summary || '');
+        const count = content.findings.length + summary.findings.length;
+        if (count)
+            findings.push({ id: memory.id, findings: [...content.findings, ...summary.findings] });
+        // Drop the stale hash — serializeMemory re-computes it over the
+        // redacted bytes so the exported record stays self-consistent.
+        return count
+            ? { ...memory, content: content.text, summary: summary.text, contentHash: undefined }
+            : memory;
+    });
+
+    const recordLines = exportable.map((memory) => JSON.stringify(serializeMemory(memory)));
+    const header = {
+        format: CONTEXT_EXPORT_FORMAT,
+        version: CONTEXT_EXPORT_VERSION,
+        exportedAt: new Date().toISOString(),
+        generator: `openself ${packageVersion}`,
+        scope: scope || null,
+        includeRestricted,
+        count: memories.length,
+    };
+
+    // Cryptographic provenance: sign the record payload with the vault's
+    // Ed25519 identity (spec §4). `sign: false` opts out.
+    const identity = options.sign === false ? null : store.signingIdentity;
+    if (identity) {
+        header.exportHash = exportPayloadHash(recordLines);
+        header.signer = identity.fingerprint;
+        header.publicKey = identity.publicKey;
+        header.signature = identity.sign(header.exportHash);
+    }
+
+    const lines = [JSON.stringify(header), ...recordLines];
     const payload = `${lines.join('\n')}\n`;
 
     const result = {
@@ -50,6 +96,9 @@ export function exportMemories(store, options = {}) {
         includeRestricted,
         bytes: Buffer.byteLength(payload),
         dryRun: Boolean(options.dryRun),
+        signed: Boolean(identity),
+        signer: identity?.fingerprint || null,
+        secrets: summarizeFindings(findings, redact),
     };
 
     if (options.dryRun) return { ...result, memories };
@@ -113,6 +162,12 @@ export function parseContextExport(text) {
     for (let index = 1; index < lines.length; index++) {
         try {
             const raw = JSON.parse(lines[index]);
+            // Spec §3: a recomputed contentHash that differs marks a corrupt
+            // record — surface it as an error instead of importing tampered
+            // content.
+            if (raw.contentHash && memoryContentHash(raw.content) !== raw.contentHash) {
+                throw new Error('contentHash mismatch');
+            }
             records.push({
                 memory: {
                     id: raw.id,
@@ -199,7 +254,50 @@ export function validateContextExport(text) {
         }
         report.records += 1;
     }
+    verifyExportSignature(report, lines.slice(1));
     return report;
+}
+
+/**
+ * When the header carries a signature, the whole record payload must verify
+ * against the embedded public key — an invalid signature marks the export
+ * as tampered. Absent signatures are legal (unsigned exports exist) and are
+ * reported as `present: false`.
+ */
+function verifyExportSignature(report, recordLines) {
+    const { signature, publicKey, exportHash, signer } = report.header;
+    if (!signature && !publicKey && !exportHash) {
+        report.signature = { present: false };
+        return;
+    }
+    report.signature = { present: true, signer: signer || null, valid: false };
+    if (!signature || !publicKey || !exportHash || !signer) {
+        report.ok = false;
+        report.errors.push(
+            'line 1: incomplete signature block (signer/publicKey/exportHash/signature)',
+        );
+        return;
+    }
+    if (exportHash !== exportPayloadHash(recordLines)) {
+        report.ok = false;
+        report.errors.push('line 1: exportHash does not match the record payload');
+        return;
+    }
+    if (signer !== signingFingerprint(publicKey)) {
+        report.ok = false;
+        report.errors.push('line 1: signer does not match publicKey');
+        return;
+    }
+    if (!verifyPayload(publicKey, exportHash, signature)) {
+        report.ok = false;
+        report.errors.push('line 1: signature verification failed');
+        return;
+    }
+    report.signature.valid = true;
+}
+
+function scanMemory(memory) {
+    return [...scanForSecrets(memory.content), ...scanForSecrets(memory.summary || '')];
 }
 
 function clampImportedTrust(value) {

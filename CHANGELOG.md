@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-18
+
+### Added — cryptographic provenance, privacy tooling & release automation
+
+- **Signed vault identity.** Every vault generates a persistent Ed25519 keypair
+  (`<dataDir>/signing-key.json`, mode 0600) on first use. Explain receipts now
+  carry `signer` (key fingerprint) + `signature` over `contextHash`; exports
+  embed `signer`/`publicKey`/`exportHash`/`signature` in the header so any
+  consumer can verify integrity and origin offline. Tampered signed exports are
+  refused on import. `openself memory export --no-sign` opts out; `openself
+  doctor` reports the vault fingerprint.
+- **Secret hygiene on export.** Exports are scanned for credential-shaped
+  strings (AWS/GitHub/OpenAI/Slack/Google keys, JWTs, private-key blocks,
+  `key = value` assignments). Findings surface in the export report;
+  `--redact` strips them before hashing/signing.
+- **Memory hygiene.** `ContextStore.sweepExpired()` / `openself memory sweep`
+  forgets memories whose `validTo` has lapsed (`--dry-run` previews).
+- **Registry release automation.** The `release` workflow now publishes
+  `server.json` to the official MCP Registry via `mcp-publisher` GitHub OIDC —
+  no secrets required. CI uploads coverage to Codecov.
+- **New exports:** `loadSigningIdentity`, `signPayload`, `verifyPayload`,
+  `signingFingerprint`, `exportPayloadHash`, `scanForSecrets`, `redactSecrets`.
+
 ### Added — verifiable trust, pluggable embeddings, standards & distribution
 
 - **Tamper-evident access audit.** Completed MCP access events are hash-chained

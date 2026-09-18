@@ -12,6 +12,7 @@ import { cosineSimilarity } from './vectors.js';
 import { resolveVectorProvider } from './embeddings.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
+import { loadSigningIdentity } from './signing.js';
 
 export const VAULT_SCHEMA_VERSION = 3;
 
@@ -50,6 +51,7 @@ export class ContextStore {
             : options.dbPath || join(dataDir, 'context.db');
         const vaultDirectory =
             options.dataDir || (this.dbPath === ':memory:' ? null : dirname(this.dbPath));
+        this.dataDir = vaultDirectory;
         const encryptionKey =
             options.encryptionKey ||
             process.env.OPENSELF_VAULT_KEY ||
@@ -1098,8 +1100,43 @@ export class ContextStore {
                 contextHash: contextBlockHash(result.context),
                 vector: this._vectorIndexSummary(),
             });
+            // Cryptographic provenance: sign the rendered-context hash so a
+            // consumer can verify the receipt against this vault's identity.
+            const identity = this.signingIdentity;
+            if (identity) {
+                result.receipt.signer = identity.fingerprint;
+                result.receipt.signature = identity.sign(result.receipt.contextHash);
+            }
         }
         return result;
+    }
+
+    get signingIdentity() {
+        if (this._signing === undefined) {
+            this._signing = this.dataDir ? loadSigningIdentity(this.dataDir) : null;
+        }
+        return this._signing;
+    }
+
+    /**
+     * Forget active memories whose temporal validity has lapsed
+     * (`validTo < now`). Returns the swept ids; `dryRun` reports without
+     * writing.
+     */
+    sweepExpired(options = {}) {
+        const now = options.now || new Date().toISOString();
+        const limit = clamp(options.limit ?? 1000, 1, 100_000);
+        const rows = this.db
+            .prepare(
+                `SELECT id FROM memories
+                 WHERE status = 'active' AND valid_to IS NOT NULL AND valid_to < ?
+                 ORDER BY valid_to LIMIT ?`,
+            )
+            .all(now, limit);
+        const ids = rows.map((row) => row.id);
+        if (options.dryRun) return { swept: 0, expired: ids.length, ids };
+        for (const id of ids) this.forget(id);
+        return { swept: ids.length, expired: ids.length, ids };
     }
 
     _vectorIndexSummary() {

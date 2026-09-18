@@ -320,6 +320,13 @@ vault without the correct key and closes the SQLite handle on all initialization
 headless environments, `OPENSELF_VAULT_KEY` accepts exactly 32 bytes encoded as base64 or 64 hex
 characters; this bypasses OS-bound storage and shifts key protection to the operator.
 
+Separately from payload encryption, each vault directory holds `signing-key.json` — an Ed25519
+keypair (mode 0600) created on first signed operation. It signs context receipts (`contextHash`)
+and exchange-format exports (`exportHash`), giving consumers offline-verifiable integrity and
+origin. The key is not the encryption key: losing it only loses the ability to prove future
+signatures come from the same vault. Protect it like the vault — a copied key can impersonate
+the vault's signature.
+
 The following operational metadata remains plaintext so SQLite can enforce filters and lifecycle:
 memory UUID, type, scope, sensitivity, confidence, validity/event timestamps, status, lifecycle
 timestamps, vector model name, and row counts. Full file/page encryption requires a SQLCipher build

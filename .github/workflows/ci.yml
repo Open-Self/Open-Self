@@ -106,6 +106,13 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
 
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.13.0'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/coverage-final.json
+          fail_ci_if_error: false
+
       - name: CLI smoke — feed + help
         shell: bash
         run: |

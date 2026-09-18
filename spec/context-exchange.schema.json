@@ -30,7 +30,30 @@
                 "generator": { "type": "string", "maxLength": 200 },
                 "scope": { "type": ["string", "null"], "maxLength": 200 },
                 "includeRestricted": { "type": "boolean" },
-                "count": { "type": "integer", "minimum": 0 }
+                "count": { "type": "integer", "minimum": 0 },
+                "exportHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "description": "sha256(\"openself-export-v1\\n\" + join(recordLines, \"\\n\"))"
+                },
+                "signer": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "description": "sha256 fingerprint of the Ed25519 public key"
+                },
+                "publicKey": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "DER (SPKI) Ed25519 public key"
+                },
+                "signature": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Ed25519 signature over exportHash, domain openself-sign-v1"
+                }
+            },
+            "dependentRequired": {
+                "signature": ["signer", "publicKey", "exportHash"]
             },
             "additionalProperties": true
         },

@@ -3,7 +3,7 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
-## From v1.1.x to the next release (audit chain + embeddings)
+## From v1.1.x to v1.2.0 (audit chain, embeddings, signatures)
 
 No vault migration is required — the memory schema is unchanged.
 
@@ -17,6 +17,13 @@ No vault migration is required — the memory schema is unchanged.
   `openself memory index` — vectors are per-model, so old rows re-index lazily.
 - **Receipts and records** gain `contentHash` / `contextHash` fields; existing
   code ignoring unknown fields is unaffected.
+- **Vault signing identity.** The first signed operation (explain receipt or
+  export) creates `<dataDir>/signing-key.json` (Ed25519, mode 0600). Receipts
+  gain `signer`/`signature`; exports gain `signer`/`publicKey`/`exportHash`/
+  `signature`. Unsigned third-party exports still import; a *bad* signature is
+  refused. Export with `--no-sign` to opt out, `--redact` to strip secrets.
+- **`openself memory sweep`** forgets memories past `validTo` — safe to run any
+  time; `--dry-run` previews.
 
 ## From v1.0.x to v1.1.0
 
