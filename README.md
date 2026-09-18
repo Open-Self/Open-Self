@@ -11,11 +11,12 @@
 
 ### Your context. Your memory. Your rules.
 
-OpenSelf is the user-owned context layer for AI agents — one private context layer for
-Claude, Codex, ChatGPT, Cursor, local agents, and whatever comes next. It stores decisions,
-preferences, commitments, relationships, events, and facts with their source, time, scope,
-confidence, sensitivity, and trust — then exposes only the relevant context through MCP,
-an authenticated dashboard, or its JavaScript API.
+OpenSelf is the user-owned **Personal Context OS** for AI agents — one private context
+layer for Claude, Codex, ChatGPT, Cursor, local agents, and whatever comes next. It stores
+decisions, preferences, commitments, relationships, events, and facts with their source,
+time, scope, confidence, sensitivity, and trust — then its **Context Compiler** turns a
+task request into an exact, bounded, explainable context package for each agent, exposed
+through MCP, an authenticated dashboard, or its JavaScript API.
 
 Open source. Local-first. Bring your own model. Agents propose memories; you approve them.
 Your existing OpenSelf personality and messaging tools continue to work.
@@ -30,7 +31,13 @@ missing the information needed to tell whether a memory is current and trustwort
 memory explicit and portable:
 
 - **Source-attributed:** every memory can point back to a file, chat, meeting, or agent.
+- **Compiled, not just searched:** the Context Compiler applies the requester's policy
+  *before* candidates are exposed, resolves temporal truth (superseded, expired,
+  not-yet-valid), deduplicates, packs to exact budgets, and renders a signed receipt
+  explaining every selected, skipped, and policy-denied candidate.
 - **Time-aware:** `validFrom`, `validTo`, and `occurredAt` distinguish old beliefs from current ones.
+- **Lifecycle-aware:** `supersede` records when one memory replaces another — historical
+  queries still see the old truth; current-truth compilation never confuses them.
 - **Scoped:** keep personal context separate from `project/acme` or `relationship/minh`.
 - **Sensitivity-aware:** public, personal, private, and restricted memories are filtered at retrieval.
 - **Trust-aware:** every memory carries a source trust level (`untrusted` → `owner`), so
@@ -238,15 +245,56 @@ bound to the destination OS account. Existing destinations are refused. See the
 [backup and recovery guide](./docs/backup-recovery.md) for key recovery, automation,
 256 MiB archive limit, and the distinction from a whole application-directory backup.
 
+## Compile task context
+
+`openself context` runs the Context Compiler — the same pipeline agents reach through
+`openself_compile_context` — and `--explain` prints receipt v2, the signed record of
+every decision:
+
+```bash
+openself context "What database does Atlas use?" \
+    --task "answer the infra question" --agent codex --purpose debugging \
+    --scope project/atlas --max-chars 4000 --explain
+```
+
+```js
+const pkg = store.compileContext(
+    { query: 'atlas database', task: 'infra answer', scope: 'project/atlas', explain: true },
+    { policy }, // an AccessPolicy requester envelope — or { envelope } for local callers
+);
+pkg.context;     // the exact bounded block an agent receives
+pkg.receipt;     // v2 receipt: requester, filters, budgets, per-candidate decisions
+```
+
+Compilation resolves the vault's lifecycle before packing: superseded records stay
+queryable history but are excluded from current truth; expired/not-yet-valid records are
+skipped with reasons; identical content never consumes budget twice; policy-denied
+candidates appear on the receipt as id + contentHash + reason only. `includeSuperseded`
+and `includeStale` re-admit history explicitly when a task genuinely needs it.
+
+```js
+// Lifecycle + context graph
+const { memory: next } = store.supersede({ content: 'Use PostgreSQL' }, oldId);
+store.unsupersede(oldId);                          // reversible — history is kept
+store.addEdge(next.id, 'contradicts', other.id);   // typed relations
+const atlas = store.ensureEntity({ kind: 'project', canonical: 'Atlas' });
+store.linkEntity(next.id, atlas.id, 'works_on');
+store.timeline({ scope: 'project/atlas' });        // inspectable lifecycle feed
+```
+
 ## Run Context Vault evaluations
 
 ```bash
-npm run eval:context
+npm run eval:context    # retrieval recall/MRR, temporal, privacy, provenance
+npm run eval:compiler   # current-truth, policy, staleness, dedupe, cross-scope, receipts
 ```
 
-The checked-in, deterministic suite measures Recall@K, mean reciprocal rank, temporal correctness,
-sensitivity leakage, and provenance completeness. It exits non-zero when a versioned threshold is
-missed, making retrieval and privacy regressions suitable for CI gating.
+The checked-in, deterministic suites measure Recall@K, mean reciprocal rank, temporal correctness,
+sensitivity leakage, and provenance completeness — plus compiler-specific guarantees: current truth
+over supersession, policy compliance, staleness handling, redundancy control, cross-scope isolation,
+and receipt integrity. Both exit non-zero when a versioned threshold is missed, making retrieval and
+privacy regressions suitable for CI gating. `npm run benchmark:compiler` measures compile latency on
+large vaults.
 
 ## Connect an AI client with MCP
 
@@ -288,7 +336,10 @@ Example MCP client configuration:
 
 For per-agent scope, sensitivity, trust ceilings, and read/write/propose permissions, launch
 with `--policy /protected/mcp-policy.json --client atlas-reader`. Policy is fixed by the
-owner at startup; agent tool arguments cannot expand it.
+owner at startup; agent tool arguments can only narrow it. Policy v2 adds explicit `deny`
+scope roots (deny wins over allow), a `minSourceTrust` floor, requester `label`/`transport`
+metadata, and `budget` ceilings that cap any client-supplied `maxChars`/`maxTokens`/
+`maxItems`.
 [Agent permissions and audit](./docs/agent-permissions.md) covers configuration,
 trust boundaries, and the audit CLI.
 
@@ -330,7 +381,10 @@ OPENSELF_EMBEDDINGS_API_KEY=... openself mcp
 Async providers never block synchronous writes: memories are stored immediately
 and their vectors are drained by `openself memory index` (or automatically after
 each MCP mutation). `openself memory stats` reports the provider, model, and
-pending count. See [docs/embeddings.md](./docs/embeddings.md).
+pending count. Remote providers (any `openai-compatible` endpoint or non-loopback
+Ollama) never receive `restricted` memory content — indexing is capped below
+`restricted` (`embeddingIndexMaxSensitivity` overrides for trusted remotes).
+See [docs/embeddings.md](./docs/embeddings.md).
 
 To expose the vault over HTTP instead of stdio (e.g. for a shared workstation setup):
 
@@ -349,6 +403,7 @@ non-localhost binds without `--allow-remote` and an explicit token.
 |---|---|
 | `openself_search_memory` | Search active memories with scope/time/sensitivity/trust filters |
 | `openself_get_context` | Build a bounded, source-attributed context block; `explain` adds a selection receipt |
+| `openself_compile_context` | Full Context Compiler: task/purpose/agent hints, `asOf`, budgets, formats, and receipt v2 |
 | `openself_remember` | Store typed context with provenance and permissions |
 | `openself_propose_memory` | Propose a memory for owner review; lands in the inbox, not the vault |
 | `openself_list_memory_proposals` | List pending/recent proposals and their review state |
@@ -434,7 +489,10 @@ openself skill install             # or ~/.agents/skills for all projects
 
 Supported types are `fact`, `preference`, `decision`, `commitment`, `relationship`, `event`, and
 `note`. Source trust climbs `untrusted` → `external` → `trusted` → `verified` → `owner`; owner
-records default to `owner`, agent proposals and imports to `external`. SQLite is the source of
+records default to `owner`, agent proposals and imports to `external`. Memories carry lifecycle
+state — `supersededAt`/`supersededBy` mark records replaced by newer truth without erasing
+history — and link into a typed context graph (`memory_edges`, `entities`, `entity_aliases`)
+for contradiction, derivation, and entity-aware retrieval. SQLite is the source of
 truth. Unicode FTS5 results and deterministic 256-dimensional local feature vectors are combined
 with reciprocal-rank fusion. The storage API remains model-independent.
 
@@ -504,20 +562,26 @@ OpenSelf is **local-first**, not magically offline in every configuration.
 Files / project capture / chat exports / manual notes / agents
                     │
                     ▼
-          typed memory + provenance
+      typed memory + provenance + lifecycle + graph
                     │
                     ▼
-        SQLite source of truth + FTS5
+        SQLite source of truth + FTS5 + vectors
                     │
-          scope · time · sensitivity
+                    ▼
+              Context Compiler
+        request → policy envelope → candidates
+        → policy partition → temporal resolution
+        → ranking → dedupe → budget → package
                     │
              ┌──────┴──────┐
              ▼             ▼
-             MCP tools    JavaScript API
+       MCP tools +     JavaScript API
+       dashboard      (compileContext)
              │             │
              └──────┬──────┘
                     ▼
              AI clients/agents
+        (exact context + signed receipt v2)
 ```
 
 The authenticated localhost dashboard is a third interface over the same `ContextStore`; it does

@@ -140,6 +140,26 @@ try {
     assert.equal(block.usedChars, block.context.length);
     assert.ok(block.usedChars <= 500);
     assert.ok(block.context.includes(remembered.content));
+    const compiled = await client.callTool({
+        name: 'openself_compile_context',
+        arguments: { query: 'database', task: 'audit fixture', explain: true },
+    });
+    assert.equal(compiled.isError, undefined);
+    const package_ = JSON.parse(compiled.content[0].text);
+    assert.equal(package_.receipt.version, 2);
+    assert.equal(package_.receipt.requester.clientId, 'fixture');
+    assert.ok(package_.contextHash.length > 0);
+    assert.ok(!package_.context.includes('Hidden database decision'));
+    assert.ok(
+        package_.receipt.candidates.some(
+            (candidate) => candidate.decision === 'denied' && candidate.contentHash,
+        ),
+    );
+    const direct = store.compileContext(
+        { query: 'database', scope: 'project/fixture', explain: true },
+        { envelope: { clientId: 'smoke' } },
+    );
+    assert.equal(direct.receipt.version, 2);
     const dashboard = api.createContextServer({ store });
     await new Promise((resolve) => {
         http = dashboard.app.listen(0, '127.0.0.1', resolve);

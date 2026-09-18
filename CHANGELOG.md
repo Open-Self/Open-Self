@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Added — Context Compiler, context firewall & lifecycle graph
+
+- **Context Compiler.** `store.compileContext(request)` / `compileContextAsync` turn a
+  typed `ContextRequest` (query, task, agent, purpose, scope(s), type, entity,
+  sensitivity/trust floors, `asOf`, budgets, lifecycle flags) into an exact, bounded
+  `ContextPackage`: policy envelope → candidate discovery → policy partition →
+  temporal resolution → conflict detection → ranking → redundancy control → budget
+  packing → render → receipt. `buildContext` now delegates to the compiler and keeps
+  its stable v1 result shape; `openself context` gained `--task`, `--agent`,
+  `--purpose`, `--entity`, `--format`, `--max-tokens`, `--include-superseded`,
+  `--include-stale`; new MCP tool `openself_compile_context`; the dashboard Context
+  Debugger runs the compiler and renders receipt v2 including policy-denied rows.
+- **Receipt v2.** `explain` packages carry a version-2 receipt: requester identity
+  (clientId + label + agent), effective filters (allowed/denied/dropped scopes,
+  sensitivity ceiling, trust floor), budget usage, per-candidate decisions
+  (`selected`/`skipped`/`denied` with reasons: `within-budget`, `over-budget`,
+  `duplicate-content`, `expired`, `not-yet-valid`, `superseded-by:*`,
+  `policy-scope`/`policy-sensitivity`/`policy-trust`), declared conflicts, and the
+  signed `contextHash` citation. Policy-denied candidates are reported as
+  id + contentHash + reason only — denied content and its scope/type metadata
+  never appear in the package or the receipt.
+- **Policy v2.** MCP client policies accept `deny` scope roots (deny wins over
+  allow), `minSourceTrust` requester floors, `label`/`transport` metadata, and
+  `budget` ceilings (`maxChars`/`maxTokens`/`maxItems`). Requests can only narrow
+  the envelope — never widen it; version-1 policy files keep working unchanged.
+  New `AccessPolicy.clampBudget()`, `.denies()`, `deniedScopes`, `minSourceTrust`,
+  `label`, `transport`, `budget`, and `listMcpPolicyClients()`.
+- **Lifecycle & context graph (schema v4).** Memories carry `supersededAt` /
+  `supersededBy`: superseded records stay retrievable for historical queries while
+  current-truth compilation excludes them. `store.supersede(input, id, {at})` /
+  `unsupersede(id)` manage the lifecycle; `memory_edges` stores typed relations
+  (`supersedes`, `contradicts`, `relates_to`, …); `entities` + `entity_aliases` +
+  `memory_entities` model people/projects/systems with alias resolution and
+  reversible merges (`ensureEntity`, `findEntity`, `listEntities`, `addEntityAlias`,
+  `mergeEntities`, `linkEntity`/`unlinkEntity`, `entitiesForMemory`,
+  `memoriesForEntity`). `store.timeline()` exposes an inspectable lifecycle feed.
+  Schema migrates in place from v3 (and earlier) preserving all data.
+- **Compiler evaluation.** `npm run eval:compiler` scores the compiler corpus
+  (`evals/context-compiler.json`) across current-truth, temporal, policy,
+  staleness, redundancy, cross-scope, and receipt-integrity groups;
+  `evaluateCompilerVault` is exported. `npm run benchmark:compiler` measures
+  compile latency on large vaults with supersession chains and entities.
+- **Embedding privacy boundary.** Remote embedding providers (`openai-compatible`,
+  non-loopback `ollama`, and any provider without a declared `locality`) no longer
+  receive `restricted` memory content: indexing is capped below `restricted`
+  (`embeddingIndexMaxSensitivity` overrides). Forgotten memories are also skipped
+  during pending-vector backfill. Providers declare `locality: 'local'|'remote'`;
+  feature-hash remains fully local.
+- **New exports:** `ContextCompiler`, `contextRequestSchema`,
+  `normalizeContextRequest`, `COMPILER_VERSION`, `CONTEXT_FORMATS`,
+  `RETRIEVAL_MODES`, `PURPOSE_TYPE_AFFINITY`, `EDGE_PREDICATES`, `ENTITY_KINDS`,
+  `ensureEntity`, `findEntity`, `listEntities`, `mergeEntities`,
+  `listMcpPolicyClients`, `evaluateCompilerVault`.
+
+### Changed
+
+- `buildContext`/`buildContextAsync` delegate to the Context Compiler and project
+  receipts back to the v1 shape — identical output contract, stronger guarantees
+  (policy partition, temporal resolution, deduplication, conflict surfacing).
+- `ContextStore` schema version is now **4** (adds `superseded_at`, `superseded_by`,
+  `memory_edges`, `entities`, `entity_aliases`, `memory_entities`).
+
 ## [1.2.0] - 2026-09-18
 
 ### Added — cryptographic provenance, privacy tooling & release automation

@@ -131,19 +131,44 @@ export function createContextServer(options = {}) {
         res.json({ potentialConflicts: store.findPotentialConflicts(req.body, req.body) });
     });
 
-    // Context Debugger: buildContext with an explain receipt. Read-only —
-    // mirrors what an agent would receive for the same query.
+    // Context Debugger: compileContext with an explain receipt. Read-only —
+    // mirrors what an agent would receive for the same request.
     api.get('/debug', (req, res) => {
         const query = optionalString(req.query.q);
         if (!query) return res.status(400).json({ error: 'q query parameter is required' });
-        const result = store.buildContext(query, {
-            scope: optionalString(req.query.scope),
-            retrieval: optionalString(req.query.retrieval) || 'hybrid',
-            maxChars: numberParam(req.query.maxChars, 8_000),
-            minSourceTrust: optionalString(req.query.minSourceTrust),
-            asOf: optionalString(req.query.asOf),
-            explain: true,
-        });
+        const result = store.compileContext(
+            {
+                query,
+                task: optionalString(req.query.task),
+                agent: optionalString(req.query.agent),
+                purpose: optionalString(req.query.purpose),
+                scope: optionalString(req.query.scope),
+                retrieval: optionalString(req.query.retrieval) || 'hybrid',
+                format: optionalString(req.query.format) || 'block',
+                minSourceTrust: optionalString(req.query.minSourceTrust),
+                asOf: optionalString(req.query.asOf),
+                includeSuperseded: req.query.includeSuperseded === 'true',
+                includeStale: req.query.includeStale === 'true',
+                explain: true,
+                budget: {
+                    maxChars: numberParam(req.query.maxChars, 8_000),
+                    maxTokens: numberParam(req.query.maxTokens, undefined),
+                    maxItems: numberParam(req.query.limit, undefined),
+                },
+            },
+            {
+                envelope: {
+                    clientId: 'dashboard',
+                    maxSensitivity: optionalString(req.query.maxSensitivity) || 'restricted',
+                    minSourceTrust: optionalString(req.query.minSourceTrust) || 'untrusted',
+                    budget: {
+                        maxChars: numberParam(req.query.maxChars, 8_000),
+                        maxTokens: numberParam(req.query.maxTokens, undefined),
+                        maxItems: numberParam(req.query.limit, undefined),
+                    },
+                },
+            },
+        );
         return res.json(result);
     });
 

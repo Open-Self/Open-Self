@@ -67,9 +67,32 @@ export {
 export { VaultCodec, PlaintextCodec, normalizeKey } from './context/vault-crypto.js';
 export { VaultKeyManager, loadConfiguredVaultKey } from './context/vault-key-manager.js';
 export { evaluateContextVault } from './context/evaluator.js';
+export { evaluateCompilerVault } from './context/compiler-evaluator.js';
 export { backupVault, restoreVault } from './context/backup.js';
-export { AccessPolicy, loadMcpPolicy, MCP_CAPABILITIES } from './context/access-policy.js';
+export {
+    AccessPolicy,
+    loadMcpPolicy,
+    listMcpPolicyClients,
+    MCP_CAPABILITIES,
+} from './context/access-policy.js';
 export { AccessAudit, auditEntryHash } from './context/access-audit.js';
+export { ContextCompiler } from './context/compiler.js';
+export {
+    contextRequestSchema,
+    normalizeContextRequest,
+    COMPILER_VERSION,
+    CONTEXT_FORMATS,
+    RETRIEVAL_MODES,
+    PURPOSE_TYPE_AFFINITY,
+} from './context/context-request.js';
+export {
+    EDGE_PREDICATES,
+    ENTITY_KINDS,
+    ensureEntity,
+    findEntity,
+    listEntities,
+    mergeEntities,
+} from './context/graph.js';
 
 // Week 3
 export { CloneArena } from './arena/arena.js';

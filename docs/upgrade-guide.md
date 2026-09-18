@@ -3,6 +3,30 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.2.x to v1.3.0 (Context Compiler, lifecycle, policy v2)
+
+Opening a vault migrates it to SQLite **schema 4** in place, preserving all memory data:
+
+- **New columns** `superseded_at` / `superseded_by` (both NULL for existing rows — every
+  memory stays active).
+- **New tables** `memory_edges`, `entities`, `entity_aliases`, `memory_entities` —
+  empty until you link or merge.
+- **`buildContext` behavior.** It now delegates to the Context Compiler and projects the
+  receipt back to the v1 shape. Output is the same contract, but identical-content
+  candidates are deduplicated and superseded/expired records resolve temporally — callers
+  relying on receiving every lexical hit may see tighter results.
+- **Policy v2** is opt-in. Version-1 policy files load unchanged; add `deny`,
+  `minSourceTrust`, `budget`, `label`, `transport` per client when needed. Unknown
+  versions still fail closed.
+- **Remote embedding privacy.** Remote providers (`openai-compatible`, non-loopback
+  Ollama) no longer index `restricted` content. Existing restricted vectors already
+  stored for remote models remain but receive no new content; switch
+  `embeddingIndexMaxSensitivity` only for remotes you trust.
+- **New surfaces:** `compileContext`/`compileContextAsync`, `openself_compile_context`,
+  lifecycle APIs (`supersede`, `unsupersede`, `timeline`), graph APIs (`addEdge`,
+  `ensureEntity`, `mergeEntities`, …), `npm run eval:compiler`,
+  `npm run benchmark:compiler`.
+
 ## From v1.1.x to v1.2.0 (audit chain, embeddings, signatures)
 
 No vault migration is required — the memory schema is unchanged.

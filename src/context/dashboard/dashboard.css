@@ -466,6 +466,13 @@ summary {
 .receipt-table tr.row-skipped td {
     color: var(--muted);
 }
+.receipt-table tr.row-denied td {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+.receipt-table tr.row-denied td:first-child {
+    color: var(--danger, #e07a6a);
+}
 
 /* Memory Inbox */
 .inbox-filters {

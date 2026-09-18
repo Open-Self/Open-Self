@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
-    contextBlockHash,
     contextDateSchema,
     memoryContentHash,
     normalizeMemory,
@@ -13,8 +12,27 @@ import { resolveVectorProvider } from './embeddings.js';
 import { PlaintextCodec, VaultCodec } from './vault-crypto.js';
 import { loadConfiguredVaultKey } from './vault-key-manager.js';
 import { loadSigningIdentity } from './signing.js';
+import { ContextCompiler } from './compiler.js';
+import {
+    addAlias,
+    addEdge,
+    edgesFor,
+    ensureEntity,
+    entitiesForMemory,
+    findEntity,
+    linkMemoryEntity,
+    listEntities,
+    memoriesForEntity,
+    mergeEntities,
+    removeEdge,
+    supersedeMemory,
+    supersededIds,
+    timeline,
+    unlinkMemoryEntity,
+    unsupersedeMemory,
+} from './graph.js';
 
-export const VAULT_SCHEMA_VERSION = 3;
+export const VAULT_SCHEMA_VERSION = 4;
 
 const SELECT_COLUMNS = `
     memories.id, memories.type, memories.content, memories.summary,
@@ -22,7 +40,7 @@ const SELECT_COLUMNS = `
     memories.scope, memories.sensitivity, memories.confidence, memories.source_trust,
     memories.valid_from, memories.valid_to, memories.occurred_at,
     memories.tags, memories.status, memories.created_at, memories.updated_at,
-    memories.forgotten_at
+    memories.forgotten_at, memories.superseded_at, memories.superseded_by
 `;
 
 const PROPOSAL_SELECT_COLUMNS = `
@@ -62,6 +80,12 @@ export class ContextStore {
             mkdirSync(dirname(this.dbPath), { recursive: true });
         }
 
+        // Remote embedding providers never receive `restricted` content:
+        // indexing is capped one level below it. Local providers (or an
+        // explicit owner override) keep full-sensitivity recall.
+        this.indexMaxSensitivity =
+            options.embeddingIndexMaxSensitivity ||
+            (this.vectorProvider.locality === 'local' ? 'restricted' : 'private');
         this.db = new Database(Buffer.isBuffer(options.dbPath) ? options.dbPath : this.dbPath);
         try {
             if (this.db.pragma('user_version', { simple: true }) > VAULT_SCHEMA_VERSION) {
@@ -103,7 +127,9 @@ export class ContextStore {
                 status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'forgotten')),
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                forgotten_at TEXT
+                forgotten_at TEXT,
+                superseded_at TEXT,
+                superseded_by TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_memories_scope_status
@@ -175,6 +201,52 @@ export class ContextStore {
 
             CREATE INDEX IF NOT EXISTS idx_memory_proposals_status
                 ON memory_proposals(status, proposed_at);
+
+            CREATE TABLE IF NOT EXISTS memory_edges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                predicate TEXT NOT NULL,
+                object TEXT NOT NULL,
+                source_kind TEXT NOT NULL DEFAULT 'owner',
+                confidence REAL NOT NULL DEFAULT 1 CHECK(confidence >= 0 AND confidence <= 1),
+                created_at TEXT NOT NULL,
+                UNIQUE(subject, predicate, object)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_memory_edges_subject
+                ON memory_edges(subject, predicate);
+            CREATE INDEX IF NOT EXISTS idx_memory_edges_object
+                ON memory_edges(object, predicate);
+
+            CREATE TABLE IF NOT EXISTS entities (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL DEFAULT 'thing',
+                canonical TEXT NOT NULL,
+                scope TEXT NOT NULL DEFAULT 'personal',
+                merged_into TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS entity_aliases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT NOT NULL REFERENCES entities(id),
+                alias TEXT NOT NULL COLLATE NOCASE,
+                created_at TEXT NOT NULL,
+                UNIQUE(alias)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_entity_aliases_entity
+                ON entity_aliases(entity_id);
+
+            CREATE TABLE IF NOT EXISTS memory_entities (
+                memory_id TEXT NOT NULL REFERENCES memories(id),
+                entity_id TEXT NOT NULL REFERENCES entities(id),
+                role TEXT NOT NULL DEFAULT 'mentions',
+                PRIMARY KEY (memory_id, entity_id, role)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_memory_entities_entity
+                ON memory_entities(entity_id);
         `);
         // v2 -> v3: source trust column + proposal inbox. Existing owner vaults
         // were written without untrusted-agent separation, so their rows keep
@@ -188,6 +260,15 @@ export class ContextStore {
             this.db.exec(
                 "ALTER TABLE memories ADD COLUMN source_trust TEXT NOT NULL DEFAULT 'owner'",
             );
+        }
+        // v3 -> v4: supersession columns. Supersession is a lifecycle dimension
+        // separate from `status` — a superseded memory stays retrievable for
+        // historical queries, unlike a forgotten one.
+        if (!memoryColumns.includes('superseded_at')) {
+            this.db.exec('ALTER TABLE memories ADD COLUMN superseded_at TEXT');
+        }
+        if (!memoryColumns.includes('superseded_by')) {
+            this.db.exec('ALTER TABLE memories ADD COLUMN superseded_by TEXT');
         }
         if (this.db.pragma('user_version', { simple: true }) !== VAULT_SCHEMA_VERSION) {
             this.db.pragma(`user_version = ${VAULT_SCHEMA_VERSION}`);
@@ -479,10 +560,17 @@ export class ContextStore {
         );
     }
 
+    _indexable(memory) {
+        return (
+            memory.status === 'active' &&
+            sensitivityRank(memory.sensitivity) <= sensitivityRank(this.indexMaxSensitivity)
+        );
+    }
+
     _writeVector(memory) {
         // Async providers index lazily via indexPending() — synchronous
         // mutation paths never block on a network embedding call.
-        if (!this.vectorSync) return;
+        if (!this.vectorSync || !this._indexable(memory)) return;
         const vector = this.vectorEncoder.encode(vectorText(memory));
         this._insertVector(memory.id, vector, memory.updatedAt);
     }
@@ -502,11 +590,19 @@ export class ContextStore {
                 `SELECT ${SELECT_COLUMNS}
                  FROM memories
                  LEFT JOIN memory_vectors ON memory_vectors.memory_id = memories.id
-                 WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != @model
+                 WHERE (memory_vectors.memory_id IS NULL OR memory_vectors.model != @model)
+                   AND memories.status = 'active'
+                   AND CASE memories.sensitivity
+                       WHEN 'public' THEN 0 WHEN 'personal' THEN 1
+                       WHEN 'private' THEN 2 ELSE 3 END <= @indexCap
                  ORDER BY memories.created_at ASC
                  LIMIT @limit`,
             )
-            .all({ model: this.vectorProvider.model, limit });
+            .all({
+                model: this.vectorProvider.model,
+                indexCap: sensitivityRank(this.indexMaxSensitivity),
+                limit,
+            });
     }
 
     _pendingVectorCount() {
@@ -516,9 +612,14 @@ export class ContextStore {
                     `SELECT COUNT(*) AS count
                      FROM memories
                      LEFT JOIN memory_vectors ON memory_vectors.memory_id = memories.id
-                     WHERE memory_vectors.memory_id IS NULL OR memory_vectors.model != ?`,
+                     WHERE (memory_vectors.memory_id IS NULL OR memory_vectors.model != ?)
+                       AND memories.status = 'active'
+                       AND CASE memories.sensitivity
+                           WHEN 'public' THEN 0 WHEN 'personal' THEN 1
+                           WHEN 'private' THEN 2 ELSE 3 END <= ?`,
                 )
-                .get(this.vectorProvider.model).count || 0,
+                .get(this.vectorProvider.model, sensitivityRank(this.indexMaxSensitivity)).count ||
+                0,
         );
     }
 
@@ -724,6 +825,59 @@ export class ContextStore {
         return this._mergeTransaction(primaryId, ids, changes);
     }
 
+    /**
+     * Lifecycle + context-graph delegates (implemented in graph.js — they run
+     * inside this store's transactions and share its codec).
+     */
+    supersede(input, supersededId, options) {
+        return supersedeMemory(this, input, supersededId, options);
+    }
+    unsupersede(id) {
+        return unsupersedeMemory(this, id);
+    }
+    addEdge(subject, predicate, object, options) {
+        return addEdge(this, subject, predicate, object, options);
+    }
+    removeEdge(subject, predicate, object) {
+        return removeEdge(this, subject, predicate, object);
+    }
+    edges(id, options) {
+        return edgesFor(this, id, options);
+    }
+    supersededIds(asOf) {
+        return supersededIds(this, asOf);
+    }
+    ensureEntity(input) {
+        return ensureEntity(this, input);
+    }
+    findEntity(nameOrId) {
+        return findEntity(this, nameOrId);
+    }
+    listEntities(options) {
+        return listEntities(this, options);
+    }
+    addEntityAlias(entityId, alias) {
+        return addAlias(this, entityId, alias);
+    }
+    mergeEntities(primaryId, duplicateIds) {
+        return mergeEntities(this, primaryId, duplicateIds);
+    }
+    linkEntity(memoryId, entityId, role) {
+        return linkMemoryEntity(this, memoryId, entityId, role);
+    }
+    unlinkEntity(memoryId, entityId, role) {
+        return unlinkMemoryEntity(this, memoryId, entityId, role);
+    }
+    entitiesForMemory(memoryId) {
+        return entitiesForMemory(this, memoryId);
+    }
+    memoriesForEntity(entityId, options) {
+        return memoriesForEntity(this, entityId, options);
+    }
+    timeline(options) {
+        return timeline(this, options);
+    }
+
     get(id, options = {}) {
         const row = this.statements.get.get(id);
         if (!row || (!options.includeForgotten && row.status !== 'active')) return null;
@@ -820,13 +974,14 @@ export class ContextStore {
                    AND memories.status = 'active'
                    AND (@scope IS NULL OR memories.scope = @scope OR substr(memories.scope, 1, length(@scope) + 1) = @scope || '/')
                    AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
+                   AND ${DENIED_SCOPES_SQL}
                    AND (@type IS NULL OR memories.type = @type)
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
                        WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
                    AND ${TRUST_RANK_SQL} >= @minTrustRank
-                   AND (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf))
-                   AND (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf))
+                   AND (@anyTime = 1 OR (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf)))
+                   AND (@anyTime = 1 OR (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf)))
                  ORDER BY rank ASC, confidence DESC, context_timestamp(COALESCE(occurred_at, created_at)) DESC
                  LIMIT @limit`,
             )
@@ -852,13 +1007,14 @@ export class ContextStore {
                  WHERE memories.status = 'active'
                    AND (@scope IS NULL OR memories.scope = @scope OR substr(memories.scope, 1, length(@scope) + 1) = @scope || '/')
                    AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
+                   AND ${DENIED_SCOPES_SQL}
                    AND (@type IS NULL OR memories.type = @type)
                    AND CASE memories.sensitivity
                        WHEN 'public' THEN 0 WHEN 'personal' THEN 1
                        WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
                    AND ${TRUST_RANK_SQL} >= @minTrustRank
-                   AND (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf))
-                   AND (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf))
+                   AND (@anyTime = 1 OR (memories.valid_from IS NULL OR context_timestamp(memories.valid_from) <= context_timestamp(@asOf)))
+                   AND (@anyTime = 1 OR (memories.valid_to IS NULL OR context_timestamp(memories.valid_to) >= context_timestamp(@asOf)))
                  ORDER BY context_timestamp(COALESCE(memories.occurred_at, memories.created_at)) DESC
                  LIMIT @limit`,
             )
@@ -939,7 +1095,8 @@ export class ContextStore {
     // Metadata eligibility precedes the candidate budget. Unlike point-in-time
     // search, conflicts span the entire proposed interval (null = unbounded).
     _conflictRows(memory, options) {
-        const { sensitivityRank, allowedScopes, minTrustRank } = searchParams(options);
+        const { sensitivityRank, allowedScopes, deniedScopes, minTrustRank } =
+            searchParams(options);
         return this.db
             .prepare(
                 `
@@ -948,6 +1105,7 @@ export class ContextStore {
             WHERE memories.status = 'active'
               AND memories.scope = @scope AND memories.type = @type
               AND (@allowedScopes IS NULL OR EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/'))
+              AND ${DENIED_SCOPES_SQL}
               AND CASE memories.sensitivity WHEN 'public' THEN 0 WHEN 'personal' THEN 1
                   WHEN 'private' THEN 2 ELSE 3 END <= @sensitivityRank
               AND ${TRUST_RANK_SQL} >= @minTrustRank
@@ -963,6 +1121,7 @@ export class ContextStore {
                 type: memory.type,
                 sensitivityRank,
                 allowedScopes,
+                deniedScopes,
                 minTrustRank,
                 excludeIds: JSON.stringify(options.excludeIds || []),
                 start: memory.validFrom ?? null,
@@ -1004,6 +1163,12 @@ export class ContextStore {
                 "EXISTS (SELECT 1 FROM json_each(@allowedScopes) AS permitted WHERE memories.scope = permitted.value OR substr(memories.scope, 1, length(permitted.value) + 1) = permitted.value || '/')",
             );
         }
+        if (options.deniedScopes !== undefined) {
+            params.deniedScopes = JSON.stringify(options.deniedScopes);
+            clauses.push(
+                "NOT EXISTS (SELECT 1 FROM json_each(@deniedScopes) AS denied WHERE memories.scope = denied.value OR substr(memories.scope, 1, length(denied.value) + 1) = denied.value || '/')",
+            );
+        }
         if (options.maxSensitivity) {
             params.sensitivityRank = searchParams(options).sensitivityRank;
             clauses.push(
@@ -1036,79 +1201,55 @@ export class ContextStore {
         return rows.map((row) => fromRow(row, this.codec));
     }
 
+    /**
+     * Compile a Context Request into a Context Package — the primary
+     * agent-facing API. `options.policy` supplies the requester envelope;
+     * `options.envelope` accepts a raw filter envelope for trusted callers.
+     */
+    compileContext(request, options = {}) {
+        return new ContextCompiler(this).compile(request, options);
+    }
+
+    /** Async compileContext — awaits async embedding providers. */
+    async compileContextAsync(request, options = {}) {
+        return new ContextCompiler(this).compileAsync(request, options);
+    }
+
     buildContext(query, options = {}) {
-        const asOf = contextDateSchema.parse(
-            options.asOf === undefined ? new Date().toISOString() : options.asOf,
+        const pkg = this.compileContext(
+            {
+                query,
+                scope: options.scope,
+                type: options.type,
+                maxSensitivity: options.maxSensitivity,
+                minSourceTrust: options.minSourceTrust,
+                asOf: options.asOf,
+                retrieval: options.retrieval || 'hybrid',
+                explain: Boolean(options.explain),
+                budget: { maxChars: options.maxChars, maxItems: options.limit },
+            },
+            { envelope: legacyEnvelope(options) },
         );
-        const memories = this.search(query, {
-            ...options,
-            asOf,
-            limit: options.limit || 12,
-        });
-        return this._composeContext(query, options, memories, asOf);
+        return legacyContextBlock(query, options, pkg);
     }
 
     /** Async buildContext — awaits async embedding providers for the query leg. */
     async buildContextAsync(query, options = {}) {
-        if (this.vectorSync) return this.buildContext(query, options);
-        const asOf = contextDateSchema.parse(
-            options.asOf === undefined ? new Date().toISOString() : options.asOf,
-        );
-        const memories = await this.searchAsync(query, {
-            ...options,
-            asOf,
-            limit: options.limit || 12,
-        });
-        return this._composeContext(query, options, memories, asOf);
-    }
-
-    _composeContext(query, options, memories, asOf) {
-        const explain = Boolean(options.explain);
-        const limit = options.limit || 12;
-        const maxChars = clamp(options.maxChars ?? 8_000, 500, 50_000);
-        const selected = [];
-        const skipped = [];
-        let usedChars = 0;
-
-        for (const memory of memories) {
-            const rendered = renderMemory(memory);
-            const addedChars = rendered.length + (selected.length > 0 ? 2 : 0);
-            if (usedChars + addedChars > maxChars) {
-                skipped.push({ memory, addedChars });
-                continue;
-            }
-            selected.push({ ...memory, rendered, addedChars });
-            usedChars += addedChars;
-        }
-
-        const result = {
-            query,
-            context: selected.map((memory) => memory.rendered).join('\n\n'),
-            memories: selected.map(({ rendered: _rendered, ...memory }) => memory),
-            usedChars,
-        };
-        if (explain) {
-            result.receipt = contextReceipt({
+        const pkg = await this.compileContextAsync(
+            {
                 query,
-                options,
-                asOf,
-                maxChars,
-                limit,
-                selected,
-                skipped,
-                usedChars,
-                contextHash: contextBlockHash(result.context),
-                vector: this._vectorIndexSummary(),
-            });
-            // Cryptographic provenance: sign the rendered-context hash so a
-            // consumer can verify the receipt against this vault's identity.
-            const identity = this.signingIdentity;
-            if (identity) {
-                result.receipt.signer = identity.fingerprint;
-                result.receipt.signature = identity.sign(result.receipt.contextHash);
-            }
-        }
-        return result;
+                scope: options.scope,
+                type: options.type,
+                maxSensitivity: options.maxSensitivity,
+                minSourceTrust: options.minSourceTrust,
+                asOf: options.asOf,
+                retrieval: options.retrieval || 'hybrid',
+                explain: Boolean(options.explain),
+                budget: { maxChars: options.maxChars, maxItems: options.limit },
+            },
+            { envelope: legacyEnvelope(options) },
+        );
+        return legacyContextBlock(query, options, pkg);
     }
 
     get signingIdentity() {
@@ -1231,6 +1372,8 @@ function fromRow(row, codec) {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         forgottenAt: row.forgotten_at,
+        supersededAt: row.superseded_at ?? null,
+        supersededBy: row.superseded_by ?? null,
     };
 }
 
@@ -1252,7 +1395,7 @@ function vectorText(memory) {
     return `${memory.content}\n${memory.summary}\n${memory.tags.join(' ')}`;
 }
 
-function renderMemory(memory) {
+export function renderMemory(memory) {
     const date = memory.occurredAt || memory.validFrom || memory.createdAt;
     const source = memory.source.title || memory.source.locator || memory.source.kind;
     const trust = memory.sourceTrust || 'owner';
@@ -1284,9 +1427,20 @@ function searchParams(options) {
         sensitivityRank,
         minTrustRank,
         asOf: options.asOf || new Date().toISOString(),
+        deniedScopes:
+            options.deniedScopes === undefined ? null : JSON.stringify(options.deniedScopes),
+        // Compiler discovery: skip the SQL validity window so the pipeline can
+        // classify candidates as current/expired/not-yet-valid itself.
+        anyTime: options.anyTime ? 1 : 0,
         limit: clamp(options.limit ?? 10, 1, 20_000),
     };
 }
+
+const DENIED_SCOPES_SQL = `(@deniedScopes IS NULL OR NOT EXISTS (
+    SELECT 1 FROM json_each(@deniedScopes) AS denied
+    WHERE memories.scope = denied.value
+       OR substr(memories.scope, 1, length(denied.value) + 1) = denied.value || '/'
+))`;
 
 const TRUST_RANK_SQL = `CASE memories.source_trust
     WHEN 'untrusted' THEN 0 WHEN 'external' THEN 1 WHEN 'trusted' THEN 2
@@ -1363,82 +1517,108 @@ function fuseRankings(lexical, vector, limit) {
     });
 }
 
-function trustRank(value) {
+export function trustRank(value) {
     const rank = SOURCE_TRUST_LEVELS.indexOf(value);
     return rank < 0 ? SOURCE_TRUST_LEVELS.indexOf('owner') : rank;
 }
 
-function contextReceipt({
-    query,
-    options,
-    asOf,
-    maxChars,
-    limit,
-    selected,
-    skipped,
-    usedChars,
-    contextHash,
-    vector,
-}) {
-    const asOfMs = Date.parse(asOf);
-    const entry = (memory, decision, reason, addedChars) => {
-        const eventTime = Date.parse(
-            memory.occurredAt || memory.validFrom || memory.createdAt || asOf,
-        );
-        return {
-            id: memory.id,
-            contentHash: memory.contentHash || memoryContentHash(memory.content),
-            type: memory.type,
-            scope: memory.scope,
-            sensitivity: memory.sensitivity,
-            sourceTrust: memory.sourceTrust || 'owner',
-            confidence: memory.confidence,
-            source: {
-                kind: memory.source?.kind || 'unknown',
-                locator: memory.source?.locator || '',
-                title: memory.source?.title || '',
-            },
-            relevance: memory.relevance ?? null,
-            match: memory.match || null,
-            recencyDays: Number.isFinite(eventTime)
-                ? Number(((asOfMs - eventTime) / 86_400_000).toFixed(2))
-                : null,
-            decision,
-            reason,
-            chars: addedChars,
-        };
-    };
+export function sensitivityRank(value) {
+    return ['public', 'personal', 'private', 'restricted'].indexOf(value);
+}
+
+/**
+ * buildContext compatibility: translate the legacy option bag into a raw
+ * envelope (no configured requester — filters are applied directly).
+ */
+function legacyEnvelope(options) {
     return {
-        version: 1,
-        query,
-        asOf,
-        contextHash,
-        vector,
-        retrieval: options.retrieval || 'hybrid',
-        filters: {
-            scope: options.scope || null,
-            allowedScopes: options.allowedScopes === undefined ? null : [...options.allowedScopes],
-            type: options.type || null,
-            maxSensitivity: options.maxSensitivity || null,
-            minSourceTrust: options.minSourceTrust || null,
-        },
-        limits: { maxChars, limit },
-        candidates: [
-            ...selected.map((item) => entry(item, 'selected', 'within-budget', item.addedChars)),
-            ...skipped.map((item) =>
-                entry(item.memory, 'skipped', 'over-character-budget', item.addedChars),
-            ),
-        ],
-        totals: {
-            candidates: selected.length + skipped.length,
-            selected: selected.length,
-            skipped: skipped.length,
-            usedChars,
-        },
+        clientId: 'local',
+        allowedScopes: options.allowedScopes,
+        deniedScopes: options.deniedScopes,
+        maxSensitivity: options.maxSensitivity || 'restricted',
+        minSourceTrust: options.minSourceTrust || 'untrusted',
+        budget: { maxChars: options.maxChars, maxItems: options.limit },
     };
 }
 
-function clamp(value, min, max) {
+/** Project a Context Package back to the stable v1 ContextBlock contract. */
+function legacyContextBlock(query, options, pkg) {
+    const result = {
+        query,
+        context: pkg.context,
+        memories: pkg.memories.map(
+            ({ temporalStatus: _t, lifecycle: _l, selectionReason: _s, ...memory }) => memory,
+        ),
+        usedChars: pkg.usedChars,
+    };
+    if (pkg.receipt) {
+        const receipt = pkg.receipt;
+        const candidates = receipt.candidates
+            .filter((candidate) => candidate.decision !== 'denied')
+            .map(
+                ({
+                    id,
+                    contentHash,
+                    type,
+                    scope,
+                    sensitivity,
+                    sourceTrust,
+                    confidence,
+                    source,
+                    relevance,
+                    match,
+                    recencyDays,
+                    decision,
+                    reason,
+                    chars,
+                }) => ({
+                    id,
+                    contentHash,
+                    type,
+                    scope,
+                    sensitivity,
+                    sourceTrust,
+                    confidence,
+                    source,
+                    relevance,
+                    match,
+                    recencyDays,
+                    decision,
+                    reason,
+                    chars,
+                }),
+            );
+        result.receipt = {
+            version: 1,
+            query: receipt.query,
+            asOf: receipt.asOf,
+            contextHash: receipt.contextHash,
+            vector: receipt.vector,
+            retrieval: receipt.retrieval,
+            filters: {
+                scope: options.scope || null,
+                allowedScopes:
+                    options.allowedScopes === undefined ? null : [...options.allowedScopes],
+                type: options.type || null,
+                maxSensitivity: options.maxSensitivity || null,
+                minSourceTrust: options.minSourceTrust || null,
+            },
+            limits: { maxChars: receipt.budget.maxChars, limit: receipt.budget.maxItems },
+            candidates,
+            totals: {
+                candidates: candidates.length,
+                selected: receipt.totals.selected,
+                skipped: candidates.length - receipt.totals.selected,
+                usedChars: receipt.totals.usedChars,
+            },
+        };
+        if (receipt.signer) result.receipt.signer = receipt.signer;
+        if (receipt.signature) result.receipt.signature = receipt.signature;
+    }
+    return result;
+}
+
+export function clamp(value, min, max) {
     const number = Number(value);
     if (!Number.isFinite(number)) return min;
     return Math.min(Math.max(Math.trunc(number), min), max);

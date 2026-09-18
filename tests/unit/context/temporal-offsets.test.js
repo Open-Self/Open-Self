@@ -70,11 +70,15 @@ describe.each([false, true])('temporal retrieval (encrypted: %s)', (encrypted) =
             content: 'database decision',
             occurredAt: '2026-01-01T08:00:00Z',
         });
-        for (const read of Object.values(readers))
+        const { context, ...searchReaders } = readers;
+        for (const read of Object.values(searchReaders))
             expect(read(store, '2026-01-01T09:00:00Z').map(({ id }) => id)).toEqual([
                 newer.id,
                 older.id,
             ]);
+        // The context compiler deduplicates identical content — the newer
+        // occurrence keeps the slot.
+        expect(context(store, '2026-01-01T09:00:00Z').map(({ id }) => id)).toEqual([newer.id]);
     });
 
     it('detects conflict overlap across UTC and offset representations', () => {

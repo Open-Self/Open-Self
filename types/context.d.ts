@@ -54,6 +54,9 @@ export interface MemoryRecord extends MemoryInput {
     createdAt: string;
     updatedAt: string;
     forgottenAt?: string | null;
+    /** Set when a newer memory replaced this record — history stays retrievable. */
+    supersededAt?: string | null;
+    supersededBy?: string | null;
 }
 export interface RetrievalMatch {
     lexicalRank: number | null;
@@ -67,10 +70,14 @@ export interface SearchMemory extends MemoryRecord {
 export interface SearchOptions {
     scope?: string;
     allowedScopes?: readonly string[];
+    /** Policy v2 deny roots — denied scopes are filtered server-side, never returned. */
+    deniedScopes?: readonly string[];
     type?: MemoryType;
     maxSensitivity?: Sensitivity;
     minSourceTrust?: SourceTrust;
     asOf?: string;
+    /** Skip temporal validity filtering (compiler discovery leg). */
+    anyTime?: boolean;
     retrieval?: RetrievalMode;
     limit?: number;
     vectorCandidateLimit?: number;
@@ -78,7 +85,14 @@ export interface SearchOptions {
 }
 export interface ListOptions extends Pick<
     SearchOptions,
-    'scope' | 'allowedScopes' | 'type' | 'maxSensitivity' | 'minSourceTrust' | 'asOf' | 'limit'
+    | 'scope'
+    | 'allowedScopes'
+    | 'deniedScopes'
+    | 'type'
+    | 'maxSensitivity'
+    | 'minSourceTrust'
+    | 'asOf'
+    | 'limit'
 > {
     offset?: number;
     includeForgotten?: boolean;
@@ -245,6 +259,66 @@ export class ContextStore {
         query: string,
         options?: SearchOptions & { maxChars?: number; explain?: boolean },
     ): Promise<ContextBlock>;
+    /**
+     * The Context Compiler — turns a ContextRequest into an exact, bounded,
+     * explainable ContextPackage. `options.policy` supplies a requester
+     * envelope (AccessPolicy); `options.envelope` accepts a raw filter
+     * envelope for trusted local callers.
+     */
+    compileContext(
+        request: ContextRequestInput,
+        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
+    ): ContextPackage;
+    compileContextAsync(
+        request: ContextRequestInput,
+        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
+    ): Promise<ContextPackage>;
+    /**
+     * Lifecycle + context-graph delegates — supersession, typed edges,
+     * entities/aliases and the inspectable timeline.
+     */
+    supersede(
+        input: MemoryInput | string,
+        supersededId: string,
+        options?: { sourceKind?: string; confidence?: number },
+    ): { memory: MemoryRecord; superseded: MemoryRecord };
+    unsupersede(id: string): boolean;
+    addEdge(
+        subject: string,
+        predicate: EdgePredicate | string,
+        object: string,
+        options?: { sourceKind?: string; confidence?: number },
+    ): MemoryEdge;
+    removeEdge(subject: string, predicate: string, object: string): boolean;
+    edges(
+        id: string,
+        options?: { direction?: 'out' | 'in' | 'both'; predicate?: string; limit?: number },
+    ): MemoryEdge[];
+    supersededIds(asOf: string): Set<string>;
+    ensureEntity(input: {
+        kind?: EntityKind;
+        canonical: string;
+        scope?: string;
+        aliases?: string[];
+    }): EntityRecord;
+    findEntity(nameOrId: string): EntityRecord | null;
+    listEntities(options?: { kind?: EntityKind; scope?: string; limit?: number }): EntityRecord[];
+    addEntityAlias(entityId: string, alias: string): EntityRecord;
+    mergeEntities(primaryId: string, duplicateIds: readonly string[]): EntityRecord;
+    linkEntity(memoryId: string, entityId: string, role?: string): boolean;
+    unlinkEntity(memoryId: string, entityId: string, role?: string): boolean;
+    entitiesForMemory(memoryId: string): (EntityRecord & { role: string })[];
+    memoriesForEntity(
+        entityId: string,
+        options?: { limit?: number; includeForgotten?: boolean },
+    ): { memory: MemoryRecord; role: string }[];
+    timeline(options?: {
+        scope?: string;
+        type?: MemoryType;
+        since?: string;
+        until?: string;
+        limit?: number;
+    }): TimelineEntry[];
     /** Drain pending vector rows through the configured provider. */
     indexPending(options?: { limit?: number }): Promise<{
         model: string;
@@ -592,34 +666,65 @@ export interface McpPolicy {
     clientId: string;
     /** Omit to grant all scopes. */
     scopes?: readonly string[];
+    /** Policy v2: deny roots win over allow roots. */
+    deny?: readonly string[];
     maxSensitivity: Sensitivity;
+    /** Policy v2: requester trust floor for compiled context. */
+    minSourceTrust?: SourceTrust;
     capabilities: readonly McpCapability[];
     /**
      * Highest source trust this client's writes may claim. Agent writes
      * default to `external`; owners may raise this deliberately.
      */
     maxSourceTrust?: SourceTrust;
+    /** Requester display label recorded on receipts. */
+    label?: string;
+    transport?: 'stdio' | 'http' | 'api' | 'dashboard';
+    /** Default compilation budget ceilings — requests can only narrow. */
+    budget?: {
+        maxChars?: number;
+        maxTokens?: number;
+        maxItems?: number;
+    };
 }
 export class AccessPolicy {
     constructor(input?: McpPolicy);
     readonly clientId: string;
+    readonly label?: string;
+    readonly transport?: 'stdio' | 'http' | 'api' | 'dashboard';
     readonly scopes?: readonly string[];
+    readonly deniedScopes?: readonly string[];
     readonly maxSensitivity: Sensitivity;
+    readonly minSourceTrust: SourceTrust;
     readonly maxSourceTrust: SourceTrust;
     readonly capabilities: readonly McpCapability[];
+    readonly budget?: { maxChars?: number; maxTokens?: number; maxItems?: number };
     require(capability: McpCapability): void;
+    /** True when `scopeValue` sits under an explicitly denied root. */
+    denies(scopeValue: string): boolean;
     contains(scope: string): boolean;
     requireMemory(memory: { scope?: string; sensitivity?: string } | null): void;
-    readOptions<T extends { maxSensitivity?: Sensitivity; scope?: string }>(
+    readOptions<
+        T extends { maxSensitivity?: Sensitivity; scope?: string; minSourceTrust?: SourceTrust },
+    >(
         input: T,
     ): T & {
         maxSensitivity: Sensitivity;
+        minSourceTrust: SourceTrust;
         allowedScopes?: readonly string[];
+        deniedScopes?: readonly string[];
+    };
+    clampBudget(requested?: { maxChars?: number; maxTokens?: number; maxItems?: number }): {
+        maxChars?: number;
+        maxTokens?: number;
+        maxItems?: number;
     };
     clampSourceTrust(requested?: SourceTrust): SourceTrust;
     deny(): never;
 }
 export function loadMcpPolicy(path: string, id: string): McpPolicy;
+/** List every configured requester identity in a policy file (v1 or v2). */
+export function listMcpPolicyClients(path: string): string[];
 export type AuditOutcome = 'attempted' | 'allowed' | 'denied' | 'error';
 export interface AuditEvent {
     id: number;
@@ -768,3 +873,294 @@ export function evaluateContextVault(
     dataset: EvaluationDataset,
     options?: { store?: ContextStore },
 ): EvaluationReport;
+
+/** Compiler evaluation — per-kind scores over a compiled-context corpus. */
+export interface CompilerEvaluationCase {
+    name: string;
+    kind?: string;
+    request: ContextRequestInput;
+    /** Policy client name from the dataset `policies` map. */
+    policy?: string;
+    expect?: {
+        include?: string[];
+        exclude?: string[];
+        denied?: string[];
+        skipped?: string[];
+        dedupeGroups?: string[][];
+        noLeak?: string[];
+        refused?: boolean;
+        receiptIntegrity?: boolean;
+    };
+}
+export interface CompilerEvaluationDataset {
+    name?: string;
+    thresholds?: Record<string, number>;
+    memories?: {
+        key: string;
+        memory: MemoryInput;
+        supersedes?: string;
+        supersedeAt?: string;
+    }[];
+    entities?: {
+        kind?: EntityKind;
+        canonical: string;
+        scope?: string;
+        aliases?: string[];
+        links?: { memory: string; role?: string }[];
+    }[];
+    policies?: Record<string, Omit<McpPolicy, 'clientId'>>;
+    cases?: CompilerEvaluationCase[];
+}
+export interface CompilerEvaluationReport {
+    dataset: string;
+    passed: boolean;
+    metrics: Record<string, number>;
+    thresholds: Record<string, number>;
+    failures: { metric: string; actual: number; threshold: number }[];
+    cases: {
+        name: string;
+        kind: string;
+        score: number;
+        selected?: string[];
+        failures: string[];
+    }[];
+}
+export function evaluateCompilerVault(
+    dataset: CompilerEvaluationDataset,
+    options?: { store?: ContextStore },
+): CompilerEvaluationReport;
+
+// ---------- Context Compiler (schema v4 / receipt v2) ----------
+
+export type ContextFormat = 'block' | 'json' | 'markdown';
+export const COMPILER_VERSION: string;
+export const CONTEXT_FORMATS: readonly ContextFormat[];
+export const RETRIEVAL_MODES: readonly RetrievalMode[];
+/** Purpose → memory-type ranking affinity (ranking only, never authorization). */
+export const PURPOSE_TYPE_AFFINITY: Record<string, Partial<Record<MemoryType, number>>>;
+
+export interface ContextBudget {
+    maxChars?: number;
+    /** Estimated tokens (chars/4) — a planning unit, not a tokenizer contract. */
+    maxTokens?: number;
+    maxItems?: number;
+}
+/**
+ * A Context Request — the typed contract every interface normalizes into
+ * before compilation. Requests express intent; authorization always comes
+ * from the configured requester policy, never from request fields.
+ */
+export interface ContextRequestInput {
+    query?: string;
+    task?: string;
+    /** Requester label for receipts — NOT an authorization input. */
+    agent?: string;
+    purpose?: string;
+    scope?: string;
+    scopes?: readonly string[];
+    type?: MemoryType;
+    entity?: string;
+    maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
+    asOf?: string;
+    budget?: ContextBudget | number;
+    maxChars?: number;
+    limit?: number;
+    retrieval?: RetrievalMode;
+    format?: ContextFormat;
+    explain?: boolean;
+    includeSuperseded?: boolean;
+    includeStale?: boolean;
+}
+export interface NormalizedContextRequest {
+    query: string;
+    task: string | null;
+    agent: string | null;
+    purpose: string;
+    scope: string | null;
+    scopes: string[] | null;
+    type: MemoryType | null;
+    entity: string | null;
+    maxSensitivity: Sensitivity | null;
+    minSourceTrust: SourceTrust | null;
+    asOf: string;
+    budget: ContextBudget;
+    retrieval: RetrievalMode;
+    format: ContextFormat;
+    explain: boolean;
+    includeSuperseded: boolean;
+    includeStale: boolean;
+}
+export const contextRequestSchema: z.ZodType<ContextRequestInput, ContextRequestInput>;
+export function normalizeContextRequest(input?: ContextRequestInput): NormalizedContextRequest;
+
+/** Raw filter envelope for trusted local callers (dashboard/CLI/buildContext). */
+export interface RawEnvelope {
+    clientId?: string;
+    allowedScopes?: readonly string[];
+    deniedScopes?: readonly string[];
+    maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
+    budget?: ContextBudget;
+}
+export type TemporalStatus = 'current' | 'superseded' | 'expired' | 'not-yet-valid';
+export interface ContextConflict {
+    class: 'declared-contradiction' | 'supersession' | 'overlapping-claim';
+    ids: string[];
+    note: string;
+}
+export interface PackagedMemory extends SearchMemory {
+    temporalStatus?: TemporalStatus;
+    lifecycle: 'active' | TemporalStatus;
+    selectionReason: string;
+}
+/** The exact, bounded output of a compilation — render + selected records. */
+export interface ContextPackage {
+    query: string;
+    task: string | null;
+    context: string;
+    format: ContextFormat;
+    /** sha256 citation of the exact rendered package. */
+    contextHash: string;
+    memories: PackagedMemory[];
+    conflicts: ContextConflict[];
+    usedChars: number;
+    usedTokens: number;
+    items: number;
+    receipt?: ContextReceiptV2;
+}
+export type ReceiptDecision = 'selected' | 'skipped' | 'denied';
+export interface ContextReceiptCandidateV2 {
+    id: string;
+    contentHash: string;
+    type?: MemoryType;
+    scope?: string;
+    sensitivity?: Sensitivity;
+    sourceTrust?: SourceTrust;
+    confidence?: number;
+    source?: MemorySource;
+    relevance?: number | null;
+    match?: RetrievalMatch | null;
+    recencyDays?: number | null;
+    temporalStatus?: TemporalStatus;
+    decision: ReceiptDecision;
+    reason: string;
+    chars?: number | null;
+}
+/** Receipt v2 — the explainable record of every compilation decision. */
+export interface ContextReceiptV2 {
+    version: 2;
+    compiler: { name: string; version: string };
+    query: string;
+    task: string | null;
+    purpose: string;
+    asOf: string;
+    contextHash: string;
+    requester: { clientId: string; label?: string; agent: string | null };
+    vector: { model: string; provider: string; indexed: number; pending: number };
+    retrieval: RetrievalMode;
+    format: ContextFormat;
+    filters: {
+        scope: string | null;
+        allowedScopes: string[] | null;
+        deniedScopes: string[] | null;
+        droppedScopes: string[];
+        type: MemoryType | null;
+        maxSensitivity: Sensitivity;
+        minSourceTrust: SourceTrust;
+        includeSuperseded: boolean;
+        includeStale: boolean;
+    };
+    budget: {
+        maxChars: number;
+        maxTokens: number | null;
+        maxItems: number;
+        usedChars: number;
+        usedTokens: number;
+        usedItems: number;
+    };
+    limits: { maxChars: number; limit: number };
+    candidates: ContextReceiptCandidateV2[];
+    conflicts: ContextConflict[];
+    totals: {
+        candidates: number;
+        selected: number;
+        skipped: number;
+        denied: number;
+        conflicts: number;
+        usedChars: number;
+    };
+    signer?: string;
+    signature?: string;
+}
+export class ContextCompiler {
+    constructor(store: ContextStore, options?: { policy?: AccessPolicy });
+    compile(
+        input: ContextRequestInput,
+        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
+    ): ContextPackage;
+    compileAsync(
+        input: ContextRequestInput,
+        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
+    ): Promise<ContextPackage>;
+}
+
+// ---------- Context graph: edges, entities, timeline ----------
+
+export type EdgePredicate =
+    | 'supersedes'
+    | 'contradicts'
+    | 'relates_to'
+    | 'sourced_from'
+    | 'derived_from'
+    | 'affects'
+    | 'works_on'
+    | 'uses'
+    | 'knows'
+    | 'part_of';
+export type EntityKind = 'person' | 'project' | 'organization' | 'technology' | 'place' | 'thing';
+export const EDGE_PREDICATES: readonly EdgePredicate[];
+export const ENTITY_KINDS: readonly EntityKind[];
+export interface MemoryEdge {
+    id: number;
+    subject: string;
+    predicate: string;
+    object: string;
+    sourceKind: string;
+    confidence: number;
+    createdAt: string;
+}
+export interface EntityRecord {
+    id: string;
+    kind: EntityKind;
+    canonical: string;
+    scope: string;
+    /** Set on losers of `mergeEntities` — points at the surviving entity. */
+    mergedInto: string | null;
+    createdAt: string;
+    aliases: string[];
+}
+export interface TimelineEntry {
+    at: string;
+    memoryId: string;
+    version: number;
+    kind: string;
+    scope: string;
+    type: MemoryType;
+    summary: string;
+    supersededBy: string | null;
+}
+export function ensureEntity(
+    store: ContextStore,
+    input: { kind?: EntityKind; canonical: string; scope?: string; aliases?: string[] },
+): EntityRecord;
+export function findEntity(store: ContextStore, nameOrId: string): EntityRecord | null;
+export function listEntities(
+    store: ContextStore,
+    options?: { kind?: EntityKind; scope?: string; limit?: number },
+): EntityRecord[];
+export function mergeEntities(
+    store: ContextStore,
+    primaryId: string,
+    duplicateIds: readonly string[],
+): EntityRecord;
