@@ -10,6 +10,7 @@ mcp-audit.db
 mcp-audit.db-shm
 mcp-audit.db-wal
 vault-key.dpapi
+signing-key.json
 .claude
 .opencode
 CLAUDE.md

@@ -36,6 +36,10 @@ manual/import/capture -> typed memory -> SQLite + FTS5 + local vector -> CLI/MCP
 - Optional AES-256-GCM protects payload fields, local vectors, and versions. HMAC blind tokens
   replace plaintext FTS terms. Filter metadata remains plaintext.
 - `VaultKeyManager` binds the random key to Windows DPAPI, macOS Keychain, or Linux Secret Service.
+- A persistent Ed25519 vault identity (`signing-key.json`, mode 0600) signs explain receipts
+  and exchange-format exports; `validateContextExport()` verifies signatures offline and the
+  importer refuses tampered signed exports. Export scanning (`secrets.js`) detects
+  credential-shaped strings with optional `--redact` stripping.
 - `AccessAudit` records MCP calls in a SHA-256 hash chain (`prev_hash` → `entry_hash`);
   `verify()` detects edited or deleted history, `toJSONL()` exports the trail for
   external anchoring, and pruning anchors the surviving suffix via `audit_meta`.

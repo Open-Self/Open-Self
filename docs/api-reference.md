@@ -139,7 +139,10 @@ until approved.
 | `createMcpHttpApp`, `runContextMcpHttpServer` | Authenticated Streamable HTTP MCP transport; loopback-only unless `allowRemote` plus an explicit `token` |
 | `AccessPolicy`, `MCP_CAPABILITIES` | Policy object with `read`/`remember`/`forget`/`propose` capabilities, scope roots, sensitivity and `maxSourceTrust` ceilings |
 | `AccessAudit` | Local metadata audit begin/finish/list/verify/toJSONL/prune/clear/close; completed events form a tamper-evident hash chain |
-| `exportMemories`, `parseContextExport`, `validateContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export, parsing, and non-throwing validation per [the exchange spec](../spec/context-exchange-format.md); imported records are clamped to `external` trust |
+| `exportMemories`, `exportPayloadHash`, `parseContextExport`, `validateContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export, parsing, and non-throwing validation per [the exchange spec](../spec/context-exchange-format.md); imported records are clamped to `external` trust; exports are Ed25519-signed unless `sign: false`, and `redact: true` strips secret-shaped strings |
+| `loadSigningIdentity`, `signPayload`, `verifyPayload`, `signingFingerprint`, `SIGNING_DOMAIN` | Vault Ed25519 identity persisted at `<dataDir>/signing-key.json`; receipts carry `signer`/`signature` over `contextHash`, exports sign `exportHash` — spec §4 |
+| `scanForSecrets`, `redactSecrets` | Pattern-based credential detection and `[REDACTED:<kind>]` stripping for export hygiene |
+| `store.sweepExpired({ now?, limit?, dryRun? })` | Forget active memories whose `validTo` has lapsed; CLI `openself memory sweep` |
 | `memoryContentHash`, `contextBlockHash` | Canonical SHA-256 content/context addresses used by receipts and export dedupe |
 | `resolveVectorProvider`, `featureHashProvider`, `OllamaEmbeddingProvider`, `OpenAiCompatibleProvider` | Pluggable embedding providers — see [embeddings](./embeddings.md) |
 | `SOURCE_TRUST_LEVELS` | Ordered trust levels: `untrusted`, `external`, `trusted`, `verified`, `owner` |

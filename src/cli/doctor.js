@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import { ContextStore, VAULT_SCHEMA_VERSION } from '../context/store.js';
 import { AccessAudit } from '../context/access-audit.js';
 import { VaultKeyManager } from '../context/vault-key-manager.js';
+import { loadSigningIdentity } from '../context/signing.js';
 import { packageVersion } from '../version.js';
 
 const MIN_NODE = [22, 13, 0];
@@ -98,6 +99,13 @@ export function doctorCommand(options = {}) {
             });
         }
         return `encrypted · provider ${status.provider}`;
+    });
+
+    check('vault-identity', () => {
+        const identity = loadSigningIdentity(dataDir, { create: false });
+        if (!identity) return 'no signing identity yet (created on first signed operation)';
+        // The fingerprint is a hash of the public key — safe to display.
+        return `ed25519 · fingerprint ${identity.fingerprint.slice(0, 16)}…`;
     });
 
     check('audit-log', () => {

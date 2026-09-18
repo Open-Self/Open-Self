@@ -75,7 +75,11 @@ ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 program
     .command('memory')
     .description('Import, store, search, list, and forget personal context')
-    .argument('[action]', 'add/import/export/index/search/conflicts/list/forget/stats', 'list')
+    .argument(
+        '[action]',
+        'add/import/export/index/search/conflicts/list/forget/sweep/stats',
+        'list',
+    )
     .option('--file <paths...>', 'Files to import (or the export destination for export)')
     .option(
         '--format <format>',
@@ -83,6 +87,8 @@ program
         'auto',
     )
     .option('--include-restricted', 'Include restricted memories in an export')
+    .option('--redact', 'Strip secret-shaped strings from an export')
+    .option('--no-sign', 'Do not sign the export with the vault identity')
     .option('--content <text>', 'Memory content')
     .option('--query <text>', 'Search query')
     .option('--id <uuid>', 'Memory ID')

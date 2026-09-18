@@ -158,6 +158,10 @@ export interface ContextReceipt {
         skipped: number;
         usedChars: number;
     };
+    /** Ed25519 fingerprint of the vault that produced this receipt. */
+    signer?: string;
+    /** Ed25519 signature over `contextHash` (domain `openself-sign-v1`). */
+    signature?: string;
 }
 export type VaultKey = string | Buffer;
 export interface VectorEncoder {
@@ -262,6 +266,14 @@ export class ContextStore {
     ): MemoryRecord | null;
     rejectProposal(id: string, options?: { reviewNote?: string }): boolean;
     forget(id: string): boolean;
+    /** Forget active memories whose `validTo` has lapsed. */
+    sweepExpired(options?: { now?: string; limit?: number; dryRun?: boolean }): {
+        swept: number;
+        expired: number;
+        ids: string[];
+    };
+    /** Vault Ed25519 identity, lazily loaded (null for read-only/in-memory). */
+    readonly signingIdentity: SigningIdentity | null;
     stats(): VaultStats;
     close(): void;
 }
@@ -332,6 +344,10 @@ export interface ContextExportOptions {
     maxSensitivity?: Sensitivity;
     includeRestricted?: boolean;
     dryRun?: boolean;
+    /** Strip secret-shaped strings before hashing/signing. */
+    redact?: boolean;
+    /** Sign the export with the vault's Ed25519 identity (default true). */
+    sign?: boolean;
 }
 export interface ContextExportReport {
     format: 'openself-context';
@@ -343,6 +359,10 @@ export interface ContextExportReport {
     dryRun: boolean;
     file?: string;
     memories?: MemoryRecord[];
+    signed: boolean;
+    /** Fingerprint of the signing vault identity, when signed. */
+    signer: string | null;
+    secrets: { findings: number; kinds: string[]; redacted: boolean; memories: number };
 }
 export function exportMemories(
     store: ContextStore,
@@ -361,9 +381,48 @@ export interface ContextExportValidation {
     errors: string[];
     records: number;
     header: Record<string, unknown> | null;
+    /** Signature block status — `present: false` for unsigned exports. */
+    signature?: { present: boolean; signer?: string | null; valid?: boolean };
 }
 /** Non-throwing spec validator for openself-context JSONL payloads. */
 export function validateContextExport(text: string): ContextExportValidation;
+/** sha256("openself-export-v1\n" + join(recordLines,"\n")) — signed payload. */
+export function exportPayloadHash(recordLines: string[]): string;
+/** Ed25519 fingerprint: sha256("openself-sign-v1\n" + publicKeyBase64). */
+export function signingFingerprint(publicKeyBase64: string): string;
+/** Ed25519 sign over domain-separated payload ("openself-sign-v1\n" + payload). */
+export function signPayload(privateKeyBase64: string, payload: string): string;
+export function verifyPayload(
+    publicKeyBase64: string,
+    payload: string,
+    signatureBase64: string,
+): boolean;
+export interface SigningIdentity {
+    publicKey: string;
+    fingerprint: string;
+    file: string;
+    created: boolean;
+    sign(payload: string): string;
+}
+/**
+ * Load or create the vault's persistent Ed25519 identity (null when read-only).
+ * Pass `create: false` for non-mutating lookups that must not write a key.
+ */
+export function loadSigningIdentity(
+    dataDir: string | null | undefined,
+    options?: { create?: boolean },
+): SigningIdentity | null;
+export const SIGNING_DOMAIN: 'openself-sign-v1';
+export interface SecretFinding {
+    kind: string;
+    index: number;
+    /** Masked preview — first 6 chars + ellipsis. */
+    match: string;
+}
+/** Pattern-based detection of credential-shaped strings in text. */
+export function scanForSecrets(text: string): SecretFinding[];
+/** Replace detected secrets with `[REDACTED:<kind>]`. */
+export function redactSecrets(text: string): { text: string; findings: SecretFinding[] };
 export function chunkDocument(
     content: string,
     maxChars?: number,

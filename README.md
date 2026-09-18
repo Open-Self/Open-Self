@@ -4,6 +4,7 @@
 [![CI](https://github.com/Open-Self/Open-Self/actions/workflows/ci.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions)
 [![CodeQL](https://github.com/Open-Self/Open-Self/actions/workflows/codeql.yml/badge.svg)](https://github.com/Open-Self/Open-Self/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Open-Self/Open-Self/badge)](https://scorecard.dev/viewer/?uri=github.com/Open-Self/Open-Self)
+[![codecov](https://codecov.io/gh/Open-Self/Open-Self/graph/badge.svg)](https://codecov.io/gh/Open-Self/Open-Self)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.github.Open--Self%2Fopenself-purple)](./server.json)
 [![Docker](https://img.shields.io/badge/ghcr.io-open--self%2Fopenself-blue?logo=docker)](https://github.com/Open-Self/Open-Self/pkgs/container/openself)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
@@ -39,6 +40,9 @@ memory explicit and portable:
 - **Explainable retrieval:** every context build can return a receipt showing which
   memories were selected or skipped and why — with a `contextHash` over the exact
   block an agent received and a `contentHash` for each cited memory.
+- **Cryptographic provenance:** each vault holds an Ed25519 identity; receipts sign
+  `contextHash` and exports sign their record payload, so consumers can verify
+  integrity and origin offline. Tampered signed exports are refused on import.
 - **Tamper-evident audit:** MCP access events are hash-chained; `openself audit verify`
   detects modified or deleted history, and `openself audit export` produces a JSONL
   trail for archival.
@@ -374,14 +378,26 @@ Export the vault to a versioned JSONL interchange format and re-import it elsewh
 ```bash
 openself memory export --file ./context.openself.jsonl
 openself memory export --file ./project.jsonl --scope project/atlas --max-sensitivity personal
+openself memory export --file ./clean.jsonl --redact      # strip secret-shaped strings
+openself memory export --file ./unsigned.jsonl --no-sign  # opt out of signing
 openself memory import --file ./context.openself.jsonl
 ```
 
 The export preserves provenance, scope, sensitivity, trust, temporal bounds, and tags.
 Restricted memories are excluded unless you pass `--include-restricted`. Imported records
-are clamped to `external` source trust — a file cannot claim owner-level trust. This is a
+are clamped to `external` source trust — a file cannot claim owner-level trust. Exports
+are Ed25519-signed by the vault identity (`signer`/`signature`/`exportHash` in the header);
+importers verify the signature and refuse tampered files. Exports are also scanned for
+credential-shaped strings — findings are reported and `--redact` strips them. This is a
 plaintext interoperability format, not an encrypted backup; use `openself vault backup`
 for protection at rest.
+
+Memories whose `validTo` has lapsed can be forgotten in one pass:
+
+```bash
+openself memory sweep --dry-run   # preview expired memories
+openself memory sweep             # forget them
+```
 
 ## Install the Agent Skill
 

@@ -26,11 +26,13 @@ export async function memoryCommand(action, options = {}) {
                 return forgetMemory(store, options);
             case 'export':
                 return exportMemoriesCli(store, options);
+            case 'sweep':
+                return sweepExpired(store, options);
             case 'stats':
                 return printJson(store.stats());
             default:
                 throw new Error(
-                    `Unknown memory action: ${action}. Use add, import, index, search, conflicts, list, forget, or stats.`,
+                    `Unknown memory action: ${action}. Use add, import, index, search, conflicts, list, forget, export, sweep, or stats.`,
                 );
         }
     } finally {
@@ -103,6 +105,24 @@ async function addMemory(store, options) {
     printJson({ memory, potentialConflicts });
 }
 
+function sweepExpired(store, options) {
+    const report = store.sweepExpired({
+        limit: options.limit ? Number(options.limit) : undefined,
+        dryRun: options.dryRun,
+    });
+    if (options.json) return printJson(report);
+    if (options.dryRun) {
+        console.log(chalk.yellow(`${report.expired} expired memor(ies) would be forgotten`));
+        return report;
+    }
+    console.log(
+        report.swept
+            ? chalk.green(`✓ Swept ${report.swept} expired memor(ies)`)
+            : chalk.gray('No expired memories'),
+    );
+    return report;
+}
+
 function exportMemoriesCli(store, options) {
     const report = exportMemories(store, {
         file: options.file?.[0] || options.output,
@@ -111,6 +131,8 @@ function exportMemoriesCli(store, options) {
         includeRestricted:
             Boolean(options.includeRestricted) || options.maxSensitivity === 'restricted',
         dryRun: options.dryRun,
+        redact: options.redact,
+        sign: options.sign !== false,
     });
     if (report.dryRun) {
         const { memories: _memories, ...summary } = report;
@@ -122,6 +144,20 @@ function exportMemoriesCli(store, options) {
             `✓ Exported ${report.count} memories (${report.bytes} bytes) to ${report.file}`,
         ),
     );
+    if (report.signed) {
+        console.log(chalk.gray(`  signed by vault ${report.signer.slice(0, 16)}…`));
+    }
+    if (report.secrets.findings) {
+        console.log(
+            chalk.yellow(
+                report.secrets.redacted
+                    ? `⚠ Redacted ${report.secrets.findings} secret-shaped string(s) ` +
+                          `(${report.secrets.kinds.join(', ')})`
+                    : `⚠ ${report.secrets.findings} secret-shaped string(s) detected ` +
+                          `(${report.secrets.kinds.join(', ')}) — re-run with --redact to strip`,
+            ),
+        );
+    }
     console.log(
         chalk.yellow(
             'This is a plaintext interoperability export — not an encrypted backup. Protect the file accordingly.',
