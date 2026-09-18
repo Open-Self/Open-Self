@@ -32,7 +32,15 @@ relevant context for a task without handing the AI an unfiltered transcript of t
 | `tags` | Normalized retrieval and organization labels |
 | `status` | active or forgotten |
 | `sourceTrust` | untrusted, external, trusted, verified, or owner |
+| `supersededAt` / `supersededBy` | Lifecycle: when this record stopped being current truth and which memory replaced it |
 | lifecycle timestamps | created, updated, and forgotten timestamps |
+
+Schema version 4 adds `memory_edges` (typed relations: `supersedes`, `contradicts`,
+`relates_to`, `sourced_from`, `derived_from`, `affects`, `works_on`, `uses`, `knows`,
+`part_of`), `entities` + `entity_aliases` + `memory_entities` (people, projects,
+organizations, technologies, places, things with alias resolution and reversible merges),
+and the `superseded_at`/`superseded_by` columns. Migration from v1–v3 is in place and
+preserves all data.
 
 Dates use ISO 8601 with an explicit offset. A memory whose validity window does not contain the
 requested `asOf` time is excluded from search.
@@ -93,13 +101,44 @@ search, list, or context until `approveProposal` writes them (with optional fiel
 links the proposal to the resulting memory. `rejectProposal` marks the proposal without writing.
 Both the CLI inbox (`openself inbox`) and the dashboard review the same queue.
 
+## Context Compiler
+
+`compileContext(request)` is the retrieval front door. A `ContextRequest` — `query`, `task`,
+`agent`, `purpose`, `scope`/`scopes`, `type`, `entity`, `maxSensitivity`, `minSourceTrust`,
+`asOf`, `budget`/`maxChars`/`limit`, `retrieval` (`hybrid`/`lexical`/`vector`), `format`
+(`block`/`json`/`markdown`), `explain`, `includeSuperseded`, `includeStale` — compiles through
+a fixed pipeline:
+
+```text
+request → policy envelope → candidate discovery → policy partition
+→ temporal resolution → conflict detection → ranking
+→ redundancy control → budget packing → render → receipt
+```
+
+- **Policy partition:** the requester's `AccessPolicy` (deny roots, sensitivity ceiling,
+  trust floor, budget caps) is applied before ranking; denied candidates can never be
+  selected, and requests can only narrow the envelope.
+- **Temporal resolution:** superseded records (`supersededAt`/`supersededBy`) are excluded
+  from current truth but remain discoverable history; `includeSuperseded`/`includeStale`
+  re-admit them, and `asOf` fixes the comparison instant.
+- **Budget packing:** `maxChars`, `maxTokens` (estimate), and `maxItems` bound the package;
+  `budget` policy ceilings override client-supplied larger budgets.
+- **Formats:** `block` (attributed text), `json` (structured memories), `markdown`.
+
+`buildContext` delegates to the compiler and projects the result back to the v1 shape —
+same output contract, stronger guarantees.
+
 ## Explainable retrieval
 
-`buildContext(query, { explain: true })` adds a `receipt` to the result: applied filters, the
-`asOf` instant, and per-candidate diagnostics — lexical and vector ranks, recency, character
-cost, and the `selected`/`skipped` decision with its reason. Receipts are owner diagnostics; they
-may reveal that filtered-out candidates exist and are not part of the agent-facing context block.
-The same receipt powers `openself context --explain` and the dashboard's Context Debugger.
+`compileContext(request, { policy })` with `explain: true` returns **receipt v2**: requester
+identity (clientId + label + agent), effective filters (allowed/denied/dropped scopes,
+sensitivity ceiling, trust floor), budget usage, per-candidate decisions (`selected`,
+`skipped`, `denied` with reasons such as `over-budget`, `duplicate-content`, `expired`,
+`not-yet-valid`, `superseded-by:*`, `policy-scope`/`policy-sensitivity`/`policy-trust`),
+declared conflicts, and the signed `contextHash` citation. Policy-denied candidates are
+reported as id + contentHash + reason only — denied content never appears. `buildContext`
+with `explain: true` still returns the v1 receipt projection. Receipts are owner diagnostics;
+the same receipt powers `openself context --explain` and the dashboard's Context Debugger.
 
 ## Retrieval
 
@@ -183,6 +222,14 @@ overlapping validity window. Results are warnings for human review, not automate
 
 Returns a compact formatted context block plus the contributing records. Use it before a bounded
 task such as preparing a meeting brief or drafting a status update.
+
+### `openself_compile_context`
+
+Full Context Compiler: accepts `query`, `task`, `agent`, `purpose`, `scope`/`scopes`, `type`,
+`entity`, `maxSensitivity`, `minSourceTrust`, `asOf`, `maxChars`, `maxTokens`, `maxItems`,
+`retrieval`, `format`, `explain`, `includeSuperseded`, and `includeStale`; returns a structured
+`ContextPackage` with the bounded context plus receipt v2 when `explain` is set. Governed by the
+`read` capability and the client's policy envelope.
 
 ### `openself_forget`
 

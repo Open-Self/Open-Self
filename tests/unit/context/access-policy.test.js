@@ -47,7 +47,8 @@ describe('owner configuration and audit retention', () => {
         const dataDir = join(directory, 'vault');
         for (const config of [
             'not JSON',
-            JSON.stringify({ version: 2, clients: { atlas: settings } }),
+            JSON.stringify({ version: 99, clients: { atlas: settings } }),
+            JSON.stringify({ version: 2, clients: { atlas: { ...settings, surprise: true } } }),
             JSON.stringify({ version: 1, clients: { atlas: { ...settings, surprise: true } } }),
             JSON.stringify({ version: 1, clients: { atlas: { ...settings, scopes: [] } } }),
             JSON.stringify({

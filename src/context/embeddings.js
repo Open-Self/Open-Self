@@ -50,10 +50,16 @@ export function resolveVectorProvider(spec, env = process.env) {
     }
 }
 
+/**
+ * `locality` marks where texts go: 'local' providers compute on-device and may
+ * index every sensitivity; 'remote' (or undeclared) providers never receive
+ * `restricted` content — the store caps indexing below it.
+ */
 export function featureHashProvider(options = {}) {
     const encoder = new LocalVectorEncoder(options);
     return {
         name: 'feature-hash',
+        locality: 'local',
         model: encoder.model,
         encodeSync: (text) => encoder.encode(text),
         encode: async (text) => encoder.encode(text),
@@ -61,10 +67,20 @@ export function featureHashProvider(options = {}) {
     };
 }
 
+function loopbackOnly(baseUrl) {
+    try {
+        return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(new URL(baseUrl).hostname);
+    } catch {
+        return false;
+    }
+}
+
 export class OllamaEmbeddingProvider {
     constructor(options = {}) {
         this.name = 'ollama';
         this.baseUrl = String(options.baseUrl || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+        // Ollama is local-first, but a configured remote URL makes it remote.
+        this.locality = loopbackOnly(this.baseUrl) ? 'local' : 'remote';
         this.model = options.model || 'nomic-embed-text';
         this.timeoutMs = options.timeoutMs || 30_000;
         this.fetch = options.fetch || globalThis.fetch;
@@ -106,6 +122,7 @@ export class OllamaEmbeddingProvider {
 export class OpenAiCompatibleProvider {
     constructor(options = {}) {
         this.name = 'openai-compatible';
+        this.locality = 'remote';
         this.baseUrl = String(options.baseUrl || '').replace(/\/+$/, '');
         this.model = options.model;
         this.apiKey = options.apiKey;

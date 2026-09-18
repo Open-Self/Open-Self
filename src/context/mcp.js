@@ -379,6 +379,82 @@ export function createContextMcpServer(store, options = {}) {
     );
 
     register(
+        'openself_compile_context',
+        {
+            description:
+                'Compile an exact, bounded context package for a task. Applies this client policy ' +
+                'before candidate exposure; the receipt explains every selected, skipped, and ' +
+                'policy-denied candidate without leaking denied content.',
+            inputSchema: {
+                query: z.string().min(1).max(2_000),
+                task: z.string().max(2_000).optional(),
+                agent: z.string().min(1).max(64).optional(),
+                purpose: z.string().min(1).max(50).optional(),
+                scope: z.string().max(200).optional(),
+                scopes: z.array(z.string().max(200)).max(50).optional(),
+                type: z.enum(MEMORY_TYPES).optional(),
+                entity: z.string().min(1).max(200).optional(),
+                maxSensitivity: z.enum(SENSITIVITY_LEVELS).optional(),
+                minSourceTrust: z.enum(SOURCE_TRUST_LEVELS).optional(),
+                asOf: z.string().datetime({ offset: true }).optional(),
+                maxChars: z.number().int().min(100).max(200_000).optional(),
+                maxTokens: z.number().int().min(25).max(200_000).optional(),
+                maxItems: z.number().int().min(1).max(500).optional(),
+                retrieval: z.enum(['hybrid', 'lexical', 'vector']).default('hybrid'),
+                format: z.enum(['block', 'json', 'markdown']).default('block'),
+                explain: z
+                    .boolean()
+                    .default(true)
+                    .describe('Include the context receipt explaining each decision'),
+                includeSuperseded: z.boolean().default(false),
+                includeStale: z.boolean().default(false),
+            },
+            outputSchema: {
+                query: z.string(),
+                task: z.string().nullable(),
+                context: z.string(),
+                format: z.enum(['block', 'json', 'markdown']),
+                contextHash: z.string(),
+                memories: z.array(memoryRecordSchema),
+                conflicts: z.array(z.record(z.string(), z.unknown())),
+                usedChars: z.number(),
+                usedTokens: z.number(),
+                items: z.number(),
+                receipt: z.record(z.string(), z.unknown()).optional(),
+            },
+        },
+        async (input) =>
+            structuredResult(
+                await store.compileContextAsync(
+                    {
+                        query: input.query,
+                        task: input.task,
+                        agent: input.agent,
+                        purpose: input.purpose,
+                        scope: input.scope,
+                        scopes: input.scopes,
+                        type: input.type,
+                        entity: input.entity,
+                        maxSensitivity: input.maxSensitivity,
+                        minSourceTrust: input.minSourceTrust,
+                        asOf: input.asOf,
+                        retrieval: input.retrieval,
+                        format: input.format,
+                        explain: input.explain,
+                        includeSuperseded: input.includeSuperseded,
+                        includeStale: input.includeStale,
+                        budget: {
+                            maxChars: input.maxChars,
+                            maxTokens: input.maxTokens,
+                            maxItems: input.maxItems,
+                        },
+                    },
+                    { policy },
+                ),
+            ),
+    );
+
+    register(
         'openself_forget',
         {
             description:

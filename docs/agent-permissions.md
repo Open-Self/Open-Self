@@ -28,6 +28,35 @@ Create a policy file that the launching application can read but the agent canno
 }
 ```
 
+Policy **version 2** adds explicit denials, trust floors, requester metadata, and
+budget ceilings — version 1 files keep working unchanged:
+
+```json
+{
+  "version": 2,
+  "clients": {
+    "atlas-reader": {
+      "label": "Atlas reader bot",
+      "transport": "stdio",
+      "scopes": ["project"],
+      "deny": ["project/secret"],
+      "maxSensitivity": "personal",
+      "minSourceTrust": "external",
+      "budget": { "maxChars": 8000, "maxTokens": 2000, "maxItems": 25 },
+      "capabilities": ["read"]
+    }
+  }
+}
+```
+
+- `deny` roots override `scopes`: `project` minus `project/secret` still permits
+  `project/atlas`. Denied memories are filtered at the SQL layer and surface on
+  explain receipts as id + contentHash + `policy-scope` only.
+- `minSourceTrust` is a floor the caller can raise but never lower in a request.
+- `budget` caps any client-supplied `maxChars`/`maxTokens`/`maxItems`; requests can
+  only tighten it.
+- `label`/`transport` are requester metadata carried onto receipt v2.
+
 Launch a separate server for each client:
 
 ```bash
@@ -66,7 +95,8 @@ through its tools.
 - The effective read ceiling is the lower of the owner's ceiling and the tool request.
   A caller can narrow it but cannot raise it. Context and conflict responses use the
   same boundary, including conflict warnings returned from `remember`.
-- `read` grants search, bounded context, and conflict review. `remember` grants storage
+- `read` grants search, bounded context (`openself_get_context` and
+  `openself_compile_context`), and conflict review. `remember` grants storage
   only inside allowed scopes and at or below the ceiling. With no `read` capability,
   remember returns the caller's newly stored memory and no existing conflict records.
 - `propose` grants `openself_propose_memory` and `openself_list_memory_proposals`.

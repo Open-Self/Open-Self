@@ -57,8 +57,18 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `list(options?)` | Records ordered by event/creation time with pagination, without relevance ranking |
 | `findPotentialConflicts(input, options?)` | Similar active facts/preferences/decisions with overlapping validity intervals; punctuation-only proposals return `[]` |
 | `findPotentialConflictsAsync(input, options?)` | Async conflict check for async embedding providers |
-| `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string; `explain: true` adds a `receipt` |
+| `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string; `explain: true` adds a `receipt` — delegates to the Context Compiler with a v1 projection |
 | `buildContextAsync(query, options?)` | Async context build for async embedding providers |
+| `compileContext(request, options?)` | Full Context Compiler: returns a `ContextPackage` (`{ request, context, format, memories, receipt }`); `options.policy` supplies an `AccessPolicy` requester envelope, `options.envelope` a raw `{ clientId, scopes, maxSensitivity, … }` |
+| `compileContextAsync(request, options?)` | Async compile — awaits async embedding providers for the vector leg |
+| `supersede(input, id, options?)` | Write `input` as the replacement for `id`; `{ memory, superseded }`; `{ at }` overrides the supersession instant |
+| `unsupersede(id)` | Clear supersession, restoring the record as current truth; `false` if not superseded |
+| `addEdge(fromId, predicate, toId)` | Typed relation (`supersedes`, `contradicts`, `relates_to`, `sourced_from`, `derived_from`, `affects`, `works_on`, `uses`, `knows`, `part_of`); `{ edge }` |
+| `removeEdge(id)` / `edgesFor(id, options?)` | Remove an edge / list edges touching a memory |
+| `ensureEntity(input)` / `findEntity(name)` / `listEntities(options?)` | Create-or-resolve entities by canonical name or alias |
+| `addEntityAlias(id, alias)` / `mergeEntities(primaryId, mergedId)` | Alias management; merge moves links + aliases to the primary entity |
+| `linkEntity(memoryId, entityId, role?)` / `unlinkEntity(memoryId, entityId)` / `entitiesForMemory(id)` / `memoriesForEntity(id, options?)` | Memory↔entity links and queries |
+| `timeline(options?)` | Newest-first lifecycle feed: created, updated, superseded, forgotten events |
 | `indexPending(options?)` | Promise; batch-encodes pending vectors through the configured provider |
 | `proposeMemory(input, options?)` | Stage a pending proposal with `proposedBy`/`note`; does not write a memory |
 | `getProposal(id)` | Proposal or `null` |
@@ -137,7 +147,10 @@ until approved.
 | `createContextServer` | Returns Express app, token, host/port metadata, store, and close; **does not start listening** |
 | `createContextMcpServer`, `runContextMcpServer`, `loadMcpPolicy` | MCP factory/stdio startup and owner policy loading |
 | `createMcpHttpApp`, `runContextMcpHttpServer` | Authenticated Streamable HTTP MCP transport; loopback-only unless `allowRemote` plus an explicit `token` |
-| `AccessPolicy`, `MCP_CAPABILITIES` | Policy object with `read`/`remember`/`forget`/`propose` capabilities, scope roots, sensitivity and `maxSourceTrust` ceilings |
+| `AccessPolicy`, `MCP_CAPABILITIES`, `listMcpPolicyClients` | Policy object with `read`/`remember`/`forget`/`propose` capabilities, scope roots, sensitivity and `maxSourceTrust` ceilings; v2 adds `deny` roots, `minSourceTrust`, `label`/`transport`, `budget` caps, `clampBudget()`, `denies()` |
+| `ContextCompiler`, `contextRequestSchema`, `normalizeContextRequest`, `COMPILER_VERSION`, `CONTEXT_FORMATS`, `RETRIEVAL_MODES`, `PURPOSE_TYPE_AFFINITY` | ContextRequest normalization + the compile pipeline; see [Context Vault](./context-vault.md#context-compiler) |
+| `EDGE_PREDICATES`, `ENTITY_KINDS`, `ensureEntity`, `findEntity`, `listEntities`, `mergeEntities` | Graph predicate/kind vocabularies and store-free entity helpers |
+| `evaluateCompilerVault` | Compiler eval runner: current-truth, temporal, policy, staleness, dedupe, cross-scope, receipt integrity (`npm run eval:compiler`) |
 | `AccessAudit` | Local metadata audit begin/finish/list/verify/toJSONL/prune/clear/close; completed events form a tamper-evident hash chain |
 | `exportMemories`, `exportPayloadHash`, `parseContextExport`, `validateContextExport`, `serializeMemory`, `CONTEXT_EXPORT_FORMAT`, `CONTEXT_EXPORT_VERSION` | Versioned `openself-context` JSONL interchange export, parsing, and non-throwing validation per [the exchange spec](../spec/context-exchange-format.md); imported records are clamped to `external` trust; exports are Ed25519-signed unless `sign: false`, and `redact: true` strips secret-shaped strings |
 | `loadSigningIdentity`, `signPayload`, `verifyPayload`, `signingFingerprint`, `SIGNING_DOMAIN` | Vault Ed25519 identity persisted at `<dataDir>/signing-key.json`; receipts carry `signer`/`signature` over `contextHash`, exports sign `exportHash` — spec §4 |

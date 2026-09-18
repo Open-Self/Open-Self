@@ -30,6 +30,7 @@ describe('Context MCP server', () => {
             'openself_search_memory',
             'openself_find_conflicts',
             'openself_get_context',
+            'openself_compile_context',
             'openself_forget',
         ]);
 
