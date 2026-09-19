@@ -37,6 +37,9 @@ export async function contextCommand(query, options = {}) {
                 },
             },
             {
+                // Local CLI is owner-authorized — the receipt may enumerate
+                // policy-denied candidates for debugging.
+                diagnostics: true,
                 envelope: {
                     clientId: 'cli',
                     maxSensitivity: options.maxSensitivity || 'restricted',

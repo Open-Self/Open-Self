@@ -150,10 +150,10 @@ try {
     assert.equal(package_.receipt.requester.clientId, 'fixture');
     assert.ok(package_.contextHash.length > 0);
     assert.ok(!package_.context.includes('Hidden database decision'));
+    // Client-facing receipts omit denied candidates entirely — denied records
+    // are indistinguishable from missing ones over MCP.
     assert.ok(
-        package_.receipt.candidates.some(
-            (candidate) => candidate.decision === 'denied' && candidate.contentHash,
-        ),
+        !package_.receipt.candidates.some((candidate) => candidate.decision === 'denied'),
     );
     const direct = store.compileContext(
         { query: 'database', scope: 'project/fixture', explain: true },

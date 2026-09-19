@@ -114,9 +114,11 @@ function runCase(store, keys, policies, testCase) {
             failures: [`unknown policy client: ${testCase.policy}`],
         };
     }
+    // The evaluator is the vault owner measuring the firewall — diagnostics
+    // receipts are required so `expect.denied` cases can see denied rows.
     const options = policy
-        ? { policy, receipt: true }
-        : { envelope: { clientId: 'eval' }, receipt: true };
+        ? { policy, receipt: true, diagnostics: true }
+        : { envelope: { clientId: 'eval' }, receipt: true, diagnostics: true };
     let pkg;
     const failures = [];
     try {

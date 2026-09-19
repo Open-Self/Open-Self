@@ -90,12 +90,14 @@ describe('openself_compile_context MCP contract', () => {
         });
         const pkg = JSON.parse(result.content[0].text);
         expect(pkg.context).not.toContain('private keys');
+        // Client-facing receipts never enumerate denied candidates — a denied
+        // memory is indistinguishable from one that does not exist, so the
+        // agent cannot use explain:true as an oracle into the vault.
         const denied = pkg.receipt.candidates.filter((c) => c.decision === 'denied');
-        expect(denied.length).toBe(1);
-        expect(Object.keys(denied[0]).sort()).toEqual(
-            ['contentHash', 'decision', 'id', 'reason'].sort(),
-        );
-        // The wire payload never carries the denied content either.
+        expect(denied.length).toBe(0);
+        expect(pkg.receipt.totals.denied).toBeUndefined();
+        expect(pkg.receipt.filters.deniedScopes).toBeNull();
+        // The wire payload never carries the denied id/hash/content either.
         expect(result.content[0].text).not.toContain('private keys');
     });
 

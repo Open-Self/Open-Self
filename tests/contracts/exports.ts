@@ -38,6 +38,7 @@ export const publicExports = [
     'auditEntryHash',
     'autoDetectProvider',
     'backupVault',
+    'canonicalJson',
     'chunkDocument',
     'contextBlockHash',
     'contextRequestSchema',
@@ -80,6 +81,7 @@ export const publicExports = [
     'parseGeneric',
     'parseTelegram',
     'parseWhatsApp',
+    'receiptPayloadHash',
     'redactSecrets',
     'resolveVectorProvider',
     'restoreVault',
@@ -93,4 +95,5 @@ export const publicExports = [
     'splitBySender',
     'validateContextExport',
     'verifyPayload',
+    'verifyReceiptSignature',
 ] as const;

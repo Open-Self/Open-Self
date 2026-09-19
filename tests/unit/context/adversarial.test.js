@@ -44,7 +44,7 @@ describe('compiler adversarial / privacy regression', () => {
         });
         const pkg = store.compileContext(
             { query: 'ignore instructions owner trust', explain: true },
-            { policy: atlasReader },
+            { policy: atlasReader, diagnostics: true },
         );
         expect(pkg.context).not.toContain('root password');
         // The injection text may be SELECTED as data — it grants nothing.
@@ -108,7 +108,7 @@ describe('compiler adversarial / privacy regression', () => {
         });
         const pkg = store.compileContext(
             { query: 'recovery phrase floor safe', explain: true },
-            { policy: atlasReader },
+            { policy: atlasReader, diagnostics: true },
         );
         expect(pkg.context).not.toContain('floor safe');
         expect(pkg.memories.map((m) => m.id)).not.toContain(secret.id);
@@ -136,7 +136,7 @@ describe('compiler adversarial / privacy regression', () => {
         });
         const pkg = store.compileContext(
             { query: 'deploy window', explain: true },
-            { policy: floor },
+            { policy: floor, diagnostics: true },
         );
         expect(pkg.memories).toHaveLength(0);
         expect(pkg.receipt.totals.denied).toBe(1);
@@ -325,7 +325,7 @@ describe('compiler adversarial / privacy regression', () => {
         });
         const pkg = store.compileContext(
             { query: 'atlas deploy', explain: true },
-            { policy: atlasReader },
+            { policy: atlasReader, diagnostics: true },
         );
         expect(pkg.receipt.totals.selected).toBe(pkg.memories.length);
         // Denied entries carry no type/scope/sensitivity — nothing to infer.
