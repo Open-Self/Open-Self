@@ -206,6 +206,13 @@ export interface ContextStoreOptions {
     embeddings?: EmbeddingProviderName | VectorProvider;
     /** Alias for `embeddings` when passing a provider object. */
     vectorProvider?: VectorProvider;
+    /**
+     * Owner override for the indexing sensitivity cap. Remote providers
+     * default to 'private' so `restricted` content never leaves the machine;
+     * local providers default to 'restricted'. Setting 'restricted' on a
+     * remote provider opts in to sending restricted text to that endpoint.
+     */
+    embeddingIndexMaxSensitivity?: Sensitivity;
 }
 export interface VaultStats {
     total: number;

@@ -7,24 +7,30 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ContextStore } from '../context/store.js';
 import { AccessAudit } from '../context/access-audit.js';
 import { createContextMcpServer } from '../context/mcp.js';
+import { verifyReceiptSignature } from '../context/signing.js';
 
 const AGENT_A_POLICY = {
     clientId: 'demo-agent-a',
-    scopes: ['project/atlas'],
+    scopes: ['project/alpha'],
     maxSensitivity: 'private',
     capabilities: ['read', 'remember', 'forget'],
 };
 const AGENT_B_POLICY = {
     clientId: 'demo-agent-b',
-    scopes: ['project/atlas'],
+    scopes: ['project/alpha'],
     maxSensitivity: 'private',
     capabilities: ['read', 'propose'],
 };
 
 /**
- * Disposable cross-agent demo. Uses the real MCP server and protocol over an
- * in-memory transport — nothing leaves the process, and the vault lives in a
- * temporary directory unless --keep is passed.
+ * Disposable two-agent / two-project handoff demo. Uses the real MCP server
+ * and protocol over an in-memory transport — nothing leaves the process, and
+ * the vault lives in a temporary directory unless --keep is passed.
+ *
+ * Scenario: agent A finishes work in project/alpha and records a decision and
+ * a status; agent B picks up the next task. A parallel project/beta holds
+ * near-identical decoy content, and the owner keeps a restricted note inside
+ * project/alpha — neither may leak into agent B's package.
  */
 export async function demoCommand(options = {}) {
     const keep = Boolean(options.keep);
@@ -40,91 +46,186 @@ export async function demoCommand(options = {}) {
         const agentA = await connectAgent(store, audit, AGENT_A_POLICY);
         const agentB = await connectAgent(store, audit, AGENT_B_POLICY);
 
-        // 1. Agent A stores a durable decision.
-        const remembered = await agentA.callTool({
+        // 1. Agent A finishes its work in project/alpha: a decision and a
+        //    verified status update, both with source provenance.
+        const decisionResult = await agentA.callTool({
             name: 'openself_remember',
             arguments: {
                 type: 'decision',
                 content:
-                    'Project Atlas uses SQLite as the local source of truth because we need portable offline operation',
-                scope: 'project/atlas',
+                    'Project Alpha uses SQLite as the local source of truth because we need portable offline operation',
+                scope: 'project/alpha',
                 sensitivity: 'personal',
                 sourceKind: 'agent',
-                sourceTitle: 'Atlas architecture review',
+                sourceLocator: 'docs/architecture.md#storage',
+                sourceTitle: 'Alpha architecture review',
                 tags: ['database', 'architecture'],
             },
         });
-        const stored = parsePayload(remembered);
-        transcript.push({ step: 'remember', client: 'agent-a', memory: stored.memory });
+        const decision = parsePayload(decisionResult).memory;
+        transcript.push({ step: 'a-decision', client: 'agent-a', memory: decision });
 
-        // 2. The owner stores a restricted memory the agents must not see.
+        const statusResult = await agentA.callTool({
+            name: 'openself_remember',
+            arguments: {
+                type: 'fact',
+                content: 'Alpha migration milestone reached: schema v4 verified on staging',
+                scope: 'project/alpha',
+                sourceKind: 'agent',
+                sourceTitle: 'Agent A run report',
+            },
+        });
+        const status = parsePayload(statusResult).memory;
+        transcript.push({ step: 'a-status', client: 'agent-a', memory: status });
+
+        // 2. Owner seeds decoys the agents must never see: a parallel project
+        //    with near-identical wording, and a restricted note inside alpha.
+        const betaDecoy = store.remember({
+            type: 'decision',
+            content:
+                'Project Beta uses SQLite as the local source of truth — beta chose Postgres before switching',
+            scope: 'project/beta',
+            sensitivity: 'public',
+        });
         const restricted = store.remember({
             type: 'note',
-            content: 'Personal banking credential rotation scheduled for next week',
-            scope: 'project/atlas',
+            content: 'Alpha vault recovery passphrase is in the hardware safe',
+            scope: 'project/alpha',
             sensitivity: 'restricted',
             source: { kind: 'manual', title: 'Owner note' },
         });
-
-        // 3. Agent B asks a question and receives context with provenance.
-        const answer = await agentB.callTool({
-            name: 'openself_get_context',
-            arguments: {
-                query: 'What database does Atlas use and why?',
-                scope: 'project/atlas',
-                explain: true,
-            },
-        });
-        const contextPayload = parsePayload(answer);
-        transcript.push({ step: 'context', client: 'agent-b', result: contextPayload });
-
-        // 4. Agent B tries a write and is denied by policy.
-        const denied = await agentB.callTool({
-            name: 'openself_remember',
-            arguments: { content: 'attempted write', scope: 'project/atlas' },
-        });
         transcript.push({
-            step: 'denied-write',
-            client: 'agent-b',
-            isError: Boolean(denied.isError),
+            step: 'owner-seed',
+            client: 'owner',
+            betaDecoy: betaDecoy.id,
+            restricted: restricted.id,
         });
 
-        // 5. Agent B proposes a memory instead — it waits for owner approval.
+        // 3. Agent B proposes the follow-up decision — it stays pending and
+        //    invisible until the owner approves it.
         const proposed = await agentB.callTool({
             name: 'openself_propose_memory',
             arguments: {
-                type: 'fact',
-                content: 'The Atlas team decided to keep migrations in db/migrate',
-                scope: 'project/atlas',
-                note: 'heard in standup',
+                type: 'decision',
+                content: 'Alpha keeps migrations in db/migrate with numbered filenames',
+                scope: 'project/alpha',
+                sourceTrust: 'owner', // agents can never claim owner trust — clamped
+                note: 'heard in standup; needs owner review',
             },
         });
         const proposal = parsePayload(proposed).proposal;
+        transcript.push({
+            step: 'b-proposal',
+            client: 'agent-b',
+            proposal,
+            trustClamped: proposal.memory.sourceTrust === 'external',
+        });
+
+        // 4. Before approval, agent B's context for the same task does not
+        //    include the pending proposal.
+        const preApproval = await agentB.callTool({
+            name: 'openself_compile_context',
+            arguments: {
+                query: 'alpha database migrations',
+                task: 'continue alpha migration work',
+                scope: 'project/alpha',
+                explain: true,
+            },
+        });
+        const preApprovalPkg = parsePayload(preApproval);
+        const pendingVisible = (preApprovalPkg.memories || []).some(
+            (memory) => memory.id === proposal.id,
+        );
+        transcript.push({ step: 'b-pre-approval', pendingVisible });
+
+        // 5. Owner approves the proposal — with verified trust, an owner
+        //    privilege the agents never hold.
         const approved = store.approveProposal(
             proposal.id,
-            {},
+            { sourceTrust: 'verified' },
             { reviewNote: 'verified in notes' },
         );
-        transcript.push({ step: 'proposal', client: 'agent-b', proposal, approved });
+        transcript.push({ step: 'owner-approval', approved });
 
-        // 6. Agent B cannot see the restricted memory at all.
-        const search = await agentB.callTool({
-            name: 'openself_search_memory',
-            arguments: { query: 'banking credential', scope: 'project/atlas' },
+        // 6. Agent B requests the handoff package for the new task: approved
+        //    context + provenance + a signed receipt, and nothing denied.
+        const handoff = await agentB.callTool({
+            name: 'openself_compile_context',
+            arguments: {
+                query: 'alpha database migrations',
+                task: 'write the next alpha migration',
+                scope: 'project/alpha',
+                explain: true,
+            },
         });
-        const searchPayload = parsePayload(search);
-        const leaked = (searchPayload.memories || []).some((m) => m.id === restricted.id);
-        transcript.push({ step: 'restricted-search', client: 'agent-b', leaked });
+        const handoffPkg = parsePayload(handoff);
+        const receipt = handoffPkg.receipt;
+        const receiptVerified = receipt?.receiptSignature
+            ? verifyReceiptSignature(receipt, store.signingIdentity.publicKey)
+            : false;
+        const leaks = {
+            betaContent: (handoffPkg.context || '').includes('Project Beta uses'),
+            restrictedContent: (handoffPkg.context || '').includes('recovery passphrase'),
+            deniedOnReceipt: (receipt?.candidates || []).some(
+                (candidate) => candidate.decision === 'denied',
+            ),
+            deniedScopeName: JSON.stringify(receipt || {}).includes('project/beta'),
+        };
+        transcript.push({
+            step: 'b-handoff',
+            client: 'agent-b',
+            package: handoffPkg,
+            receiptVerified,
+            leaks,
+        });
 
-        const events = audit.list({ limit: 20 });
+        // 7. Agent B still cannot write — proposals are the only write path.
+        const deniedWrite = await agentB.callTool({
+            name: 'openself_remember',
+            arguments: { content: 'attempted write', scope: 'project/alpha' },
+        });
+        transcript.push({
+            step: 'b-denied-write',
+            client: 'agent-b',
+            isError: Boolean(deniedWrite.isError),
+        });
+
+        // 8. And cannot widen into the sibling project.
+        const crossover = await agentB.callTool({
+            name: 'openself_search_memory',
+            arguments: { query: 'beta postgres sqlite', scope: 'project/beta' },
+        });
+        const crossoverLeaked = crossover.isError
+            ? false // scope outside the policy fails closed
+            : (parsePayload(crossover).memories || []).some(
+                  (memory) => memory.id === betaDecoy.id,
+              );
+        transcript.push({ step: 'b-crossover', crossoverLeaked });
+
+        const events = audit.list({ limit: 30 });
         transcript.push({ step: 'audit', events });
+        const pendingProposals = store.listProposals({ status: 'pending' }).length;
 
+        const result = {
+            dataDir,
+            transcript,
+            handoffPkg,
+            receiptVerified,
+            leaks,
+            pendingVisible,
+            deniedWrite,
+            crossoverLeaked,
+            approved,
+            status,
+            decision,
+            pendingProposals,
+        };
         if (options.json) {
             console.log(JSON.stringify({ dataDir, transcript }, null, 2));
         } else {
-            printDemo({ dataDir, transcript, contextPayload, denied, approved, leaked, events });
+            printDemo(result);
         }
-        return { dataDir, transcript };
+        return result;
     } finally {
         await closeAll();
         audit.close();
@@ -153,60 +254,85 @@ function parsePayload(result) {
     return result.structuredContent ?? JSON.parse(result.content[0].text);
 }
 
-function printDemo({ dataDir, transcript, contextPayload, denied, approved, leaked, events }) {
-    const stored = transcript.find((item) => item.step === 'remember').memory;
-    console.log(chalk.bold('\nOpenSelf cross-agent demo'));
+function printDemo({
+    dataDir,
+    transcript,
+    handoffPkg,
+    receiptVerified,
+    leaks,
+    pendingVisible,
+    deniedWrite,
+    crossoverLeaked,
+    approved,
+    decision,
+    pendingProposals,
+}) {
+    const betaDecoyId = transcript.find((item) => item.step === 'owner-seed').betaDecoy;
+    console.log(chalk.bold('\nOpenSelf cross-agent handoff demo'));
     console.log(chalk.gray(`Disposable vault: ${dataDir}\n`));
 
-    console.log(chalk.bold('1. agent-a stores a decision (MCP openself_remember)'));
+    console.log(chalk.bold('1. agent-a finishes project/alpha work (MCP openself_remember)'));
     console.log(
-        `   ${chalk.green('✓')} ${stored.type} · ${stored.scope} · trust ${stored.sourceTrust}`,
+        `   ${chalk.green('✓')} decision · trust ${decision.sourceTrust} · "${decision.content.slice(0, 72)}…"`,
     );
-    console.log(`   "${stored.content}"\n`);
+    console.log(
+        `   ${chalk.green('✓')} status  · "Alpha migration milestone reached: schema v4 verified on staging"\n`,
+    );
 
-    console.log(chalk.bold('2. owner stores a restricted memory directly (outside agent policy)'));
-    console.log(`   ${chalk.green('✓')} sensitivity restricted\n`);
+    console.log(chalk.bold('2. owner seeds decoys outside agent-B policy'));
+    console.log(
+        `   ${chalk.green('✓')} project/beta near-identical decision + restricted note inside alpha\n`,
+    );
 
-    console.log(chalk.bold('3. agent-b asks a question (MCP openself_get_context --explain)'));
-    const receipt = contextPayload.receipt;
+    console.log(chalk.bold('3. agent-b proposes the follow-up decision (MCP openself_propose_memory)'));
+    const proposed = transcript.find((item) => item.step === 'b-proposal');
+    console.log(
+        `   ${chalk.green('✓')} pending · trust clamped to ${proposed.proposal.memory.sourceTrust}\n`,
+    );
+
+    console.log(chalk.bold('4. before approval the proposal is invisible to agent-b'));
+    console.log(
+        `   ${pendingVisible ? chalk.red('✗ pending proposal leaked') : chalk.green('✓ not in the package')}\n`,
+    );
+
+    console.log(chalk.bold('5. owner approves — trust raised to verified'));
+    console.log(`   ${chalk.green('✓')} memory ${chalk.gray(approved.id.slice(0, 8))} approved\n`);
+
+    console.log(chalk.bold('6. agent-b receives the handoff package (MCP openself_compile_context)'));
+    const receipt = handoffPkg.receipt;
+    console.log(chalk.cyan('   --- context block ---'));
+    for (const line of (handoffPkg.context || '').split('\n')) console.log(`   ${line}`);
+    console.log(chalk.cyan('   ---------------------'));
     for (const entry of receipt?.candidates || []) {
         console.log(
-            `   ${chalk.green('✓')} ${entry.type} ${chalk.gray(entry.scope)} ` +
-                `sim ${entry.match?.vectorSimilarity ?? '—'} · ${entry.decision} · ` +
+            `   ${entry.decision === 'selected' ? chalk.green('✓') : '–'} ` +
+                `${entry.type} ${chalk.gray(entry.scope)} · ${entry.decision} · ` +
                 `${entry.sensitivity}/${entry.sourceTrust}`,
         );
     }
-    console.log(chalk.cyan('\n   --- context block ---'));
-    for (const line of (contextPayload.context || '').split('\n')) console.log(`   ${line}`);
-    console.log(chalk.cyan('   ---------------------\n'));
-
-    console.log(chalk.bold('4. agent-b attempts a write — policy denies it'));
     console.log(
-        `   ${denied.isError ? chalk.red('denied') : chalk.green('allowed')} (no remember capability)\n`,
+        `   receipt ${receipt?.receiptHash?.slice(0, 16)}… ` +
+            `${receiptVerified ? chalk.green('signature verified') : chalk.red('unsigned')}\n`,
     );
 
-    console.log(chalk.bold('5. agent-b proposes a memory instead — owner approves it'));
+    console.log(chalk.bold('7. handoff evidence'));
     console.log(
-        `   ${chalk.green('✓')} proposal ${chalk.gray(approved.id.slice(0, 8))} approved → ` +
-            `memory with trust ${approved.sourceTrust}`,
+        `   objective: "write the next alpha migration" · ` +
+            `sources: ${(handoffPkg.memories || [])
+                .map((memory) => memory.source?.locator || memory.source?.title || memory.source?.kind)
+                .join(', ') || '—'}`,
     );
-    console.log(`   "${approved.content}"\n`);
-
-    console.log(chalk.bold('6. agent-b searches for the restricted memory'));
     console.log(
-        `   ${leaked ? chalk.red('LEAKED') : chalk.green('not visible')} — restricted memories require an owner grant\n`,
+        `   leaks: beta ${leaks.betaContent ? chalk.red('LEAKED') : chalk.green('none')} · ` +
+            `restricted ${leaks.restrictedContent ? chalk.red('LEAKED') : chalk.green('none')} · ` +
+            `denied rows on receipt ${leaks.deniedOnReceipt ? chalk.red('LEAKED') : chalk.green('none')}`,
     );
-
-    console.log(chalk.bold('7. local access audit'));
-    for (const event of events) {
-        console.log(
-            `   ${chalk.gray(event.occurredAt)} ${event.client} ${event.tool} → ${event.outcome}`,
-        );
-    }
-
-    console.log(chalk.bold('\nNext steps'));
-    console.log('  openself init                       # create your real vault');
-    console.log('  openself connect claude             # wire a compatible client');
-    console.log('  openself mcp                        # run the stdio MCP server');
-    console.log('  openself dashboard                  # inspect the vault locally');
+    console.log(
+        `   write attempt ${deniedWrite.isError ? chalk.red('denied') : chalk.green('allowed')} · ` +
+            `beta crossover ${crossoverLeaked ? chalk.red('LEAKED') : chalk.green('none')}`,
+    );
+    console.log(
+        `   unresolved: proposals still pending ${pendingProposals} · ` +
+            `beta decoy ${betaDecoyId.slice(0, 8)} stayed out of scope\n`,
+    );
 }

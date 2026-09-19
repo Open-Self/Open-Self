@@ -251,6 +251,47 @@ describe('compiler adversarial / privacy regression', () => {
         store.close();
     });
 
+    it('remote indexing honors the cap on every write path, not just indexPending', async () => {
+        const sent = [];
+        const remote = {
+            name: 'spy-async',
+            model: 'spy-v1',
+            encode: async (text) => {
+                sent.push(text);
+                return [0.1, 0.2];
+            },
+        };
+        const store = new ContextStore({ dbPath: ':memory:', embeddings: remote });
+        // Writes with an async provider are indexed lazily — still capped.
+        store.remember({ content: 'restricted async write path', sensitivity: 'restricted' });
+        store.remember({ content: 'private async write path', sensitivity: 'private' });
+        await store.indexPending();
+        expect(sent.join('\n')).not.toContain('restricted async write path');
+        expect(sent.join('\n')).toContain('private async write path');
+        store.close();
+    });
+
+    it('an explicit owner override can extend remote indexing to restricted', async () => {
+        const sent = [];
+        const remote = {
+            name: 'spy-override',
+            model: 'spy-v1',
+            encode: async (text) => {
+                sent.push(text);
+                return [0.1, 0.2];
+            },
+        };
+        const store = new ContextStore({
+            dbPath: ':memory:',
+            embeddings: remote,
+            embeddingIndexMaxSensitivity: 'restricted', // owner opt-in
+        });
+        store.remember({ content: 'restricted override phrase', sensitivity: 'restricted' });
+        await store.indexPending();
+        expect(sent.join('\n')).toContain('restricted override phrase');
+        store.close();
+    });
+
     it('MCP policy crossover: one requester cannot see another requester scope', () => {
         const store = vault();
         const finance = store.remember({
