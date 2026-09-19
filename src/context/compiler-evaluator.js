@@ -1,7 +1,7 @@
 import { AccessPolicy } from './access-policy.js';
 import { contextBlockHash } from './schema.js';
 import { ContextStore } from './store.js';
-import { verifyPayload } from './signing.js';
+import { verifyReceiptSignature } from './signing.js';
 
 /**
  * Compiler evaluation — measures the Context Compiler against the promises a
@@ -194,12 +194,9 @@ function runCase(store, keys, policies, testCase) {
             if (receipt.contextHash !== contextBlockHash(pkg.context)) {
                 failures.push('contextHash does not cite the rendered package');
             }
-            if (receipt.signature) {
+            if (receipt.signature || receipt.receiptSignature) {
                 const identity = store.signingIdentity;
-                if (
-                    !identity ||
-                    !verifyPayload(identity.publicKey, receipt.contextHash, receipt.signature)
-                ) {
+                if (!identity || !verifyReceiptSignature(receipt, identity.publicKey)) {
                     failures.push('receipt signature failed verification');
                 }
             }
