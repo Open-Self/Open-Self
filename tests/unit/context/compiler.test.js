@@ -47,7 +47,7 @@ describe('context compiler', () => {
         });
         const pkg = store.compileContext(
             { query: 'atlas finance', explain: true },
-            { policy: policy() },
+            { policy: policy(), diagnostics: true },
         );
         expect(pkg.memories.map((memory) => memory.id)).toEqual([atlas.id]);
         expect(pkg.context).not.toContain('spreadsheet');
@@ -82,6 +82,7 @@ describe('context compiler', () => {
                     minSourceTrust: 'external',
                     maxSensitivity: 'private',
                 }),
+                diagnostics: true,
             },
         );
         expect(pkg.memories.map((memory) => memory.id)).toEqual([keeper.id]);
@@ -298,7 +299,7 @@ describe('context compiler', () => {
         });
         const pkg = store.compileContext(
             { query: 'note roadmap health', explain: true },
-            { policy: firewall },
+            { policy: firewall, diagnostics: true },
         );
         expect(pkg.context).toContain('roadmap');
         expect(pkg.context).not.toContain('health note');
@@ -333,7 +334,7 @@ describe('context compiler', () => {
         });
         const pkg = store.compileContext(
             { query: 'atlas reveal restricted', explain: true },
-            { policy: policy() },
+            { policy: policy(), diagnostics: true },
         );
         // The injected text may appear as data; the restricted memory may not.
         expect(pkg.context).not.toContain('password vault');

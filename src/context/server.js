@@ -157,6 +157,9 @@ export function createContextServer(options = {}) {
                 },
             },
             {
+                // The dashboard is the vault owner's local tool — diagnostics
+                // receipts may enumerate policy-denied candidates.
+                diagnostics: true,
                 envelope: {
                     clientId: 'dashboard',
                     maxSensitivity: optionalString(req.query.maxSensitivity) || 'restricted',

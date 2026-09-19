@@ -59,7 +59,7 @@ owner-level access: direct calls do not inherit an MCP client's authorization po
 | `findPotentialConflictsAsync(input, options?)` | Async conflict check for async embedding providers |
 | `buildContext(query, options?)` | `{ query, context, memories, usedChars }` with a bounded context string; `explain: true` adds a `receipt` — delegates to the Context Compiler with a v1 projection |
 | `buildContextAsync(query, options?)` | Async context build for async embedding providers |
-| `compileContext(request, options?)` | Full Context Compiler: returns a `ContextPackage` (`{ request, context, format, memories, receipt }`); `options.policy` supplies an `AccessPolicy` requester envelope, `options.envelope` a raw `{ clientId, scopes, maxSensitivity, … }` |
+| `compileContext(request, options?)` | Full Context Compiler: returns a `ContextPackage` (`{ request, context, format, memories, receipt }`); `options.policy` supplies an `AccessPolicy` requester envelope, `options.envelope` a raw `{ clientId, scopes, maxSensitivity, … }`; `options.diagnostics` (owner tools only) adds policy-denied candidates to the receipt |
 | `compileContextAsync(request, options?)` | Async compile — awaits async embedding providers for the vector leg |
 | `supersede(input, id, options?)` | Write `input` as the replacement for `id`; `{ memory, superseded }`; `{ at }` overrides the supersession instant |
 | `unsupersede(id)` | Clear supersession, restoring the record as current truth; `false` if not superseded |

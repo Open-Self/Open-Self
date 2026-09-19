@@ -110,14 +110,16 @@ Both the CLI inbox (`openself inbox`) and the dashboard review the same queue.
 a fixed pipeline:
 
 ```text
-request → policy envelope → candidate discovery → policy partition
+request → policy envelope → policy-filtered candidate discovery
 → temporal resolution → conflict detection → ranking
 → redundancy control → budget packing → render → receipt
 ```
 
-- **Policy partition:** the requester's `AccessPolicy` (deny roots, sensitivity ceiling,
-  trust floor, budget caps) is applied before ranking; denied candidates can never be
-  selected, and requests can only narrow the envelope.
+- **Policy-filtered discovery:** the requester's `AccessPolicy` (allow/deny scope roots,
+  sensitivity ceiling, trust floor) is pushed into the retrieval query itself, so
+  policy-denied records never enter the bounded candidate window and can never starve
+  allowed results out of the top-k. A policy partition still runs afterwards as
+  defense-in-depth; requests can only narrow the envelope.
 - **Temporal resolution:** superseded records (`supersededAt`/`supersededBy`) are excluded
   from current truth but remain discoverable history; `includeSuperseded`/`includeStale`
   re-admit them, and `asOf` fixes the comparison instant.
@@ -131,14 +133,26 @@ same output contract, stronger guarantees.
 ## Explainable retrieval
 
 `compileContext(request, { policy })` with `explain: true` returns **receipt v2**: requester
-identity (clientId + label + agent), effective filters (allowed/denied/dropped scopes,
-sensitivity ceiling, trust floor), budget usage, per-candidate decisions (`selected`,
-`skipped`, `denied` with reasons such as `over-budget`, `duplicate-content`, `expired`,
-`not-yet-valid`, `superseded-by:*`, `policy-scope`/`policy-sensitivity`/`policy-trust`),
-declared conflicts, and the signed `contextHash` citation. Policy-denied candidates are
-reported as id + contentHash + reason only — denied content never appears. `buildContext`
-with `explain: true` still returns the v1 receipt projection. Receipts are owner diagnostics;
-the same receipt powers `openself context --explain` and the dashboard's Context Debugger.
+identity (clientId + label + agent), effective filters (allowed scopes, sensitivity ceiling,
+trust floor, dropped request scopes), budget usage, per-candidate decisions (`selected`,
+`skipped` with reasons such as `over-budget`, `duplicate-content`, `expired`,
+`not-yet-valid`, `superseded-by:*`), declared conflicts, and the signed `contextHash`
+citation. Client-facing receipts never enumerate policy-denied candidates — a denied record
+is indistinguishable from one that does not exist.
+
+Owner tools (CLI `openself context --explain`, the dashboard Context Debugger, the compiler
+evaluator) set `options.diagnostics: true`, which re-runs discovery without the policy
+clamps and reports denied candidates as id + contentHash + reason only — denied content,
+scope, type, and sensitivity never appear even there. The `diagnostics` flag lives on
+`options`, never on the request, so a client cannot self-enable it. `buildContext` with
+`explain: true` still returns the v1 receipt projection, which strips denied rows entirely.
+
+Signed receipts carry `receiptHash` (sha256 over the canonical receipt payload) and
+`receiptSignature` (Ed25519 over `receiptHash`), binding requester identity, filters,
+`asOf`, compiler version, budgets and per-candidate decisions — not just the context bytes.
+`verifyReceiptSignature(receipt, publicKey)` verifies current receipts and falls back to
+the legacy `signature`-over-`contextHash` scheme for receipts written before
+`receiptHash` existed.
 
 ## Retrieval
 

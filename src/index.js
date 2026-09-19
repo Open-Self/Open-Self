@@ -45,6 +45,9 @@ export {
     loadSigningIdentity,
     signPayload,
     verifyPayload,
+    verifyReceiptSignature,
+    receiptPayloadHash,
+    canonicalJson,
     signingFingerprint,
     SIGNING_DOMAIN,
 } from './context/signing.js';

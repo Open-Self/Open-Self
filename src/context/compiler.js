@@ -1,4 +1,5 @@
 import { AccessPolicy } from './access-policy.js';
+import { receiptPayloadHash } from './signing.js';
 import {
     COMPILER_VERSION,
     normalizeContextRequest,
@@ -40,15 +41,29 @@ export class ContextCompiler {
     _compile(input, options, searchFn) {
         const request = normalizeContextRequest(input);
         const envelope = this._resolveEnvelope(request, options);
+        const diagnostics = options.diagnostics === true;
         const discovered = this._discover(request, envelope, searchFn);
-        return this._package(request, envelope, discovered, options);
+        const deniedProbe = diagnostics
+            ? this._probeDenied(request, envelope, searchFn)
+            : [];
+        return this._package(request, envelope, discovered, options, {
+            diagnostics,
+            deniedProbe,
+        });
     }
 
     async _compileAsync(input, options) {
         const request = normalizeContextRequest(input);
         const envelope = this._resolveEnvelope(request, options);
+        const diagnostics = options.diagnostics === true;
         const discovered = await this._discoverAsync(request, envelope);
-        return this._package(request, envelope, discovered, options);
+        const deniedProbe = diagnostics
+            ? await this._probeDeniedAsync(request, envelope)
+            : [];
+        return this._package(request, envelope, discovered, options, {
+            diagnostics,
+            deniedProbe,
+        });
     }
 
     /**
@@ -124,12 +139,54 @@ export class ContextCompiler {
     }
 
     /**
-     * Candidate discovery runs WITHOUT the policy clamps so the receipt can
-     * report policy-denied candidates (id + contentHash only — never content).
-     * Temporal filters are also deferred: the pipeline classifies validity
-     * itself so stale/superseded candidates are explainable.
+     * Candidate discovery runs INSIDE the policy clamps: the requester
+     * envelope (allowed/denied scope roots, sensitivity ceiling, trust floor)
+     * is pushed into the retrieval query itself, so policy-denied records
+     * never consume the bounded candidate window and can never starve allowed
+     * results out of the top-k. Temporal filters stay deferred — the pipeline
+     * classifies validity itself so stale/superseded candidates are
+     * explainable.
      */
     _discoveryOptions(request, envelope) {
+        const maxItems = envelope.budget.maxItems ?? 12;
+        return {
+            scope: request.scope || undefined,
+            type: request.type || undefined,
+            retrieval: request.retrieval,
+            anyTime: true,
+            allowedScopes: envelope.allowedScopes ?? undefined,
+            deniedScopes: envelope.deniedScopes ?? undefined,
+            maxSensitivity: envelope.maxSensitivity,
+            minSourceTrust: envelope.minSourceTrust ?? undefined,
+            limit: clamp(Math.max(maxItems * 8, 50), 50, 100),
+        };
+    }
+
+    _discover(request, envelope, searchFn) {
+        const params = this._discoveryOptions(request, envelope);
+        if (!request.query) {
+            return this.store.list(params);
+        }
+        return searchFn(request.query, params);
+    }
+
+    async _discoverAsync(request, envelope) {
+        const params = this._discoveryOptions(request, envelope);
+        if (!request.query) {
+            return this.store.list(params);
+        }
+        return this.store.searchAsync(request.query, params);
+    }
+
+    /**
+     * Owner-diagnostics probe: re-run discovery WITHOUT the policy clamps so
+     * an owner-authorized receipt can enumerate what the firewall denied
+     * (id + contentHash + reason only — never content). This second pass runs
+     * only when `options.diagnostics` is set by the embedding host (CLI,
+     * dashboard, evaluator) — it is never reachable from request fields, so a
+     * client cannot self-enable it.
+     */
+    _deniedProbeOptions(request, envelope) {
         const maxItems = envelope.budget.maxItems ?? 12;
         return {
             scope: request.scope || undefined,
@@ -141,30 +198,22 @@ export class ContextCompiler {
         };
     }
 
-    _discover(request, envelope, searchFn) {
-        const params = this._discoveryOptions(request, envelope);
-        if (!request.query) {
-            return this.store.list({
-                scope: params.scope,
-                type: params.type,
-                maxSensitivity: 'restricted',
-                limit: params.limit,
-            });
-        }
-        return searchFn(request.query, params);
+    _probeDenied(request, envelope, searchFn) {
+        const params = this._deniedProbeOptions(request, envelope);
+        const rows = !request.query ? this.store.list(params) : searchFn(request.query, params);
+        return rows
+            .map((memory) => ({ memory, reason: this._policyVerdict(memory, envelope) }))
+            .filter((item) => item.reason);
     }
 
-    async _discoverAsync(request, envelope) {
-        const params = this._discoveryOptions(request, envelope);
-        if (!request.query) {
-            return this.store.list({
-                scope: params.scope,
-                type: params.type,
-                maxSensitivity: 'restricted',
-                limit: params.limit,
-            });
-        }
-        return this.store.searchAsync(request.query, params);
+    async _probeDeniedAsync(request, envelope) {
+        const params = this._deniedProbeOptions(request, envelope);
+        const rows = !request.query
+            ? this.store.list(params)
+            : await this.store.searchAsync(request.query, params);
+        return rows
+            .map((memory) => ({ memory, reason: this._policyVerdict(memory, envelope) }))
+            .filter((item) => item.reason);
     }
 
     /** Deny reason for a candidate under the envelope, or null when allowed. */
@@ -261,7 +310,8 @@ export class ContextCompiler {
         return relevance * trustWeight * affinity * entityBoost * (memory.confidence || 1);
     }
 
-    _package(request, envelope, discovered, options) {
+    _package(request, envelope, discovered, options, runtime = {}) {
+        const diagnostics = runtime.diagnostics === true;
         const asOfMs = Date.parse(request.asOf);
         const superseded = this.store.supersededIds(request.asOf);
         const entityIds = request.entity
@@ -274,9 +324,12 @@ export class ContextCompiler {
               )
             : null;
 
-        // Policy partition → temporal classification.
+        // Policy partition → temporal classification. Discovery already ran
+        // inside the envelope, so `denied` is normally empty here — the
+        // partition stays as defense-in-depth, and the owner-diagnostics probe
+        // (when enabled) contributes the unfiltered denied list.
         const allowed = [];
-        const denied = [];
+        const denied = [...(runtime.deniedProbe || [])];
         for (const memory of discovered) {
             const verdict = this._policyVerdict(memory, envelope);
             if (verdict) denied.push({ memory, reason: verdict });
@@ -343,7 +396,8 @@ export class ContextCompiler {
             unique.push(memory);
         }
 
-        // Budget packing — greedy under every configured unit.
+        // Budget packing — greedy under every configured unit, then verified
+        // against the real rendered output.
         const maxItems = clamp(envelope.budget.maxItems ?? 12, 1, 500);
         const maxChars = clamp(envelope.budget.maxChars ?? 8_000, 500, 200_000);
         const maxTokens = envelope.budget.maxTokens
@@ -351,26 +405,43 @@ export class ContextCompiler {
             : null;
         const selected = [];
         const budgetSkipped = [];
-        let usedChars = 0;
-        let usedTokens = 0;
+        let estimatedChars = 0;
+        let estimatedTokens = 0;
         for (const memory of unique) {
             const rendered = renderMemory(memory);
             const addedChars = rendered.length + (selected.length > 0 ? 2 : 0);
             const addedTokens = Math.ceil(addedChars / 4);
             if (
                 selected.length >= maxItems ||
-                usedChars + addedChars > maxChars ||
-                (maxTokens !== null && usedTokens + addedTokens > maxTokens)
+                estimatedChars + addedChars > maxChars ||
+                (maxTokens !== null && estimatedTokens + addedTokens > maxTokens)
             ) {
                 budgetSkipped.push({ memory, addedChars });
                 continue;
             }
             selected.push({ memory, rendered, addedChars, addedTokens });
-            usedChars += addedChars;
-            usedTokens += addedTokens;
+            estimatedChars += addedChars;
+            estimatedTokens += addedTokens;
         }
 
-        const context = renderContext(request.format, selected, conflicts);
+        // Format wrappers (JSON envelope, markdown headings) and lifecycle
+        // markers add bytes the per-item estimate cannot see — so budgets are
+        // enforced again on the real emitted block: trim the lowest-ranked
+        // items until the actual output fits.
+        let context = renderContext(request.format, selected, conflicts);
+        while (
+            selected.length > 0 &&
+            (context.length > maxChars ||
+                (maxTokens !== null && Math.ceil(context.length / 4) > maxTokens))
+        ) {
+            const dropped = selected.pop();
+            budgetSkipped.push({ memory: dropped.memory, addedChars: dropped.addedChars });
+            context = renderContext(request.format, selected, conflicts);
+        }
+        // usedChars/usedTokens measure the emitted block exactly (tokens are a
+        // chars/4 estimate — a conservative planning unit, not a tokenizer).
+        const usedChars = context.length;
+        const usedTokens = Math.ceil(context.length / 4);
         const contextHash = contextBlockHash(context);
         const pkg = {
             query: request.query,
@@ -392,7 +463,6 @@ export class ContextCompiler {
             pkg.receipt = this._receipt({
                 request,
                 envelope,
-                discovered,
                 denied,
                 temporalSkipped,
                 duplicates,
@@ -405,11 +475,19 @@ export class ContextCompiler {
                 maxChars,
                 maxTokens,
                 contextHash,
+                diagnostics,
             });
+            // receiptHash covers every emitted receipt field — requester,
+            // filters, asOf, compiler version, budgets and per-candidate
+            // decisions — so receiptSignature binds the whole explanation.
+            // `signature` keeps covering contextHash alone for verifiers
+            // written against the v2 receipt before receiptHash existed.
+            pkg.receipt.receiptHash = receiptPayloadHash(pkg.receipt);
             const identity = this.store.signingIdentity;
             if (identity) {
                 pkg.receipt.signer = identity.fingerprint;
                 pkg.receipt.signature = identity.sign(contextHash);
+                pkg.receipt.receiptSignature = identity.sign(pkg.receipt.receiptHash);
             }
         }
         return pkg;
@@ -431,6 +509,7 @@ export class ContextCompiler {
             maxChars,
             maxTokens,
             contextHash,
+            diagnostics,
         } = parts;
         const asOfMs = Date.parse(request.asOf);
         const entry = (memory, decision, reason, chars) => {
@@ -474,14 +553,20 @@ export class ContextCompiler {
             ...temporalSkipped.map((item) =>
                 entry(item.memory, 'skipped', item.reason, item.addedChars),
             ),
-            // Policy-denied candidates are reported as id + hash + reason only
-            // — scope/sensitivity/type stay hidden inside the receipt.
-            ...denied.map((item) => ({
-                id: item.memory.id,
-                contentHash: item.memory.contentHash || memoryContentHash(item.memory.content),
-                decision: 'denied',
-                reason: item.reason,
-            })),
+            // Policy-denied candidates exist only on owner-diagnostics
+            // receipts, reported as id + hash + reason — scope, sensitivity,
+            // type and source stay hidden even there. Client-facing receipts
+            // omit denied candidates entirely: an agent must not be able to
+            // enumerate vault records it was never allowed to see.
+            ...(diagnostics
+                ? denied.map((item) => ({
+                      id: item.memory.id,
+                      contentHash:
+                          item.memory.contentHash || memoryContentHash(item.memory.content),
+                      decision: 'denied',
+                      reason: item.reason,
+                  }))
+                : []),
         ];
         return {
             version: 2,
@@ -498,7 +583,9 @@ export class ContextCompiler {
             filters: {
                 scope: request.scope,
                 allowedScopes: envelope.allowedScopes ?? null,
-                deniedScopes: envelope.deniedScopes ?? null,
+                // Deny-root names describe vault areas the requester cannot
+                // see — they only surface on owner-diagnostics receipts.
+                deniedScopes: diagnostics ? (envelope.deniedScopes ?? null) : null,
                 droppedScopes: envelope.droppedScopes,
                 type: request.type,
                 maxSensitivity: envelope.maxSensitivity,
@@ -521,7 +608,7 @@ export class ContextCompiler {
                 candidates: candidates.length,
                 selected: selected.length,
                 skipped: candidates.filter((item) => item.decision === 'skipped').length,
-                denied: denied.length,
+                denied: diagnostics ? denied.length : undefined,
                 conflicts: conflicts.length,
                 usedChars,
             },
