@@ -140,10 +140,7 @@ describe('client receipts vs owner diagnostics', () => {
     it('client receipts carry no denied candidates, deny roots, or denied totals', () => {
         store = vault();
         seedStarvation(store, { denied: 3 });
-        const pkg = store.compileContext(
-            { query: 'deploy', explain: true },
-            { policy: reader },
-        );
+        const pkg = store.compileContext({ query: 'deploy', explain: true }, { policy: reader });
         expect(pkg.receipt.candidates.some((c) => c.decision === 'denied')).toBe(false);
         expect(pkg.receipt.totals.denied).toBeUndefined();
         expect(pkg.receipt.filters.deniedScopes).toBeNull();
@@ -161,10 +158,7 @@ describe('client receipts vs owner diagnostics', () => {
             ),
         ).toThrow(); // strict request schema strips/forbids unknown fields
         // And a caller that passes it through options gets a client receipt anyway.
-        const pkg = store.compileContext(
-            { query: 'deploy', explain: true },
-            { policy: reader },
-        );
+        const pkg = store.compileContext({ query: 'deploy', explain: true }, { policy: reader });
         expect(pkg.receipt.candidates.every((c) => c.decision !== 'denied')).toBe(true);
     });
 
@@ -208,19 +202,14 @@ describe('receipt signatures bind the whole payload', () => {
         );
         expect(pkg.receipt.receiptHash).toMatch(/^[a-f0-9]{64}$/);
         expect(pkg.receipt.receiptSignature).toBeDefined();
-        expect(
-            verifyReceiptSignature(pkg.receipt, store.signingIdentity.publicKey),
-        ).toBe(true);
+        expect(verifyReceiptSignature(pkg.receipt, store.signingIdentity.publicKey)).toBe(true);
         store.close();
     });
 
     it('metadata tampering breaks the signature', () => {
         const store = signedVault();
         store.remember({ content: 'alpha uses SQLite', scope: 'project/alpha' });
-        const pkg = store.compileContext(
-            { query: 'sqlite', explain: true },
-            { policy: reader },
-        );
+        const pkg = store.compileContext({ query: 'sqlite', explain: true }, { policy: reader });
         const key = store.signingIdentity.publicKey;
         for (const tamper of [
             (receipt) => {
@@ -247,13 +236,8 @@ describe('receipt signatures bind the whole payload', () => {
         const store = signedVault();
         const other = signedVault();
         store.remember({ content: 'alpha uses SQLite', scope: 'project/alpha' });
-        const pkg = store.compileContext(
-            { query: 'sqlite', explain: true },
-            { policy: reader },
-        );
-        expect(
-            verifyReceiptSignature(pkg.receipt, other.signingIdentity.publicKey),
-        ).toBe(false);
+        const pkg = store.compileContext({ query: 'sqlite', explain: true }, { policy: reader });
+        expect(verifyReceiptSignature(pkg.receipt, other.signingIdentity.publicKey)).toBe(false);
         store.close();
         other.close();
     });
@@ -261,10 +245,7 @@ describe('receipt signatures bind the whole payload', () => {
     it('partial signature blocks fail closed', () => {
         const store = signedVault();
         store.remember({ content: 'alpha uses SQLite', scope: 'project/alpha' });
-        const pkg = store.compileContext(
-            { query: 'sqlite', explain: true },
-            { policy: reader },
-        );
+        const pkg = store.compileContext({ query: 'sqlite', explain: true }, { policy: reader });
         const key = store.signingIdentity.publicKey;
         const forged = JSON.parse(JSON.stringify(pkg.receipt));
         delete forged.receiptSignature;

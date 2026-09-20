@@ -893,8 +893,7 @@ export class ContextStore {
         };
         const limit = clamp(options.limit ?? 10, 1, 100);
         const ftsQuery = this.codec.indexQuery(query);
-        if (!ftsQuery)
-            return this.list(noFtsListOptions(options, limit));
+        if (!ftsQuery) return this.list(noFtsListOptions(options, limit));
 
         const retrieval = options.retrieval || 'hybrid';
         if (!['hybrid', 'lexical', 'vector'].includes(retrieval)) {

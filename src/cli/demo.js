@@ -197,9 +197,7 @@ export async function demoCommand(options = {}) {
         });
         const crossoverLeaked = crossover.isError
             ? false // scope outside the policy fails closed
-            : (parsePayload(crossover).memories || []).some(
-                  (memory) => memory.id === betaDecoy.id,
-              );
+            : (parsePayload(crossover).memories || []).some((memory) => memory.id === betaDecoy.id);
         transcript.push({ step: 'b-crossover', crossoverLeaked });
 
         const events = audit.list({ limit: 30 });
@@ -284,7 +282,9 @@ function printDemo({
         `   ${chalk.green('✓')} project/beta near-identical decision + restricted note inside alpha\n`,
     );
 
-    console.log(chalk.bold('3. agent-b proposes the follow-up decision (MCP openself_propose_memory)'));
+    console.log(
+        chalk.bold('3. agent-b proposes the follow-up decision (MCP openself_propose_memory)'),
+    );
     const proposed = transcript.find((item) => item.step === 'b-proposal');
     console.log(
         `   ${chalk.green('✓')} pending · trust clamped to ${proposed.proposal.memory.sourceTrust}\n`,
@@ -298,7 +298,9 @@ function printDemo({
     console.log(chalk.bold('5. owner approves — trust raised to verified'));
     console.log(`   ${chalk.green('✓')} memory ${chalk.gray(approved.id.slice(0, 8))} approved\n`);
 
-    console.log(chalk.bold('6. agent-b receives the handoff package (MCP openself_compile_context)'));
+    console.log(
+        chalk.bold('6. agent-b receives the handoff package (MCP openself_compile_context)'),
+    );
     const receipt = handoffPkg.receipt;
     console.log(chalk.cyan('   --- context block ---'));
     for (const line of (handoffPkg.context || '').split('\n')) console.log(`   ${line}`);
@@ -318,9 +320,14 @@ function printDemo({
     console.log(chalk.bold('7. handoff evidence'));
     console.log(
         `   objective: "write the next alpha migration" · ` +
-            `sources: ${(handoffPkg.memories || [])
-                .map((memory) => memory.source?.locator || memory.source?.title || memory.source?.kind)
-                .join(', ') || '—'}`,
+            `sources: ${
+                (handoffPkg.memories || [])
+                    .map(
+                        (memory) =>
+                            memory.source?.locator || memory.source?.title || memory.source?.kind,
+                    )
+                    .join(', ') || '—'
+            }`,
     );
     console.log(
         `   leaks: beta ${leaks.betaContent ? chalk.red('LEAKED') : chalk.green('none')} · ` +

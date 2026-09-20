@@ -43,9 +43,7 @@ export class ContextCompiler {
         const envelope = this._resolveEnvelope(request, options);
         const diagnostics = options.diagnostics === true;
         const discovered = this._discover(request, envelope, searchFn);
-        const deniedProbe = diagnostics
-            ? this._probeDenied(request, envelope, searchFn)
-            : [];
+        const deniedProbe = diagnostics ? this._probeDenied(request, envelope, searchFn) : [];
         return this._package(request, envelope, discovered, options, {
             diagnostics,
             deniedProbe,
@@ -57,9 +55,7 @@ export class ContextCompiler {
         const envelope = this._resolveEnvelope(request, options);
         const diagnostics = options.diagnostics === true;
         const discovered = await this._discoverAsync(request, envelope);
-        const deniedProbe = diagnostics
-            ? await this._probeDeniedAsync(request, envelope)
-            : [];
+        const deniedProbe = diagnostics ? await this._probeDeniedAsync(request, envelope) : [];
         return this._package(request, envelope, discovered, options, {
             diagnostics,
             deniedProbe,
