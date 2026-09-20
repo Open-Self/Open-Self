@@ -53,6 +53,58 @@ export function verifyPayload(publicKeyBase64, payload, signatureBase64) {
 }
 
 /**
+ * Deterministic JSON serialization — object keys sorted recursively, arrays
+ * keep order, undefined-valued keys are dropped. Used so a receipt hash can
+ * be recomputed from the emitted object regardless of key insertion order.
+ */
+export function canonicalJson(value) {
+    if (value === null || typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+    const keys = Object.keys(value)
+        .filter((key) => value[key] !== undefined)
+        .sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+}
+
+const RECEIPT_SIGNATURE_FIELDS = ['receiptHash', 'receiptSignature', 'signer', 'signature'];
+
+/**
+ * Domain-separated digest over the emitted receipt fields — the payload a
+ * receipt's `receiptSignature` covers. Everything that steers interpretation
+ * (requester, filters, asOf, compiler/schema versions, budgets, per-candidate
+ * decisions, contextHash) is bound; signature fields are excluded.
+ */
+export function receiptPayloadHash(receipt) {
+    const payload = Object.fromEntries(
+        Object.entries(receipt || {}).filter(([key]) => !RECEIPT_SIGNATURE_FIELDS.includes(key)),
+    );
+    return createHash('sha256')
+        .update('openself-receipt-v1\n')
+        .update(canonicalJson(payload), 'utf8')
+        .digest('hex');
+}
+
+/**
+ * Verify a context receipt's signature. Current receipts carry
+ * `receiptSignature` over the full receipt payload (integrity + provenance of
+ * the whole explanation); legacy receipts signed only `contextHash`, and stay
+ * verifiable through the fallback. Returns false on any mismatch — signatures
+ * prove integrity and origin, never that memory content is true.
+ */
+export function verifyReceiptSignature(receipt, publicKeyBase64) {
+    if (!receipt || typeof receipt !== 'object') return false;
+    if (receipt.receiptHash || receipt.receiptSignature) {
+        if (!receipt.receiptHash || !receipt.receiptSignature) return false;
+        if (receiptPayloadHash(receipt) !== receipt.receiptHash) return false;
+        return verifyPayload(publicKeyBase64, receipt.receiptHash, receipt.receiptSignature);
+    }
+    if (receipt.signature && receipt.contextHash) {
+        return verifyPayload(publicKeyBase64, receipt.contextHash, receipt.signature);
+    }
+    return false;
+}
+
+/**
  * Load (or create on first use) the vault signing identity for a data
  * directory. Returns null when the directory is not writable/readable —
  * read-only consumers simply omit signatures. Pass `create: false` for

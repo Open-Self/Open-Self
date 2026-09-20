@@ -206,6 +206,13 @@ export interface ContextStoreOptions {
     embeddings?: EmbeddingProviderName | VectorProvider;
     /** Alias for `embeddings` when passing a provider object. */
     vectorProvider?: VectorProvider;
+    /**
+     * Owner override for the indexing sensitivity cap. Remote providers
+     * default to 'private' so `restricted` content never leaves the machine;
+     * local providers default to 'restricted'. Setting 'restricted' on a
+     * remote provider opts in to sending restricted text to that endpoint.
+     */
+    embeddingIndexMaxSensitivity?: Sensitivity;
 }
 export interface VaultStats {
     total: number;
@@ -265,13 +272,10 @@ export class ContextStore {
      * envelope (AccessPolicy); `options.envelope` accepts a raw filter
      * envelope for trusted local callers.
      */
-    compileContext(
-        request: ContextRequestInput,
-        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
-    ): ContextPackage;
+    compileContext(request: ContextRequestInput, options?: CompileOptions): ContextPackage;
     compileContextAsync(
         request: ContextRequestInput,
-        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
+        options?: CompileOptions,
     ): Promise<ContextPackage>;
     /**
      * Lifecycle + context-graph delegates — supersession, typed edges,
@@ -471,6 +475,22 @@ export function verifyPayload(
     payload: string,
     signatureBase64: string,
 ): boolean;
+/**
+ * Deterministic JSON — sorted object keys, array order preserved, undefined
+ * object properties dropped. Used to canonicalize receipt payloads.
+ */
+export function canonicalJson(value: unknown): string;
+/**
+ * sha256("openself-receipt-v1\n" + canonicalJson(receipt minus signature
+ * fields)) — binds every metadata field that affects interpretation.
+ */
+export function receiptPayloadHash(receipt: object): string;
+/**
+ * Verify a receipt's signature. Current receipts verify `receiptSignature`
+ * over `receiptHash`; legacy receipts fall back to `signature` over
+ * `contextHash`.
+ */
+export function verifyReceiptSignature(receipt: object, publicKeyBase64: string): boolean;
 export interface SigningIdentity {
     publicKey: string;
     fingerprint: string;
@@ -1003,6 +1023,19 @@ export interface RawEnvelope {
     minSourceTrust?: SourceTrust;
     budget?: ContextBudget;
 }
+/**
+ * Options accepted by compileContext/compileContextAsync/ContextCompiler.
+ * `diagnostics` is host-only: it re-runs discovery unfiltered so the receipt
+ * can enumerate policy-denied candidates (id + contentHash + reason). It is
+ * never reachable from request fields — set it only for owner tools (CLI,
+ * dashboard debugger, evaluator), never for client/agent-facing calls.
+ */
+export interface CompileOptions {
+    policy?: AccessPolicy;
+    envelope?: RawEnvelope;
+    receipt?: boolean;
+    diagnostics?: boolean;
+}
 export type TemporalStatus = 'current' | 'superseded' | 'expired' | 'not-yet-valid';
 export interface ContextConflict {
     class: 'declared-contradiction' | 'supersession' | 'overlapping-claim';
@@ -1063,6 +1096,7 @@ export interface ContextReceiptV2 {
     filters: {
         scope: string | null;
         allowedScopes: string[] | null;
+        /** Deny-root names — only present on owner-diagnostics receipts. */
         deniedScopes: string[] | null;
         droppedScopes: string[];
         type: MemoryType | null;
@@ -1086,23 +1120,23 @@ export interface ContextReceiptV2 {
         candidates: number;
         selected: number;
         skipped: number;
-        denied: number;
+        /** Owner-diagnostics only — absent on client-facing receipts. */
+        denied?: number;
         conflicts: number;
         usedChars: number;
     };
+    /** sha256 over the canonical receipt payload (excludes signature fields). */
+    receiptHash?: string;
     signer?: string;
+    /** Legacy Ed25519 signature over `contextHash` only. */
     signature?: string;
+    /** Ed25519 signature over `receiptHash` — binds the whole receipt. */
+    receiptSignature?: string;
 }
 export class ContextCompiler {
     constructor(store: ContextStore, options?: { policy?: AccessPolicy });
-    compile(
-        input: ContextRequestInput,
-        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
-    ): ContextPackage;
-    compileAsync(
-        input: ContextRequestInput,
-        options?: { policy?: AccessPolicy; envelope?: RawEnvelope; receipt?: boolean },
-    ): Promise<ContextPackage>;
+    compile(input: ContextRequestInput, options?: CompileOptions): ContextPackage;
+    compileAsync(input: ContextRequestInput, options?: CompileOptions): Promise<ContextPackage>;
 }
 
 // ---------- Context graph: edges, entities, timeline ----------

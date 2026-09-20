@@ -257,18 +257,38 @@ describe('new agent-era CLI commands', () => {
     });
 
     describe('demo', () => {
-        it('runs the two-agent flow without network credentials', { timeout: 60_000 }, async () => {
-            const { result } = await captureConsoleAsync(() => demoCommand({ json: true }));
-            const steps = Object.fromEntries(result.transcript.map((item) => [item.step, item]));
-            expect(steps.remember.memory.scope).toBe('project/atlas');
-            expect(steps['denied-write'].isError).toBe(true);
-            expect(steps.proposal.proposal.status).toBe('pending');
-            expect(steps.proposal.approved.content).toContain('db/migrate');
-            expect(steps['restricted-search'].leaked).toBe(false);
-            expect(steps.audit.events.length).toBeGreaterThan(0);
-            // Temporary vault was cleaned up.
-            expect(existsSync(result.dataDir)).toBe(false);
-        });
+        it(
+            'runs the two-agent handoff without network credentials',
+            { timeout: 60_000 },
+            async () => {
+                const { result } = await captureConsoleAsync(() => demoCommand({ json: true }));
+                const steps = Object.fromEntries(
+                    result.transcript.map((item) => [item.step, item]),
+                );
+                // Agent A's work lands in project/alpha.
+                expect(steps['a-decision'].memory.scope).toBe('project/alpha');
+                expect(steps['a-status'].memory.scope).toBe('project/alpha');
+                // Agent B's proposal waits for the owner and is trust-clamped.
+                expect(steps['b-proposal'].proposal.status).toBe('pending');
+                expect(steps['b-proposal'].trustClamped).toBe(true);
+                // Pending proposals are invisible until approved.
+                expect(steps['b-pre-approval'].pendingVisible).toBe(false);
+                expect(steps['owner-approval'].approved.content).toContain('db/migrate');
+                // The handoff receipt verifies and carries no leaks.
+                expect(steps['b-handoff'].receiptVerified).toBe(true);
+                expect(steps['b-handoff'].leaks).toEqual({
+                    betaContent: false,
+                    restrictedContent: false,
+                    deniedOnReceipt: false,
+                    deniedScopeName: false,
+                });
+                expect(steps['b-denied-write'].isError).toBe(true);
+                expect(steps['b-crossover'].crossoverLeaked).toBe(false);
+                expect(steps.audit.events.length).toBeGreaterThan(0);
+                // Temporary vault was cleaned up.
+                expect(existsSync(result.dataDir)).toBe(false);
+            },
+        );
     });
 });
 
