@@ -36,7 +36,29 @@ describe('compiler evaluation', () => {
         expect(report.cases[0].failures).toEqual(['unknown policy client: missing']);
     });
 
-    it('distinguishes expected refusals from unexpected compiler errors', () => {
+    it('accepts a real policy refusal when the case expects it', () => {
+        const report = evaluateCompilerVault({
+            policies: {
+                reader: {
+                    scopes: ['project/atlas'],
+                    maxSensitivity: 'private',
+                    capabilities: ['read'],
+                },
+            },
+            cases: [
+                {
+                    name: 'scope denied',
+                    policy: 'reader',
+                    request: { query: 'finance', scope: 'finance' },
+                    expect: { refused: true },
+                },
+            ],
+        });
+        expect(report.passed).toBe(true);
+        expect(report.cases[0]).toMatchObject({ score: 1, failures: [] });
+    });
+
+    it('fails unexpected compiler errors even when a refusal was expected', () => {
         const store = new ContextStore({ dbPath: ':memory:' });
         try {
             vi.spyOn(store, 'compileContext').mockImplementation(() => {
@@ -52,9 +74,15 @@ describe('compiler evaluation', () => {
                 },
                 { store },
             );
-            expect(report.cases[0]).toMatchObject({ score: 1, failures: [] });
+            expect(report.cases[0]).toMatchObject({
+                score: 0,
+                failures: ['compile threw: compiler unavailable'],
+            });
             expect(report.cases[1].failures).toEqual(['compile threw: compiler unavailable']);
-            expect(report.failures).toEqual([{ metric: 'custom', actual: 0, threshold: 0.5 }]);
+            expect(report.failures).toEqual([
+                { metric: 'policy', actual: 0, threshold: 1 },
+                { metric: 'custom', actual: 0, threshold: 0.5 },
+            ]);
             expect(store.list()).toEqual([]);
         } finally {
             store.close();
