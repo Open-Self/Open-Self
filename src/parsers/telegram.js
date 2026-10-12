@@ -32,6 +32,7 @@ export function parseTelegram(filePath) {
 
         // Parse date
         const dateObj = new Date(msg.date);
+        const timestamp = Number.isNaN(dateObj.getTime()) ? undefined : dateObj.toISOString();
         const date = dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
         const time = dateObj.toLocaleTimeString('en-GB', {
             hour: '2-digit',
@@ -41,6 +42,7 @@ export function parseTelegram(filePath) {
         messages.push({
             date,
             time,
+            timestamp,
             sender: msg.from || msg.from_id || 'Unknown',
             text: text.trim(),
         });

@@ -41,7 +41,7 @@ export class SafetyGuard {
                 const deflect =
                     this.soul.deflectMessage ||
                     this.soul.unsureFallback ||
-                    'Thôi ko bàn cái này 😅';
+                    "Let's not get into that 😅";
                 return {
                     safe: false,
                     action: 'deflect',

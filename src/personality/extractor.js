@@ -2,6 +2,9 @@
  * Personality Extractor — Analyze chat messages to extract personality traits
  */
 
+import { detectLanguage } from '../lang/detect.js';
+import { ALL_STOPWORDS } from '../lang/languages.js';
+
 // Common emoji regex. Combining marks (FE00–FE0F, 20E3) and the ZWJ (200D) are
 // intentional inside the character class so emoji sequences are counted as parts.
 // Block-disable survives Prettier wrapping the long literal onto its own line.
@@ -85,107 +88,9 @@ function getTopEmojis(texts, n) {
 }
 
 export function getTopWords(texts, n) {
-    const stopWords = new Set([
-        'the',
-        'a',
-        'an',
-        'is',
-        'are',
-        'was',
-        'were',
-        'be',
-        'been',
-        'being',
-        'have',
-        'has',
-        'had',
-        'do',
-        'does',
-        'did',
-        'will',
-        'would',
-        'could',
-        'should',
-        'may',
-        'might',
-        'can',
-        'shall',
-        'to',
-        'of',
-        'in',
-        'for',
-        'on',
-        'with',
-        'at',
-        'by',
-        'from',
-        'as',
-        'into',
-        'through',
-        'during',
-        'before',
-        'after',
-        'and',
-        'but',
-        'or',
-        'nor',
-        'not',
-        'so',
-        'yet',
-        'i',
-        'me',
-        'my',
-        'we',
-        'our',
-        'you',
-        'your',
-        'he',
-        'him',
-        'his',
-        'she',
-        'her',
-        'it',
-        'its',
-        'they',
-        'them',
-        'their',
-        'this',
-        'that',
-        'these',
-        'those',
-        'if',
-        'then',
-        'than',
-        'when',
-        'what',
-        'which',
-        // Vietnamese stop words
-        'là',
-        'và',
-        'của',
-        'có',
-        'được',
-        'cho',
-        'với',
-        'từ',
-        'trong',
-        'các',
-        'này',
-        'đó',
-        'để',
-        'về',
-        'cũng',
-        'như',
-        'nhưng',
-        'hay',
-        'thì',
-        'sẽ',
-        'đã',
-        'rồi',
-        'mà',
-        'vì',
-        'nếu',
-    ]);
+    // Union of every registered language's stop words (see src/lang/languages.js)
+    // so top-word extraction stays clean regardless of the detected language.
+    const stopWords = ALL_STOPWORDS;
 
     const counts = {};
     for (const text of texts) {
@@ -435,26 +340,4 @@ export function detectAbbreviations(texts) {
         .map(([abbr]) => abbr);
 }
 
-function detectLanguage(texts) {
-    let vnCount = 0;
-    let enCount = 0;
-    const vnPattern = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
-    const vnSlangPattern = /\b(k[oô]ng?|vl|đm|ck|cmn|vcl|ntn|bt|bn)\b/i;
-
-    for (const text of texts) {
-        if (vnPattern.test(text) || vnSlangPattern.test(text)) vnCount++;
-        else enCount++;
-    }
-
-    const total = vnCount + enCount || 1;
-    const vnPercent = Math.round((vnCount / total) * 100);
-    const enPercent = Math.round((enCount / total) * 100);
-
-    // Detect mixed usage (both > 20%)
-    if (vnPercent > 20 && enPercent > 20) {
-        return `Mixed (Vietnamese ${vnPercent}% / English ${enPercent}%)`;
-    }
-    if (vnCount > enCount) return 'Vietnamese';
-    if (enCount > vnCount) return 'English';
-    return 'Mixed';
-}
+// detectLanguage now lives in src/lang/detect.js (registry-driven, multi-language).
