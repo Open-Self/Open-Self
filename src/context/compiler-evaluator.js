@@ -125,7 +125,7 @@ function runCase(store, keys, policies, testCase) {
         pkg = store.compileContext({ explain: true, ...testCase.request }, options);
     } catch (error) {
         // A policy denial is a pass only when the case expects refusal.
-        if (expect.refused) {
+        if (expect.refused && error.code === 'ACCESS_DENIED') {
             return { name: testCase.name, kind: testCase.kind || 'policy', score: 1, failures: [] };
         }
         return {
