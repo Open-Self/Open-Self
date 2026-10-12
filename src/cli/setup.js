@@ -99,7 +99,7 @@ function generateEnv(answers) {
     switch (answers.provider) {
         case 'anthropic':
             lines.push(`ANTHROPIC_API_KEY=${answers.apiKey}`);
-            lines.push('LLM_MODEL=claude-sonnet-4-20250514');
+            lines.push('LLM_MODEL=claude-sonnet-5');
             break;
         case 'openai':
             lines.push(`OPENAI_API_KEY=${answers.apiKey}`);

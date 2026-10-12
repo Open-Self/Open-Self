@@ -169,7 +169,7 @@ h1{color:#a78bfa}strong{color:#22d3ee}hr{border-color:#334155}</style></head>
             } else if (result.action === 'ignore') {
                 res.json({ replies: ['...'] });
             } else {
-                res.json({ replies: ['Hmm, để t check lại nha'] });
+                res.json({ replies: ['Hmm, let me get back to you on that'] });
             }
         } catch {
             res.status(500).json({ error: 'Clone error' });

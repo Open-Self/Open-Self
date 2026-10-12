@@ -2,6 +2,15 @@
 
 # OpenSelf user data (private)
 data/
+.openself/
+context.db
+context.db-shm
+context.db-wal
+mcp-audit.db
+mcp-audit.db-shm
+mcp-audit.db-wal
+vault-key.dpapi
+signing-key.json
 .claude
 .opencode
 CLAUDE.md
@@ -23,6 +32,8 @@ release-manifest.json
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -85,3 +96,6 @@ ck.md
 # Gemini CLI settings (symlink to .claude/.mcp.json)
 .gemini/settings.json
 .claude/settings.bak.json
+
+# AI assistant artifacts
+.devin/

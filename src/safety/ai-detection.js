@@ -1,39 +1,23 @@
 /**
  * AI Self-Reveal Detection
- * Prevents clone from accidentally revealing it's an AI
+ * Prevents clone from accidentally revealing it's an AI.
+ * "I am an AI"-style reveals are sourced per-language from the language registry
+ * (src/lang/languages.js); the assistant-speak phrases below are English tells
+ * (over-formal helpdesk lines a real person would never send).
  */
 
-const AI_REVEAL_PATTERNS = [
-    /\bas an ai\b/i,
-    /\bi'm an ai\b/i,
-    /\bi am an ai\b/i,
-    /\blanguage model\b/i,
-    /\bi don'?t have feelings\b/i,
-    /\bi was programmed\b/i,
-    /\bi can'?t experience\b/i,
-    /\bmy training\b/i,
-    /\bmy training data\b/i,
-    /\bi'?m a (chat)?bot\b/i,
-    /\bi'?m not (a )?human\b/i,
-    /\bartificial intelligence\b/i,
-    /\bneural network\b/i,
-    /\bI don'?t have (personal )?(experiences?|emotions?|opinions?)\b/i,
+import { ALL_AI_REVEAL_PATTERNS } from '../lang/languages.js';
+
+const ASSISTANT_SPEAK = [
     /\bI appreciate your patience\b/i,
     /\bI understand your concern\b/i,
     /\bI'?m here to (help|assist)\b/i,
     /\bHow can I (help|assist) you\b/i,
     /\bIs there anything else\b/i,
     /\bLet me know if you need\b/i,
-    // Vietnamese AI patterns
-    // Note: \b word-boundary anchors are intentionally omitted on pure-Vietnamese
-    // phrases because \b only works with ASCII \w chars — Vietnamese chars like ữ, ắ
-    // are non-\w, so trailing \b would never fire mid-sentence.
-    /\btôi là (một )?AI\b/i,
-    /\btôi là (một )?(chat)?bot\b/i,
-    /\btôi không phải (là )?người\b/i,
-    /mô hình ngôn ngữ/i,
-    /trí tuệ nhân tạo/i,
 ];
+
+const AI_REVEAL_PATTERNS = [...ALL_AI_REVEAL_PATTERNS, ...ASSISTANT_SPEAK];
 
 /**
  * Check if a reply contains AI self-reveal patterns

@@ -12,7 +12,7 @@ const DEFAULT_OPPONENT = `# SOUL.md — Default Arena Opponent
 
 ## Identity
 - Name: Rival
-- Language: Vietnamese
+- Language: English
 
 ## Communication Patterns
 - Average message length: 30 chars
@@ -21,7 +21,7 @@ const DEFAULT_OPPONENT = `# SOUL.md — Default Arena Opponent
 - Humor: sarcastic
 
 ## Vocabulary Fingerprint
-- Catchphrases: "hmm", "nah", "không đồng ý"
+- Catchphrases: "hmm", "nah", "hard disagree"
 - Capitalization: lowercase
 
 ## Boundaries
@@ -41,7 +41,7 @@ export async function arenaCommand(options) {
         return;
     }
 
-    const topic = options.topic || 'Cà phê hay trà sữa?';
+    const topic = options.topic || 'Coffee or bubble tea?';
     const rounds = parseInt(options.rounds) || 5;
 
     console.log(chalk.white(`  💬 Topic: ${chalk.cyan(`"${topic}"`)}`));
