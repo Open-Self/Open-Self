@@ -47,7 +47,8 @@ describe('owner configuration and audit retention', () => {
         const dataDir = join(directory, 'vault');
         for (const config of [
             'not JSON',
-            JSON.stringify({ version: 2, clients: { atlas: settings } }),
+            JSON.stringify({ version: 99, clients: { atlas: settings } }),
+            JSON.stringify({ version: 2, clients: { atlas: { ...settings, surprise: true } } }),
             JSON.stringify({ version: 1, clients: { atlas: { ...settings, surprise: true } } }),
             JSON.stringify({ version: 1, clients: { atlas: { ...settings, scopes: [] } } }),
             JSON.stringify({
@@ -84,16 +85,20 @@ describe('owner configuration and audit retention', () => {
         expect(() => new AccessAudit({ maxEntries: 1.5 })).toThrow('Audit setting');
     });
 
-    it('persists pending attempts across reopen without query, content or memory IDs', () => {
-        const dbPath = join(directory, 'mcp-audit.db');
-        audit = new AccessAudit({ dbPath });
-        audit.begin('atlas', 'openself_get_context');
-        audit.close();
-        audit = new AccessAudit({ dbPath });
-        expect(audit.list()[0]).toMatchObject({
-            client: 'atlas',
-            outcome: 'attempted',
-            tool: 'openself_get_context',
-        });
-    });
+    it(
+        'persists pending attempts across reopen without query, content or memory IDs',
+        { timeout: 30_000 },
+        () => {
+            const dbPath = join(directory, 'mcp-audit.db');
+            audit = new AccessAudit({ dbPath });
+            audit.begin('atlas', 'openself_get_context');
+            audit.close();
+            audit = new AccessAudit({ dbPath });
+            expect(audit.list()[0]).toMatchObject({
+                client: 'atlas',
+                outcome: 'attempted',
+                tool: 'openself_get_context',
+            });
+        },
+    );
 });

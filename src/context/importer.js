@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { parseTelegram } from '../parsers/telegram.js';
 import { parseWhatsApp } from '../parsers/whatsapp.js';
+import { parseContextExport, validateContextExport } from './exporter.js';
 
 const WHATSAPP_HEADER = /^\d{1,2}\/\d{1,2}\/\d{2,4},?\s\d{1,2}:\d{2}\s-\s[^:]+:\s/m;
 
@@ -29,11 +30,28 @@ export class ContextImporter {
             errors: [],
         };
 
+        // Signed exports that fail verification are refused outright — a
+        // bad signature means the file was modified after it left a vault.
+        if (format === 'openself') {
+            const validation = validateContextExport(readFileSync(absolutePath, 'utf8'));
+            report.signature = validation.signature;
+            if (validation.signature?.present && !validation.signature.valid) {
+                throw new Error(
+                    `Refusing to import ${absolutePath}: signature verification failed ` +
+                        `(${validation.errors.join('; ') || 'signature invalid'})`,
+                );
+            }
+        }
+
         if (options.dryRun) return report;
 
         for (const candidate of candidates) {
             try {
-                const result = this.store.rememberOnce(candidate.memory, candidate.dedupeKey);
+                const result = this.store.rememberOnce(candidate.memory, candidate.dedupeKey, {
+                    // Portable exports dedupe by content too — identical facts
+                    // re-imported under new ids stay a single memory.
+                    dedupeByContent: format === 'openself',
+                });
                 if (result.created) report.created++;
                 else report.duplicates++;
             } catch (error) {
@@ -50,6 +68,10 @@ export function detectImportFormat(filePath) {
     const extension = extname(filePath).toLowerCase();
     if (extension === '.md' || extension === '.mdx') return 'markdown';
     if (extension === '.json') return 'telegram';
+    if (extension === '.jsonl') {
+        const sample = readFileSync(filePath, 'utf8').slice(0, 4_000);
+        return sample.includes('"openself-context"') ? 'openself' : 'text';
+    }
     if (extension === '.txt') {
         const sample = readFileSync(filePath, 'utf8').slice(0, 8_000);
         return WHATSAPP_HEADER.test(sample) ? 'whatsapp' : 'text';
@@ -66,11 +88,29 @@ function buildCandidates(filePath, format, options) {
             return buildChatCandidates(parseWhatsApp(filePath), filePath, format, options);
         case 'telegram':
             return buildChatCandidates(parseTelegram(filePath), filePath, format, options);
+        case 'openself':
+            return buildExportCandidates(filePath, options);
         default:
             throw new Error(
-                `Unsupported import format: ${format}. Use auto, markdown, text, whatsapp, or telegram.`,
+                `Unsupported import format: ${format}. Use auto, markdown, text, whatsapp, telegram, or openself.`,
             );
     }
+}
+
+function buildExportCandidates(filePath, options) {
+    const { records, errors } = parseContextExport(readFileSync(filePath, 'utf8'));
+    if (errors.length) {
+        throw new Error(`Invalid openself export ${filePath}: ${errors.join('; ')}`);
+    }
+    return records.map((record) => ({
+        memory: {
+            ...record.memory,
+            scope: options.scope || record.memory.scope,
+            sensitivity: options.sensitivity || record.memory.sensitivity,
+            tags: unique([...(record.memory.tags || []), 'imported', ...(options.tags || [])]),
+        },
+        dedupeKey: record.dedupeKey,
+    }));
 }
 
 function buildDocumentCandidates(filePath, format, options) {
@@ -88,6 +128,8 @@ function buildDocumentCandidates(filePath, format, options) {
             source: { kind: format, locator: filePath, title },
             scope,
             sensitivity,
+            // Imported file content is unverified until the owner reviews it.
+            sourceTrust: 'external',
             confidence: options.confidence ?? 1,
             tags: unique([
                 format,
@@ -116,6 +158,7 @@ function buildChatCandidates(messages, filePath, format, options) {
             source: { kind: format, locator: filePath, title },
             scope,
             sensitivity,
+            sourceTrust: 'external',
             confidence: options.confidence ?? 1,
             occurredAt,
             tags: unique([format, `sender-${slug(message.sender)}`, ...(options.tags || [])]),

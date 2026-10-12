@@ -51,10 +51,112 @@ const restore = api.restoreVault('backup', 'new-vault', {
     passphrase: 'test passphrase',
     keyBackend: backend,
 });
+// Agent-era API fixtures: trust, proposals, receipts, export, HTTP transport.
+const trust: api.SourceTrust = memory.sourceTrust;
+const proposal: api.MemoryProposal = store.proposeMemory(
+    { content: 'proposed fixture', sourceTrust: 'external' },
+    { proposedBy: 'fixture-agent', note: 'why' },
+);
+const pendingProposals: api.MemoryProposal[] = store.listProposals({ status: 'pending' });
+const allProposals: api.MemoryProposal[] = store.listProposals({ status: null });
+const approved: MemoryRecord | null = store.approveProposal(proposal.id, {
+    sourceTrust: 'verified',
+});
+const rejected: boolean = store.rejectProposal(proposal.id, { reviewNote: 'n/a' });
+const explained = store.buildContext('database', { explain: true, minSourceTrust: 'external' });
+const receipt: api.ContextReceipt | undefined = explained.receipt;
+const exportReport: api.ContextExportReport = api.exportMemories(store, { dryRun: true });
+const httpApp: api.McpHttpApp = api.createMcpHttpApp({ store });
+const policy = new api.AccessPolicy(config);
+const clamped: api.SourceTrust = policy.clampSourceTrust('owner');
+const parsedExport = api.parseContextExport('{"format":"openself-context","version":1}\n');
+const _proposalChecks: [typeof pendingProposals, typeof allProposals] = [
+    pendingProposals,
+    allProposals,
+];
+void [
+    trust,
+    approved,
+    rejected,
+    receipt,
+    exportReport,
+    httpApp,
+    clamped,
+    parsedExport,
+    _proposalChecks,
+];
 const audit = new api.AccessAudit();
 const event = audit.begin('reader', 'openself_search_memory');
 audit.finish(event, 'allowed');
 const pending: api.AuditOutcome | undefined = audit.list()[0]?.outcome;
+const chain: api.AuditChainVerification = audit.verify();
+const auditJsonl: string = audit.toJSONL();
+const roAudit = new api.AccessAudit({ readonly: true });
+roAudit.close();
+// Wave-2 fixtures: content/context hashes, async providers, export validation.
+const contentHash: string = memory.contentHash;
+const contextHash: string | undefined = explained.receipt?.contextHash;
+const candidateHash: string | undefined = receipt?.candidates[0]?.contentHash;
+const provider: api.VectorProvider = api.resolveVectorProvider('feature-hash', {});
+const ollama = new api.OllamaEmbeddingProvider({ fetch: globalThis.fetch });
+const openaiProvider = new api.OpenAiCompatibleProvider({
+    baseUrl: 'http://localhost:1234/v1',
+    model: 'm',
+});
+const asyncStore = new api.ContextStore({
+    dbPath: ':memory:',
+    embeddings: { model: 'x', encode: async () => [1, 2, 3] },
+});
+const pendingIndex: Promise<{ indexed: number; pending: number }> = asyncStore.indexPending();
+const asyncSearch: Promise<SearchMemory[]> = asyncStore.searchAsync('q');
+const asyncContext: Promise<api.ContextBlock> = asyncStore.buildContextAsync('q');
+const asyncConflicts: Promise<api.ConflictMemory[]> = asyncStore.findPotentialConflictsAsync({
+    content: 'x',
+});
+const validation: api.ContextExportValidation = api.validateContextExport('');
+const sigValid: boolean | undefined = validation.signature?.valid;
+const hashFns: [string, string] = [api.memoryContentHash('c'), api.contextBlockHash('ctx')];
+// Wave-3 fixtures: signing identity, export signing, secret scanning, sweep.
+const identity: api.SigningIdentity | null = api.loadSigningIdentity(null);
+const sig: string = api.signPayload('aGk=', 'payload');
+const verified: boolean = api.verifyPayload('aGk=', 'payload', sig);
+const fingerprint: string = api.signingFingerprint('aGk=');
+const payloadHash: string = api.exportPayloadHash(['{}']);
+const secretHits: api.SecretFinding[] = api.scanForSecrets('text');
+const redacted: { text: string; findings: api.SecretFinding[] } = api.redactSecrets('text');
+const swept: { swept: number; expired: number; ids: string[] } = store.sweepExpired({
+    dryRun: true,
+});
+const receiptSigner: string | undefined = explained.receipt?.signer;
+const domain: 'openself-sign-v1' = api.SIGNING_DOMAIN;
+void [
+    chain,
+    auditJsonl,
+    contentHash,
+    contextHash,
+    candidateHash,
+    provider,
+    ollama,
+    openaiProvider,
+    asyncStore,
+    pendingIndex,
+    asyncSearch,
+    asyncContext,
+    asyncConflicts,
+    validation,
+    sigValid,
+    hashFns,
+    identity,
+    sig,
+    verified,
+    fingerprint,
+    payloadHash,
+    secretHits,
+    redacted,
+    swept,
+    receiptSigner,
+    domain,
+];
 const parsed: api.MemoryInput = api.memoryInputSchema.parse({ content: 'runtime validated' });
 const messages = api.parseWhatsApp('fixture.txt');
 const pairs = api.splitBySender(messages, 'Fixture');

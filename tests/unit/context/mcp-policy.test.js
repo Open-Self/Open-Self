@@ -219,9 +219,11 @@ describe('MCP owner policy enforcement', () => {
         expect(JSON.stringify(audit.list())).not.toContain('never-store-this-query');
         expect(Object.keys(audit.list()[0]).sort()).toEqual([
             'client',
+            'entryHash',
             'id',
             'occurredAt',
             'outcome',
+            'prevHash',
             'tool',
         ]);
         vi.spyOn(audit, 'begin').mockImplementation(() => {

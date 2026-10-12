@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 export const MEMORY_TYPES = [
@@ -12,6 +12,16 @@ export const MEMORY_TYPES = [
 ];
 
 export const SENSITIVITY_LEVELS = ['public', 'personal', 'private', 'restricted'];
+
+/**
+ * Ordered trust in the entity that supplied a memory, lowest to highest.
+ * `owner` is an explicit owner-authored record. `verified` was confirmed by the
+ * owner against its source. `trusted` comes from a connector or agent the owner
+ * has chosen to rely on. `external` is imported or agent-proposed content that
+ * has not been owner-reviewed. `untrusted` is content that should be treated as
+ * inert evidence only.
+ */
+export const SOURCE_TRUST_LEVELS = ['untrusted', 'external', 'trusted', 'verified', 'owner'];
 
 export const contextDateSchema = z
     .string()
@@ -34,6 +44,7 @@ export const memoryInputSchema = z.object({
         .default({ kind: 'manual', locator: '', title: '' }),
     scope: z.string().trim().min(1).max(200).default('personal'),
     sensitivity: z.enum(SENSITIVITY_LEVELS).default('personal'),
+    sourceTrust: z.enum(SOURCE_TRUST_LEVELS).default('owner'),
     confidence: z.number().min(0).max(1).default(1),
     validFrom: optionalDate,
     validTo: optionalDate,
@@ -56,9 +67,29 @@ export function normalizeMemory(input, now = new Date()) {
     return {
         ...parsed,
         id: parsed.id || randomUUID(),
+        contentHash: memoryContentHash(parsed.content),
         tags: [...new Set(parsed.tags.map((tag) => tag.toLowerCase()))],
         status: 'active',
         createdAt: timestamp,
         updatedAt: timestamp,
     };
+}
+
+/**
+ * Stable content address for a memory — sha256 over the namespaced plaintext
+ * content. Identical content yields the same hash in any vault, which makes it
+ * the portability-level dedupe key for exports and a verifiable citation in
+ * context receipts.
+ */
+export function memoryContentHash(content) {
+    return createHash('sha256')
+        .update(`openself-memory-v1\n${String(content ?? '')}`)
+        .digest('hex');
+}
+
+/** sha256 of a rendered context block — receipts cite exactly what was sent. */
+export function contextBlockHash(renderedContext) {
+    return createHash('sha256')
+        .update(`openself-context-v1\n${String(renderedContext ?? '')}`)
+        .digest('hex');
 }

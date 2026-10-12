@@ -1,7 +1,9 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +45,11 @@ export function createContextServer(options = {}) {
     app.get('/dashboard.js', requireAuth(token), (_req, res) => {
         res.type('application/javascript').sendFile(join(__dirname, 'dashboard', 'dashboard.js'));
     });
+    for (const script of ['debugger.js', 'inbox.js', 'audit.js']) {
+        app.get(`/${script}`, requireAuth(token), (_req, res) => {
+            res.type('application/javascript').sendFile(join(__dirname, 'dashboard', script));
+        });
+    }
     app.get('/dashboard.css', requireAuth(token), (_req, res) => {
         res.type('text/css').sendFile(join(__dirname, 'dashboard', 'dashboard.css'));
     });
@@ -122,6 +129,110 @@ export function createContextServer(options = {}) {
 
     api.post('/conflicts', requireLocalMutation, (req, res) => {
         res.json({ potentialConflicts: store.findPotentialConflicts(req.body, req.body) });
+    });
+
+    // Context Debugger: compileContext with an explain receipt. Read-only —
+    // mirrors what an agent would receive for the same request.
+    api.get('/debug', (req, res) => {
+        const query = optionalString(req.query.q);
+        if (!query) return res.status(400).json({ error: 'q query parameter is required' });
+        const result = store.compileContext(
+            {
+                query,
+                task: optionalString(req.query.task),
+                agent: optionalString(req.query.agent),
+                purpose: optionalString(req.query.purpose),
+                scope: optionalString(req.query.scope),
+                retrieval: optionalString(req.query.retrieval) || 'hybrid',
+                format: optionalString(req.query.format) || 'block',
+                minSourceTrust: optionalString(req.query.minSourceTrust),
+                asOf: optionalString(req.query.asOf),
+                includeSuperseded: req.query.includeSuperseded === 'true',
+                includeStale: req.query.includeStale === 'true',
+                explain: true,
+                budget: {
+                    maxChars: numberParam(req.query.maxChars, 8_000),
+                    maxTokens: numberParam(req.query.maxTokens, undefined),
+                    maxItems: numberParam(req.query.limit, undefined),
+                },
+            },
+            {
+                // The dashboard is the vault owner's local tool — diagnostics
+                // receipts may enumerate policy-denied candidates.
+                diagnostics: true,
+                envelope: {
+                    clientId: 'dashboard',
+                    maxSensitivity: optionalString(req.query.maxSensitivity) || 'restricted',
+                    minSourceTrust: optionalString(req.query.minSourceTrust) || 'untrusted',
+                    budget: {
+                        maxChars: numberParam(req.query.maxChars, 8_000),
+                        maxTokens: numberParam(req.query.maxTokens, undefined),
+                        maxItems: numberParam(req.query.limit, undefined),
+                    },
+                },
+            },
+        );
+        return res.json(result);
+    });
+
+    api.get('/proposals', (req, res) => {
+        const status = optionalString(req.query.status);
+        res.json({
+            proposals: store.listProposals({
+                status: status === 'all' ? null : status || 'pending',
+                limit: numberParam(req.query.limit, 100),
+            }),
+        });
+    });
+
+    api.post('/proposals/:id/approve', requireLocalMutation, (req, res) => {
+        const existing = store.getProposal(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Proposal not found' });
+        if (existing.status !== 'pending') {
+            return res.status(409).json({ error: `Already ${existing.status}` });
+        }
+        const memory = store.approveProposal(req.params.id, req.body?.overrides || {}, {
+            reviewNote: req.body?.reviewNote,
+        });
+        return res.json({ approved: true, memory });
+    });
+
+    api.post('/proposals/:id/reject', requireLocalMutation, (req, res) => {
+        const rejected = store.rejectProposal(req.params.id, {
+            reviewNote: req.body?.reviewNote,
+        });
+        if (!rejected) {
+            const existing = store.getProposal(req.params.id);
+            return res
+                .status(existing ? 409 : 404)
+                .json({ error: existing ? `Already ${existing.status}` : 'Proposal not found' });
+        }
+        return res.json({ rejected: true, id: req.params.id });
+    });
+
+    // Read-only view over the MCP access audit, when the vault has one. The
+    // audit database lives beside context.db and is opened read-only so the
+    // dashboard never creates or mutates it.
+    api.get('/audit', (_req, res) => {
+        if (typeof store.dbPath !== 'string' || store.dbPath === ':memory:') {
+            return res.json({ events: [] });
+        }
+        const auditPath = join(dirname(store.dbPath), 'mcp-audit.db');
+        if (!existsSync(auditPath)) {
+            return res.json({ events: [] });
+        }
+        let audit;
+        try {
+            audit = new AccessAudit({ dbPath: auditPath, readonly: true });
+        } catch {
+            return res.json({ events: [], chain: null });
+        }
+        try {
+            const events = audit.list({ limit: 200 });
+            return res.json({ events, chain: audit.verify() });
+        } finally {
+            audit.close();
+        }
     });
 
     app.use('/api/context', api);

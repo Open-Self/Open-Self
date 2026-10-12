@@ -7,7 +7,17 @@ import type { z } from 'zod';
 export type MemoryType =
     'fact' | 'preference' | 'decision' | 'commitment' | 'relationship' | 'event' | 'note';
 export type Sensitivity = 'public' | 'personal' | 'private' | 'restricted';
+/**
+ * Ordered trust in the entity that supplied a memory, lowest to highest.
+ * `owner` is owner-authored; `external` is imported or agent-proposed content
+ * that has not been owner-reviewed.
+ */
+export type SourceTrust = 'untrusted' | 'external' | 'trusted' | 'verified' | 'owner';
 export type RetrievalMode = 'hybrid' | 'lexical' | 'vector';
+export const MEMORY_TYPES: readonly MemoryType[];
+export const SENSITIVITY_LEVELS: readonly Sensitivity[];
+export const SOURCE_TRUST_LEVELS: readonly SourceTrust[];
+export const VAULT_SCHEMA_VERSION: number;
 export interface MemorySource {
     kind: string;
     locator: string;
@@ -21,6 +31,7 @@ export interface MemoryInput {
     source?: Partial<MemorySource>;
     scope?: string;
     sensitivity?: Sensitivity;
+    sourceTrust?: SourceTrust;
     confidence?: number;
     validFrom?: string | null;
     validTo?: string | null;
@@ -30,16 +41,22 @@ export interface MemoryInput {
 export interface MemoryRecord extends MemoryInput {
     id: string;
     type: MemoryType;
+    /** sha256("openself-memory-v1\n" + content) — stable content address. */
+    contentHash: string;
     summary: string;
     source: MemorySource;
     scope: string;
     sensitivity: Sensitivity;
+    sourceTrust: SourceTrust;
     confidence: number;
     tags: string[];
     status: 'active' | 'forgotten';
     createdAt: string;
     updatedAt: string;
     forgottenAt?: string | null;
+    /** Set when a newer memory replaced this record — history stays retrievable. */
+    supersededAt?: string | null;
+    supersededBy?: string | null;
 }
 export interface RetrievalMatch {
     lexicalRank: number | null;
@@ -53,9 +70,14 @@ export interface SearchMemory extends MemoryRecord {
 export interface SearchOptions {
     scope?: string;
     allowedScopes?: readonly string[];
+    /** Policy v2 deny roots — denied scopes are filtered server-side, never returned. */
+    deniedScopes?: readonly string[];
     type?: MemoryType;
     maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
     asOf?: string;
+    /** Skip temporal validity filtering (compiler discovery leg). */
+    anyTime?: boolean;
     retrieval?: RetrievalMode;
     limit?: number;
     vectorCandidateLimit?: number;
@@ -63,7 +85,14 @@ export interface SearchOptions {
 }
 export interface ListOptions extends Pick<
     SearchOptions,
-    'scope' | 'allowedScopes' | 'type' | 'maxSensitivity' | 'asOf' | 'limit'
+    | 'scope'
+    | 'allowedScopes'
+    | 'deniedScopes'
+    | 'type'
+    | 'maxSensitivity'
+    | 'minSourceTrust'
+    | 'asOf'
+    | 'limit'
 > {
     offset?: number;
     includeForgotten?: boolean;
@@ -93,17 +122,97 @@ export interface ContextBlock {
     memories: SearchMemory[];
     /** Exactly context.length, including separators. */
     usedChars: number;
+    /** Present when built with `explain: true`. */
+    receipt?: ContextReceipt;
+}
+export interface ContextReceiptCandidate {
+    id: string;
+    /** sha256 content address of the candidate record. */
+    contentHash: string;
+    type: MemoryType;
+    scope: string;
+    sensitivity: Sensitivity;
+    sourceTrust: SourceTrust;
+    confidence: number;
+    source: MemorySource;
+    relevance: number | null;
+    match: RetrievalMatch | null;
+    /** Days between the memory's effective timestamp and the receipt's asOf. */
+    recencyDays: number | null;
+    decision: 'selected' | 'skipped';
+    reason: string;
+    chars: number;
+}
+export interface ContextReceipt {
+    version: 1;
+    query: string;
+    /** sha256("openself-context-v1\n" + context) — cites the exact rendered block. */
+    contextHash: string;
+    asOf: string;
+    /** Vector index state at build time. */
+    vector: {
+        model: string;
+        provider: string;
+        indexed: number;
+        pending: number;
+    };
+    retrieval: RetrievalMode;
+    filters: {
+        scope: string | null;
+        allowedScopes: string[] | null;
+        type: MemoryType | null;
+        maxSensitivity: Sensitivity | null;
+        minSourceTrust: SourceTrust | null;
+    };
+    limits: { maxChars: number; limit: number };
+    candidates: ContextReceiptCandidate[];
+    totals: {
+        candidates: number;
+        selected: number;
+        skipped: number;
+        usedChars: number;
+    };
+    /** Ed25519 fingerprint of the vault that produced this receipt. */
+    signer?: string;
+    /** Ed25519 signature over `contextHash` (domain `openself-sign-v1`). */
+    signature?: string;
 }
 export type VaultKey = string | Buffer;
 export interface VectorEncoder {
     model: string;
     encode(text: string): number[];
 }
+/**
+ * Pluggable embedding provider. Synchronous providers expose `encodeSync`;
+ * async providers expose `encode`/`batchEncode` and index lazily through
+ * `store.indexPending()`. `model` is recorded per-vector — changing it
+ * re-indexes pending rows.
+ */
+export interface VectorProvider {
+    name?: string;
+    model: string;
+    encode?(text: string): Promise<number[]>;
+    encodeSync?(text: string): number[];
+    batchEncode?(texts: string[]): Promise<number[][]>;
+}
+export type EmbeddingProviderName = 'feature-hash' | 'ollama' | 'openai-compatible';
 export interface ContextStoreOptions {
     dataDir?: string;
     dbPath?: string | Buffer;
     encryptionKey?: VaultKey;
+    /** Back-compat alias: a synchronous vector encoder. */
     vectorEncoder?: VectorEncoder;
+    /** Provider name ('feature-hash'|'ollama'|'openai-compatible') or a custom provider object. */
+    embeddings?: EmbeddingProviderName | VectorProvider;
+    /** Alias for `embeddings` when passing a provider object. */
+    vectorProvider?: VectorProvider;
+    /**
+     * Owner override for the indexing sensitivity cap. Remote providers
+     * default to 'private' so `restricted` content never leaves the machine;
+     * local providers default to 'restricted'. Setting 'restricted' on a
+     * remote provider opts in to sending restricted text to that endpoint.
+     */
+    embeddingIndexMaxSensitivity?: Sensitivity;
 }
 export interface VaultStats {
     total: number;
@@ -111,8 +220,13 @@ export interface VaultStats {
     forgotten: number;
     vectors: number;
     vectorModel: string;
+    vectorProvider: string;
+    /** Memories whose vectors are not yet indexed under the current model. */
+    pendingVectors: number;
     encrypted: boolean;
     byType: Partial<Record<MemoryType, number>>;
+    /** Memory Inbox counts keyed by proposal status. */
+    proposals: Partial<Record<ProposalStatus, number>>;
     dbPath: string;
 }
 export class ContextStore {
@@ -134,13 +248,136 @@ export class ContextStore {
         duplicateIds: readonly string[],
         changes?: Partial<MemoryInput>,
     ): { memory: MemoryRecord; mergedIds: string[] };
+    /** True when the embedding provider encodes synchronously. */
+    readonly vectorSync: boolean;
     search(query: string, options?: SearchOptions): SearchMemory[];
+    searchAsync(query: string, options?: SearchOptions): Promise<SearchMemory[]>;
     list(options?: ListOptions): MemoryRecord[];
     findPotentialConflicts(input: MemoryInput, options?: ConflictOptions): ConflictMemory[];
-    buildContext(query: string, options?: SearchOptions & { maxChars?: number }): ContextBlock;
+    findPotentialConflictsAsync(
+        input: MemoryInput,
+        options?: ConflictOptions,
+    ): Promise<ConflictMemory[]>;
+    buildContext(
+        query: string,
+        options?: SearchOptions & { maxChars?: number; explain?: boolean },
+    ): ContextBlock;
+    buildContextAsync(
+        query: string,
+        options?: SearchOptions & { maxChars?: number; explain?: boolean },
+    ): Promise<ContextBlock>;
+    /**
+     * The Context Compiler — turns a ContextRequest into an exact, bounded,
+     * explainable ContextPackage. `options.policy` supplies a requester
+     * envelope (AccessPolicy); `options.envelope` accepts a raw filter
+     * envelope for trusted local callers.
+     */
+    compileContext(request: ContextRequestInput, options?: CompileOptions): ContextPackage;
+    compileContextAsync(
+        request: ContextRequestInput,
+        options?: CompileOptions,
+    ): Promise<ContextPackage>;
+    /**
+     * Lifecycle + context-graph delegates — supersession, typed edges,
+     * entities/aliases and the inspectable timeline.
+     */
+    supersede(
+        input: MemoryInput | string,
+        supersededId: string,
+        options?: { sourceKind?: string; confidence?: number },
+    ): { memory: MemoryRecord; superseded: MemoryRecord };
+    unsupersede(id: string): boolean;
+    addEdge(
+        subject: string,
+        predicate: EdgePredicate | string,
+        object: string,
+        options?: { sourceKind?: string; confidence?: number },
+    ): MemoryEdge;
+    removeEdge(subject: string, predicate: string, object: string): boolean;
+    edges(
+        id: string,
+        options?: { direction?: 'out' | 'in' | 'both'; predicate?: string; limit?: number },
+    ): MemoryEdge[];
+    supersededIds(asOf: string): Set<string>;
+    ensureEntity(input: {
+        kind?: EntityKind;
+        canonical: string;
+        scope?: string;
+        aliases?: string[];
+    }): EntityRecord;
+    findEntity(nameOrId: string): EntityRecord | null;
+    listEntities(options?: { kind?: EntityKind; scope?: string; limit?: number }): EntityRecord[];
+    addEntityAlias(entityId: string, alias: string): EntityRecord;
+    mergeEntities(primaryId: string, duplicateIds: readonly string[]): EntityRecord;
+    linkEntity(memoryId: string, entityId: string, role?: string): boolean;
+    unlinkEntity(memoryId: string, entityId: string, role?: string): boolean;
+    entitiesForMemory(memoryId: string): (EntityRecord & { role: string })[];
+    memoriesForEntity(
+        entityId: string,
+        options?: { limit?: number; includeForgotten?: boolean },
+    ): { memory: MemoryRecord; role: string }[];
+    timeline(options?: {
+        scope?: string;
+        type?: MemoryType;
+        since?: string;
+        until?: string;
+        limit?: number;
+    }): TimelineEntry[];
+    /** Drain pending vector rows through the configured provider. */
+    indexPending(options?: { limit?: number }): Promise<{
+        model: string;
+        indexed: number;
+        pending: number;
+    }>;
+    /**
+     * Submit a memory for owner review instead of writing it directly.
+     * The proposal is persisted in the Memory Inbox until approved or rejected.
+     */
+    proposeMemory(input: MemoryInput, options?: ProposeOptions): MemoryProposal;
+    getProposal(id: string): MemoryProposal | null;
+    listProposals(options?: ListProposalsOptions): MemoryProposal[];
+    /** Approve a pending proposal into a durable memory; `overrides` edit before commit. */
+    approveProposal(
+        id: string,
+        overrides?: Partial<MemoryInput>,
+        options?: { reviewNote?: string },
+    ): MemoryRecord | null;
+    rejectProposal(id: string, options?: { reviewNote?: string }): boolean;
     forget(id: string): boolean;
+    /** Forget active memories whose `validTo` has lapsed. */
+    sweepExpired(options?: { now?: string; limit?: number; dryRun?: boolean }): {
+        swept: number;
+        expired: number;
+        ids: string[];
+    };
+    /** Vault Ed25519 identity, lazily loaded (null for read-only/in-memory). */
+    readonly signingIdentity: SigningIdentity | null;
     stats(): VaultStats;
     close(): void;
+}
+export type ProposalStatus = 'pending' | 'approved' | 'rejected';
+export interface MemoryProposal {
+    id: string;
+    /** The normalized memory payload awaiting review. */
+    memory: MemoryRecord;
+    status: ProposalStatus;
+    proposedBy: string;
+    note: string;
+    proposedAt: string;
+    reviewedAt?: string | null;
+    reviewNote?: string;
+    memoryId?: string | null;
+}
+export interface ProposeOptions {
+    proposedBy?: string;
+    note?: string;
+}
+export interface ListProposalsOptions {
+    /** `undefined` defaults to pending; pass `null` to list every status. */
+    status?: ProposalStatus | null;
+    proposedBy?: string;
+    limit?: number;
+    offset?: number;
 }
 export function normalizeMemory(input: MemoryInput, now?: Date): MemoryRecord;
 export const memoryInputSchema: z.ZodType<
@@ -150,7 +387,7 @@ export const memoryInputSchema: z.ZodType<
     MemoryInput
 >;
 
-export type ImportFormat = 'markdown' | 'text' | 'whatsapp' | 'telegram';
+export type ImportFormat = 'markdown' | 'text' | 'whatsapp' | 'telegram' | 'openself';
 export interface ImportOptions extends Pick<
     MemoryInput,
     'scope' | 'sensitivity' | 'type' | 'confidence' | 'tags'
@@ -174,6 +411,112 @@ export class ContextImporter {
     importFile(filePath: string, options?: ImportOptions): ImportReport;
 }
 export function detectImportFormat(filePath: string): ImportFormat;
+/**
+ * Human-readable interoperability export (JSONL). Plaintext — this is NOT the
+ * encrypted `.osbackup` vault backup. `restricted` memories require
+ * `includeRestricted: true`.
+ */
+export interface ContextExportOptions {
+    file?: string;
+    scope?: string;
+    maxSensitivity?: Sensitivity;
+    includeRestricted?: boolean;
+    dryRun?: boolean;
+    /** Strip secret-shaped strings before hashing/signing. */
+    redact?: boolean;
+    /** Sign the export with the vault's Ed25519 identity (default true). */
+    sign?: boolean;
+}
+export interface ContextExportReport {
+    format: 'openself-context';
+    version: 1;
+    count: number;
+    scope: string | null;
+    includeRestricted: boolean;
+    bytes: number;
+    dryRun: boolean;
+    file?: string;
+    memories?: MemoryRecord[];
+    signed: boolean;
+    /** Fingerprint of the signing vault identity, when signed. */
+    signer: string | null;
+    secrets: { findings: number; kinds: string[]; redacted: boolean; memories: number };
+}
+export function exportMemories(
+    store: ContextStore,
+    options?: ContextExportOptions,
+): ContextExportReport;
+export function serializeMemory(memory: MemoryRecord): Record<string, unknown>;
+export const CONTEXT_EXPORT_FORMAT: 'openself-context';
+export const CONTEXT_EXPORT_VERSION: 1;
+export function parseContextExport(text: string): {
+    header: Record<string, unknown>;
+    records: { memory: MemoryInput; dedupeKey: string }[];
+    errors: string[];
+};
+export interface ContextExportValidation {
+    ok: boolean;
+    errors: string[];
+    records: number;
+    header: Record<string, unknown> | null;
+    /** Signature block status — `present: false` for unsigned exports. */
+    signature?: { present: boolean; signer?: string | null; valid?: boolean };
+}
+/** Non-throwing spec validator for openself-context JSONL payloads. */
+export function validateContextExport(text: string): ContextExportValidation;
+/** sha256("openself-export-v1\n" + join(recordLines,"\n")) — signed payload. */
+export function exportPayloadHash(recordLines: string[]): string;
+/** Ed25519 fingerprint: sha256("openself-sign-v1\n" + publicKeyBase64). */
+export function signingFingerprint(publicKeyBase64: string): string;
+/** Ed25519 sign over domain-separated payload ("openself-sign-v1\n" + payload). */
+export function signPayload(privateKeyBase64: string, payload: string): string;
+export function verifyPayload(
+    publicKeyBase64: string,
+    payload: string,
+    signatureBase64: string,
+): boolean;
+/**
+ * Deterministic JSON — sorted object keys, array order preserved, undefined
+ * object properties dropped. Used to canonicalize receipt payloads.
+ */
+export function canonicalJson(value: unknown): string;
+/**
+ * sha256("openself-receipt-v1\n" + canonicalJson(receipt minus signature
+ * fields)) — binds every metadata field that affects interpretation.
+ */
+export function receiptPayloadHash(receipt: object): string;
+/**
+ * Verify a receipt's signature. Current receipts verify `receiptSignature`
+ * over `receiptHash`; legacy receipts fall back to `signature` over
+ * `contextHash`.
+ */
+export function verifyReceiptSignature(receipt: object, publicKeyBase64: string): boolean;
+export interface SigningIdentity {
+    publicKey: string;
+    fingerprint: string;
+    file: string;
+    created: boolean;
+    sign(payload: string): string;
+}
+/**
+ * Load or create the vault's persistent Ed25519 identity (null when read-only).
+ * Pass `create: false` for non-mutating lookups that must not write a key.
+ */
+export function loadSigningIdentity(
+    dataDir: string | null | undefined,
+    options?: { create?: boolean },
+): SigningIdentity | null;
+export const SIGNING_DOMAIN: 'openself-sign-v1';
+export interface SecretFinding {
+    kind: string;
+    index: number;
+    /** Masked preview — first 6 chars + ellipsis. */
+    match: string;
+}
+/** Pattern-based detection of credential-shaped strings in text. */
+export function scanForSecrets(text: string): SecretFinding[];
+/** Replace detected secrets with `[REDACTED:<kind>]`. */
+export function redactSecrets(text: string): { text: string; findings: SecretFinding[] };
 export function chunkDocument(
     content: string,
     maxChars?: number,
@@ -185,6 +528,42 @@ export class LocalVectorEncoder implements VectorEncoder {
     encode(text: string): number[];
 }
 export function cosineSimilarity(left: number[], right: number[]): number;
+/** sha256("openself-memory-v1\n" + utf8(content)) — stable content address. */
+export function memoryContentHash(content: string): string;
+/** sha256("openself-context-v1\n" + renderedContext) — receipt citation. */
+export function contextBlockHash(renderedContext: string): string;
+export function resolveVectorProvider(
+    spec?: EmbeddingProviderName | VectorProvider,
+    env?: Record<string, string | undefined>,
+): VectorProvider;
+export function featureHashProvider(options?: { dimensions?: number }): VectorProvider;
+export class OllamaEmbeddingProvider implements VectorProvider {
+    constructor(options?: {
+        baseUrl?: string;
+        model?: string;
+        timeoutMs?: number;
+        fetch?: typeof globalThis.fetch;
+    });
+    name: 'ollama';
+    baseUrl: string;
+    model: string;
+    encode(text: string): Promise<number[]>;
+    batchEncode(texts: string[]): Promise<number[][]>;
+}
+export class OpenAiCompatibleProvider implements VectorProvider {
+    constructor(options: {
+        baseUrl: string;
+        model: string;
+        apiKey?: string;
+        timeoutMs?: number;
+        fetch?: typeof globalThis.fetch;
+    });
+    name: 'openai-compatible';
+    baseUrl: string;
+    model: string;
+    encode(text: string): Promise<number[]>;
+    batchEncode(texts: string[]): Promise<number[][]>;
+}
 
 export interface CaptureOptions {
     scope?: string;
@@ -301,14 +680,71 @@ export function restoreVault(
     options: { passphrase: string; keyBackend?: KeyBackend },
 ): Promise<{ dataDir: string; createdAt: string; encrypted: true }>;
 
-export type McpCapability = 'read' | 'remember' | 'forget';
+export type McpCapability = 'read' | 'remember' | 'forget' | 'propose';
+export const MCP_CAPABILITIES: readonly McpCapability[];
 export interface McpPolicy {
     clientId: string;
-    scopes: readonly string[];
+    /** Omit to grant all scopes. */
+    scopes?: readonly string[];
+    /** Policy v2: deny roots win over allow roots. */
+    deny?: readonly string[];
     maxSensitivity: Sensitivity;
+    /** Policy v2: requester trust floor for compiled context. */
+    minSourceTrust?: SourceTrust;
     capabilities: readonly McpCapability[];
+    /**
+     * Highest source trust this client's writes may claim. Agent writes
+     * default to `external`; owners may raise this deliberately.
+     */
+    maxSourceTrust?: SourceTrust;
+    /** Requester display label recorded on receipts. */
+    label?: string;
+    transport?: 'stdio' | 'http' | 'api' | 'dashboard';
+    /** Default compilation budget ceilings — requests can only narrow. */
+    budget?: {
+        maxChars?: number;
+        maxTokens?: number;
+        maxItems?: number;
+    };
+}
+export class AccessPolicy {
+    constructor(input?: McpPolicy);
+    readonly clientId: string;
+    readonly label?: string;
+    readonly transport?: 'stdio' | 'http' | 'api' | 'dashboard';
+    readonly scopes?: readonly string[];
+    readonly deniedScopes?: readonly string[];
+    readonly maxSensitivity: Sensitivity;
+    readonly minSourceTrust: SourceTrust;
+    readonly maxSourceTrust: SourceTrust;
+    readonly capabilities: readonly McpCapability[];
+    readonly budget?: { maxChars?: number; maxTokens?: number; maxItems?: number };
+    require(capability: McpCapability): void;
+    /** True when `scopeValue` sits under an explicitly denied root. */
+    denies(scopeValue: string): boolean;
+    contains(scope: string): boolean;
+    requireMemory(memory: { scope?: string; sensitivity?: string } | null): void;
+    readOptions<
+        T extends { maxSensitivity?: Sensitivity; scope?: string; minSourceTrust?: SourceTrust },
+    >(
+        input: T,
+    ): T & {
+        maxSensitivity: Sensitivity;
+        minSourceTrust: SourceTrust;
+        allowedScopes?: readonly string[];
+        deniedScopes?: readonly string[];
+    };
+    clampBudget(requested?: { maxChars?: number; maxTokens?: number; maxItems?: number }): {
+        maxChars?: number;
+        maxTokens?: number;
+        maxItems?: number;
+    };
+    clampSourceTrust(requested?: SourceTrust): SourceTrust;
+    deny(): never;
 }
 export function loadMcpPolicy(path: string, id: string): McpPolicy;
+/** List every configured requester identity in a policy file (v1 or v2). */
+export function listMcpPolicyClients(path: string): string[];
 export type AuditOutcome = 'attempted' | 'allowed' | 'denied' | 'error';
 export interface AuditEvent {
     id: number;
@@ -316,16 +752,50 @@ export interface AuditEvent {
     client: string;
     tool: string;
     outcome: AuditOutcome;
+    /** Hash of the previous completed event; absent on legacy/pending rows. */
+    prevHash?: string | null;
+    /** SHA-256 over `prevHash + occurredAt + client + tool + outcome`. */
+    entryHash?: string | null;
+}
+export interface AuditChainVerification {
+    /** False when a completed event's hash or link was tampered with. */
+    ok: boolean;
+    /** Completed events that verified against the chain. */
+    checked: number;
+    /** Pre-chain rows (written before hash chaining existed). */
+    legacy: number;
+    /** Interrupted `attempted` rows that never joined the chain. */
+    pending: number;
+    /** First row where verification failed, or null. */
+    brokenAt: number | null;
+    /** Hash of the newest verified event, or null. */
+    tip: string | null;
+    genesis: string;
 }
 export class AccessAudit {
-    constructor(options?: { dbPath?: string; retentionDays?: number; maxEntries?: number });
+    constructor(options?: {
+        dbPath?: string;
+        retentionDays?: number;
+        maxEntries?: number;
+        /** Open without creating/mutating; legacy databases stay unmigrated. */
+        readonly?: boolean;
+    });
     begin(client: string, tool: string): number;
     finish(id: number, outcome: AuditOutcome): void;
     list(options?: { client?: string; limit?: number }): AuditEvent[];
+    /** Walk the hash chain; detects edited/deleted history. */
+    verify(): AuditChainVerification;
+    /** JSONL export for archival or transparency-log anchoring. */
+    toJSONL(options?: { client?: string; limit?: number }): string;
     prune(): number;
     clear(): number;
     close(): void;
 }
+export function auditEntryHash(
+    prevHash: string | null,
+    event: { occurred_at?: string; occurredAt?: string; client: string; tool: string },
+    outcome: string,
+): string;
 export interface McpServerOptions {
     version?: string;
     policy?: McpPolicy;
@@ -340,8 +810,41 @@ export function runContextMcpServer(
         dataDir?: string;
         policyFile?: string;
         clientId?: string;
+        embeddings?: EmbeddingProviderName | VectorProvider;
     },
 ): Promise<{ server: McpServer; store: ContextStore }>;
+/**
+ * Authenticated, localhost-first Streamable HTTP transport. Stateless request
+ * handling: every POST creates a short-lived MCP session server-side.
+ *
+ * Threat model: the bearer token authorizes requests; Host/Origin checks plus
+ * the loopback default defend against DNS rebinding and browser cross-origin
+ * reads. `allowRemote` only removes the loopback expectation — never auth.
+ */
+export interface McpHttpOptions extends McpServerOptions {
+    store: ContextStore;
+    host?: string;
+    port?: number;
+    token?: string;
+    allowRemote?: boolean;
+}
+export interface McpHttpApp {
+    app: Express;
+    /** The effective bearer token (generated when not supplied). */
+    token: string;
+    generatedToken: boolean;
+    host: string;
+    allowRemote: boolean;
+}
+export function createMcpHttpApp(options: McpHttpOptions): McpHttpApp;
+export function runContextMcpHttpServer(options?: McpHttpOptions): Promise<
+    McpHttpApp & {
+        listener: import('node:http').Server;
+        port: number;
+        url: string;
+        close(): Promise<void>;
+    }
+>;
 export function createContextServer(options?: {
     token?: string;
     host?: string;
@@ -390,3 +893,308 @@ export function evaluateContextVault(
     dataset: EvaluationDataset,
     options?: { store?: ContextStore },
 ): EvaluationReport;
+
+/** Compiler evaluation — per-kind scores over a compiled-context corpus. */
+export interface CompilerEvaluationCase {
+    name: string;
+    kind?: string;
+    request: ContextRequestInput;
+    /** Policy client name from the dataset `policies` map. */
+    policy?: string;
+    expect?: {
+        include?: string[];
+        exclude?: string[];
+        denied?: string[];
+        skipped?: string[];
+        dedupeGroups?: string[][];
+        noLeak?: string[];
+        refused?: boolean;
+        receiptIntegrity?: boolean;
+    };
+}
+export interface CompilerEvaluationDataset {
+    name?: string;
+    thresholds?: Record<string, number>;
+    memories?: {
+        key: string;
+        memory: MemoryInput;
+        supersedes?: string;
+        supersedeAt?: string;
+    }[];
+    entities?: {
+        kind?: EntityKind;
+        canonical: string;
+        scope?: string;
+        aliases?: string[];
+        links?: { memory: string; role?: string }[];
+    }[];
+    policies?: Record<string, Omit<McpPolicy, 'clientId'>>;
+    cases?: CompilerEvaluationCase[];
+}
+export interface CompilerEvaluationReport {
+    dataset: string;
+    passed: boolean;
+    metrics: Record<string, number>;
+    thresholds: Record<string, number>;
+    failures: { metric: string; actual: number; threshold: number }[];
+    cases: {
+        name: string;
+        kind: string;
+        score: number;
+        selected?: string[];
+        failures: string[];
+    }[];
+}
+export function evaluateCompilerVault(
+    dataset: CompilerEvaluationDataset,
+    options?: { store?: ContextStore },
+): CompilerEvaluationReport;
+
+// ---------- Context Compiler (schema v4 / receipt v2) ----------
+
+export type ContextFormat = 'block' | 'json' | 'markdown';
+export const COMPILER_VERSION: string;
+export const CONTEXT_FORMATS: readonly ContextFormat[];
+export const RETRIEVAL_MODES: readonly RetrievalMode[];
+/** Purpose → memory-type ranking affinity (ranking only, never authorization). */
+export const PURPOSE_TYPE_AFFINITY: Record<string, Partial<Record<MemoryType, number>>>;
+
+export interface ContextBudget {
+    maxChars?: number;
+    /** Estimated tokens (chars/4) — a planning unit, not a tokenizer contract. */
+    maxTokens?: number;
+    maxItems?: number;
+}
+/**
+ * A Context Request — the typed contract every interface normalizes into
+ * before compilation. Requests express intent; authorization always comes
+ * from the configured requester policy, never from request fields.
+ */
+export interface ContextRequestInput {
+    query?: string;
+    task?: string;
+    /** Requester label for receipts — NOT an authorization input. */
+    agent?: string;
+    purpose?: string;
+    scope?: string;
+    scopes?: readonly string[];
+    type?: MemoryType;
+    entity?: string;
+    maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
+    asOf?: string;
+    budget?: ContextBudget | number;
+    maxChars?: number;
+    limit?: number;
+    retrieval?: RetrievalMode;
+    format?: ContextFormat;
+    explain?: boolean;
+    includeSuperseded?: boolean;
+    includeStale?: boolean;
+}
+export interface NormalizedContextRequest {
+    query: string;
+    task: string | null;
+    agent: string | null;
+    purpose: string;
+    scope: string | null;
+    scopes: string[] | null;
+    type: MemoryType | null;
+    entity: string | null;
+    maxSensitivity: Sensitivity | null;
+    minSourceTrust: SourceTrust | null;
+    asOf: string;
+    budget: ContextBudget;
+    retrieval: RetrievalMode;
+    format: ContextFormat;
+    explain: boolean;
+    includeSuperseded: boolean;
+    includeStale: boolean;
+}
+export const contextRequestSchema: z.ZodType<ContextRequestInput, ContextRequestInput>;
+export function normalizeContextRequest(input?: ContextRequestInput): NormalizedContextRequest;
+
+/** Raw filter envelope for trusted local callers (dashboard/CLI/buildContext). */
+export interface RawEnvelope {
+    clientId?: string;
+    allowedScopes?: readonly string[];
+    deniedScopes?: readonly string[];
+    maxSensitivity?: Sensitivity;
+    minSourceTrust?: SourceTrust;
+    budget?: ContextBudget;
+}
+/**
+ * Options accepted by compileContext/compileContextAsync/ContextCompiler.
+ * `diagnostics` is host-only: it re-runs discovery unfiltered so the receipt
+ * can enumerate policy-denied candidates (id + contentHash + reason). It is
+ * never reachable from request fields — set it only for owner tools (CLI,
+ * dashboard debugger, evaluator), never for client/agent-facing calls.
+ */
+export interface CompileOptions {
+    policy?: AccessPolicy;
+    envelope?: RawEnvelope;
+    receipt?: boolean;
+    diagnostics?: boolean;
+}
+export type TemporalStatus = 'current' | 'superseded' | 'expired' | 'not-yet-valid';
+export interface ContextConflict {
+    class: 'declared-contradiction' | 'supersession' | 'overlapping-claim';
+    ids: string[];
+    note: string;
+}
+export interface PackagedMemory extends SearchMemory {
+    temporalStatus?: TemporalStatus;
+    lifecycle: 'active' | TemporalStatus;
+    selectionReason: string;
+}
+/** The exact, bounded output of a compilation — render + selected records. */
+export interface ContextPackage {
+    query: string;
+    task: string | null;
+    context: string;
+    format: ContextFormat;
+    /** sha256 citation of the exact rendered package. */
+    contextHash: string;
+    memories: PackagedMemory[];
+    conflicts: ContextConflict[];
+    usedChars: number;
+    usedTokens: number;
+    items: number;
+    receipt?: ContextReceiptV2;
+}
+export type ReceiptDecision = 'selected' | 'skipped' | 'denied';
+export interface ContextReceiptCandidateV2 {
+    id: string;
+    contentHash: string;
+    type?: MemoryType;
+    scope?: string;
+    sensitivity?: Sensitivity;
+    sourceTrust?: SourceTrust;
+    confidence?: number;
+    source?: MemorySource;
+    relevance?: number | null;
+    match?: RetrievalMatch | null;
+    recencyDays?: number | null;
+    temporalStatus?: TemporalStatus;
+    decision: ReceiptDecision;
+    reason: string;
+    chars?: number | null;
+}
+/** Receipt v2 — the explainable record of every compilation decision. */
+export interface ContextReceiptV2 {
+    version: 2;
+    compiler: { name: string; version: string };
+    query: string;
+    task: string | null;
+    purpose: string;
+    asOf: string;
+    contextHash: string;
+    requester: { clientId: string; label?: string; agent: string | null };
+    vector: { model: string; provider: string; indexed: number; pending: number };
+    retrieval: RetrievalMode;
+    format: ContextFormat;
+    filters: {
+        scope: string | null;
+        allowedScopes: string[] | null;
+        /** Deny-root names — only present on owner-diagnostics receipts. */
+        deniedScopes: string[] | null;
+        droppedScopes: string[];
+        type: MemoryType | null;
+        maxSensitivity: Sensitivity;
+        minSourceTrust: SourceTrust;
+        includeSuperseded: boolean;
+        includeStale: boolean;
+    };
+    budget: {
+        maxChars: number;
+        maxTokens: number | null;
+        maxItems: number;
+        usedChars: number;
+        usedTokens: number;
+        usedItems: number;
+    };
+    limits: { maxChars: number; limit: number };
+    candidates: ContextReceiptCandidateV2[];
+    conflicts: ContextConflict[];
+    totals: {
+        candidates: number;
+        selected: number;
+        skipped: number;
+        /** Owner-diagnostics only — absent on client-facing receipts. */
+        denied?: number;
+        conflicts: number;
+        usedChars: number;
+    };
+    /** sha256 over the canonical receipt payload (excludes signature fields). */
+    receiptHash?: string;
+    signer?: string;
+    /** Legacy Ed25519 signature over `contextHash` only. */
+    signature?: string;
+    /** Ed25519 signature over `receiptHash` — binds the whole receipt. */
+    receiptSignature?: string;
+}
+export class ContextCompiler {
+    constructor(store: ContextStore, options?: { policy?: AccessPolicy });
+    compile(input: ContextRequestInput, options?: CompileOptions): ContextPackage;
+    compileAsync(input: ContextRequestInput, options?: CompileOptions): Promise<ContextPackage>;
+}
+
+// ---------- Context graph: edges, entities, timeline ----------
+
+export type EdgePredicate =
+    | 'supersedes'
+    | 'contradicts'
+    | 'relates_to'
+    | 'sourced_from'
+    | 'derived_from'
+    | 'affects'
+    | 'works_on'
+    | 'uses'
+    | 'knows'
+    | 'part_of';
+export type EntityKind = 'person' | 'project' | 'organization' | 'technology' | 'place' | 'thing';
+export const EDGE_PREDICATES: readonly EdgePredicate[];
+export const ENTITY_KINDS: readonly EntityKind[];
+export interface MemoryEdge {
+    id: number;
+    subject: string;
+    predicate: string;
+    object: string;
+    sourceKind: string;
+    confidence: number;
+    createdAt: string;
+}
+export interface EntityRecord {
+    id: string;
+    kind: EntityKind;
+    canonical: string;
+    scope: string;
+    /** Set on losers of `mergeEntities` — points at the surviving entity. */
+    mergedInto: string | null;
+    createdAt: string;
+    aliases: string[];
+}
+export interface TimelineEntry {
+    at: string;
+    memoryId: string;
+    version: number;
+    kind: string;
+    scope: string;
+    type: MemoryType;
+    summary: string;
+    supersededBy: string | null;
+}
+export function ensureEntity(
+    store: ContextStore,
+    input: { kind?: EntityKind; canonical: string; scope?: string; aliases?: string[] },
+): EntityRecord;
+export function findEntity(store: ContextStore, nameOrId: string): EntityRecord | null;
+export function listEntities(
+    store: ContextStore,
+    options?: { kind?: EntityKind; scope?: string; limit?: number },
+): EntityRecord[];
+export function mergeEntities(
+    store: ContextStore,
+    primaryId: string,
+    duplicateIds: readonly string[],
+): EntityRecord;

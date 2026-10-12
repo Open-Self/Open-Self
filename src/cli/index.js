@@ -23,6 +23,13 @@ import { ghostCommand } from './ghost.js';
 import { profileCommand } from './profile.js';
 import { memoryCommand } from './memory.js';
 import { mcpCommand } from './mcp.js';
+import { initCommand } from './init.js';
+import { doctorCommand } from './doctor.js';
+import { contextCommand } from './context.js';
+import { inboxCommand } from './inbox.js';
+import { demoCommand } from './demo.js';
+import { connectCommand } from './connect.js';
+import { skillCommand } from './skill.js';
 import { dashboardCommand } from './dashboard.js';
 import { captureCommand } from './capture.js';
 import { vaultCommand } from './vault.js';
@@ -51,9 +58,11 @@ program
         'after',
         `
 ${chalk.bold('Quick Start:')}
-  ${chalk.gray('$')} openself memory add --type decision --content "Use SQLite"  ${chalk.dim('# Remember')}
-  ${chalk.gray('$')} openself memory search --query "database"                   ${chalk.dim('# Recall')}
-  ${chalk.gray('$')} openself mcp                                                  ${chalk.dim('# Connect AI clients')}
+  ${chalk.gray('$')} openself init                                                 ${chalk.dim('# Create your vault')}
+  ${chalk.gray('$')} openself demo                                                 ${chalk.dim('# See two agents share context')}
+  ${chalk.gray('$')} openself memory add --type decision --content "Use SQLite"    ${chalk.dim('# Remember')}
+  ${chalk.gray('$')} openself context "What database?" --explain                   ${chalk.dim('# Recall, with receipts')}
+  ${chalk.gray('$')} openself connect claude                                       ${chalk.dim('# Wire an agent client')}
 
 ${chalk.bold('Personality tools (legacy-compatible):')}
   ${chalk.gray('$')} openself feed --whatsapp ./chat.txt --name "You"
@@ -66,9 +75,20 @@ ${chalk.dim('Docs: https://github.com/Open-Self/open-self/tree/main/docs')}
 program
     .command('memory')
     .description('Import, store, search, list, and forget personal context')
-    .argument('[action]', 'add/import/search/conflicts/list/forget/stats', 'list')
-    .option('--file <paths...>', 'Files to import')
-    .option('--format <format>', 'auto/markdown/text/whatsapp/telegram', 'auto')
+    .argument(
+        '[action]',
+        'add/import/export/index/search/conflicts/list/forget/sweep/stats',
+        'list',
+    )
+    .option('--file <paths...>', 'Files to import (or the export destination for export)')
+    .option(
+        '--format <format>',
+        'auto/markdown/text/whatsapp/telegram/openself (export is JSONL)',
+        'auto',
+    )
+    .option('--include-restricted', 'Include restricted memories in an export')
+    .option('--redact', 'Strip secret-shaped strings from an export')
+    .option('--no-sign', 'Do not sign the export with the vault identity')
     .option('--content <text>', 'Memory content')
     .option('--query <text>', 'Search query')
     .option('--id <uuid>', 'Memory ID')
@@ -78,6 +98,7 @@ program
     .option('--sensitivity <level>', 'public/personal/private/restricted')
     .option('--max-sensitivity <level>', 'Maximum sensitivity returned', 'private')
     .option('--retrieval <mode>', 'hybrid/lexical/vector', 'hybrid')
+    .option('--min-source-trust <level>', 'untrusted/external/trusted/verified/owner')
     .option('--threshold <number>', 'Similarity threshold for conflict detection')
     .option('--confidence <number>', 'Confidence from 0 to 1')
     .option('--source-kind <kind>', 'Source type', 'manual')
@@ -90,28 +111,132 @@ program
     .option('--dry-run', 'Inspect an import without writing memories')
     .option('--limit <number>', 'Maximum results')
     .option('--include-forgotten', 'Include forgotten memories when listing')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction((action, options) => memoryCommand(action, options)));
 
 program
+    .command('init')
+    .description('Initialize the OpenSelf Context Vault (idempotent)')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .option('--encrypt', 'Encrypt new memories at rest')
+    .option('--json', 'Emit a JSON report')
+    .action(wrapAction(initCommand));
+
+program
+    .command('doctor')
+    .description('Check vault health, schema, audit, and policy configuration')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .option('--json', 'Emit a JSON report')
+    .action(wrapAction(doctorCommand));
+
+program
+    .command('context')
+    .description('Compile agent context for a query — --explain shows the context receipt')
+    .argument('[query]', 'Context query')
+    .option('--task <task>', 'Task description used for ranking and receipts')
+    .option('--agent <name>', 'Requester label recorded on the receipt')
+    .option('--purpose <purpose>', 'Purpose hint steering ranking (never widens permissions)')
+    .option('--scope <scope>', 'Scope root filter')
+    .option('--type <type>', 'Memory type filter')
+    .option('--entity <name>', 'Entity name or id — boosts linked memories')
+    .option('--mode <mode>', 'Retrieval mode: hybrid/lexical/vector')
+    .option('--format <format>', 'Context format: block/json/markdown')
+    .option('--max-chars <chars>', 'Character budget')
+    .option('--max-tokens <tokens>', 'Estimated token budget')
+    .option('--as-of <iso>', 'Evaluate temporal validity at a point in time')
+    .option('--min-source-trust <level>', 'untrusted/external/trusted/verified/owner')
+    .option('--max-sensitivity <level>', 'public/personal/private/restricted')
+    .option('--limit <number>', 'Maximum candidate memories')
+    .option('--include-superseded', 'Include superseded memories in the package')
+    .option('--include-stale', 'Include expired memories in the package')
+    .option('--explain', 'Include a context receipt explaining selection')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
+    .option('--json', 'Emit JSON')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .action(wrapAction((query, options) => contextCommand(query, options)));
+
+program
+    .command('demo')
+    .description('Disposable two-agent demo in a temporary vault — no API keys needed')
+    .option('--keep', 'Keep the demo vault instead of deleting it')
+    .option('--data-dir <path>', 'Vault directory to use with --keep')
+    .option('--json', 'Emit the demo transcript as JSON')
+    .action(wrapAction(demoCommand));
+
+program
+    .command('connect')
+    .description('Generate agent client MCP config (claude/cursor/vscode/windsurf/codex/generic)')
+    .argument('<target>', 'claude, cursor, vscode, windsurf, codex, or generic')
+    .option('--client <id>', 'OpenSelf client identity granted to this agent', 'agent')
+    .option('--policy <path>', 'Owner-managed MCP policy JSON to reference')
+    .option('--data-dir <path>', 'OpenSelf data directory the server should use')
+    .option('--token <token>', 'Bearer token to embed for http transport')
+    .option('--transport <mode>', 'stdio or http', 'stdio')
+    .option('--url <url>', 'HTTP MCP endpoint', 'http://127.0.0.1:3211/mcp')
+    .option('--project', 'Write project-level config instead of user-level')
+    .option('--dry-run', 'Print the change without writing files')
+    .option('--remove', 'Remove the openself entry')
+    .option('--json', 'Emit JSON')
+    .action(wrapAction((target, options) => connectCommand(target, options)));
+
+program
+    .command('inbox')
+    .description('Owner review inbox for agent memory proposals')
+    .argument('[action]', 'list/approve/reject', 'list')
+    .option('--id <id>', 'Proposal ID (required for approve/reject)')
+    .option('--status <status>', 'Filter: pending/approved/rejected')
+    .option('--client <id>', 'Filter proposals by proposing client')
+    .option('--limit <number>', 'Maximum proposals listed')
+    .option('--note <note>', 'Review note')
+    .option('--content <text>', 'Override content on approval')
+    .option('--type <type>', 'Override type on approval')
+    .option('--tags <csv>', 'Override tags on approval')
+    .option('--scope <scope>', 'Override scope on approval')
+    .option('--sensitivity <level>', 'Override sensitivity on approval')
+    .option('--source-trust <level>', 'Override source trust on approval')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .option('--json', 'Emit JSON')
+    .action(wrapAction((action, options) => inboxCommand(action, options)));
+
+program
+    .command('skill')
+    .description('Manage the bundled OpenSelf Agent Skill')
+    .argument('[action]', 'path/validate/install/uninstall', 'path')
+    .option('--project', 'Install into ./.agents/skills instead of ~/.agents/skills')
+    .option('--target <dir>', 'Explicit skills directory')
+    .option('--force', 'Reinstall over an existing copy')
+    .option('--dry-run', 'Print the change without writing files')
+    .option('--json', 'Emit JSON')
+    .action(wrapAction((action, options) => skillCommand(action, options)));
+
+program
     .command('mcp')
-    .description('Run the OpenSelf Context MCP server over stdio')
+    .description('Run the OpenSelf Context MCP server (stdio default, --http for streamable HTTP)')
     .option('--policy <path>', 'Owner-managed MCP policy JSON')
     .option('--client <id>', 'Client identity selected by the owner')
+    .option('--http', 'Serve streamable HTTP instead of stdio')
+    .option('--host <host>', 'HTTP bind host (loopback only unless --allow-remote)', '127.0.0.1')
+    .option('--port <port>', 'HTTP port', '3211')
+    .option('--token <token>', 'Bearer token for HTTP (or OPENSELF_MCP_TOKEN)')
+    .option('--allow-remote', 'Permit non-loopback HTTP binds; requires --token')
     .option('--audit-retention-days <days>', 'Audit retention in days', '30')
     .option('--audit-max-entries <count>', 'Maximum retained audit entries', '10000')
+    .option('--embeddings <provider>', 'Vector provider: feature-hash/ollama/openai-compatible')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .action(wrapAction(mcpCommand));
 
 program
     .command('audit')
-    .description('Inspect or prune local MCP access metadata')
-    .argument('[action]', 'list/prune/clear', 'list')
+    .description('Inspect, verify, export, or prune tamper-evident MCP access metadata')
+    .argument('[action]', 'list/verify/export/prune/clear', 'list')
     .option('--data-dir <path>', 'OpenSelf data directory')
     .option('--client <id>', 'Filter by owner-configured client identity')
     .option('--limit <count>', 'Maximum results', '50')
+    .option('--file <path>', 'JSONL export destination (export action)')
     .option('--retention-days <days>', 'Retention in days', '30')
     .option('--max-entries <count>', 'Maximum retained entries', '10000')
+    .option('--json', 'Emit JSON')
     .action(wrapAction(auditCommand));
 
 program

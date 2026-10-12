@@ -35,7 +35,7 @@ for (const released of ['v0.9.1', 'v0.11.0', 'v0.13.1']) {
             false,
         );
         assert.equal(store.stats().total, 2);
-        assert.equal(store.db.pragma('user_version', { simple: true }), 2);
+        assert.equal(store.db.pragma('user_version', { simple: true }), api.VAULT_SCHEMA_VERSION);
         assert.equal(
             store.db.prepare('SELECT COUNT(*) AS count FROM capture_checkpoints').get().count,
             released === 'v0.13.1' ? 1 : 0,
@@ -140,6 +140,24 @@ try {
     assert.equal(block.usedChars, block.context.length);
     assert.ok(block.usedChars <= 500);
     assert.ok(block.context.includes(remembered.content));
+    const compiled = await client.callTool({
+        name: 'openself_compile_context',
+        arguments: { query: 'database', task: 'audit fixture', explain: true },
+    });
+    assert.equal(compiled.isError, undefined);
+    const package_ = JSON.parse(compiled.content[0].text);
+    assert.equal(package_.receipt.version, 2);
+    assert.equal(package_.receipt.requester.clientId, 'fixture');
+    assert.ok(package_.contextHash.length > 0);
+    assert.ok(!package_.context.includes('Hidden database decision'));
+    // Client-facing receipts omit denied candidates entirely — denied records
+    // are indistinguishable from missing ones over MCP.
+    assert.ok(!package_.receipt.candidates.some((candidate) => candidate.decision === 'denied'));
+    const direct = store.compileContext(
+        { query: 'database', scope: 'project/fixture', explain: true },
+        { envelope: { clientId: 'smoke' } },
+    );
+    assert.equal(direct.receipt.version, 2);
     const dashboard = api.createContextServer({ store });
     await new Promise((resolve) => {
         http = dashboard.app.listen(0, '127.0.0.1', resolve);

@@ -31,7 +31,16 @@ relevant context for a task without handing the AI an unfiltered transcript of t
 | `occurredAt` | When an event happened |
 | `tags` | Normalized retrieval and organization labels |
 | `status` | active or forgotten |
+| `sourceTrust` | untrusted, external, trusted, verified, or owner |
+| `supersededAt` / `supersededBy` | Lifecycle: when this record stopped being current truth and which memory replaced it |
 | lifecycle timestamps | created, updated, and forgotten timestamps |
+
+Schema version 4 adds `memory_edges` (typed relations: `supersedes`, `contradicts`,
+`relates_to`, `sourced_from`, `derived_from`, `affects`, `works_on`, `uses`, `knows`,
+`part_of`), `entities` + `entity_aliases` + `memory_entities` (people, projects,
+organizations, technologies, places, things with alias resolution and reversible merges),
+and the `superseded_at`/`superseded_by` columns. Migration from v1–v3 is in place and
+preserves all data.
 
 Dates use ISO 8601 with an explicit offset. A memory whose validity window does not contain the
 requested `asOf` time is excluded from search.
@@ -67,6 +76,84 @@ an explicit owner grant. Scope filtering applies before retrieval limits, includ
 fallback queries and conflict responses. See [Agent permissions and audit](./agent-permissions.md).
 This tool boundary does not replace OS isolation or network authentication.
 
+## Source trust
+
+Source trust is ordered:
+
+```text
+untrusted < external < trusted < verified < owner
+```
+
+It records *how much the owner relies on the channel that produced a memory*, not the memory's
+truth. Owner-authored records default to `owner`; MCP writes and file imports are clamped to
+`external` (a per-client `maxSourceTrust` policy ceiling applies). Passing `minSourceTrust` to
+search, list, or `buildContext` floors the trust of returned records, so an operator can run
+`--min-source-trust trusted` to exclude unvetted agent output from a query.
+
+Trust is a plaintext operational column like sensitivity: visible to anyone who can read the
+vault, intentionally so that filtering works without decryption.
+
+## Owner-approved proposals
+
+`proposeMemory` stages a candidate in `memory_proposals` instead of writing it. Proposals carry
+the full normalized memory plus `proposedBy`, a note, and review metadata; they never appear in
+search, list, or context until `approveProposal` writes them (with optional field overrides) and
+links the proposal to the resulting memory. `rejectProposal` marks the proposal without writing.
+Both the CLI inbox (`openself inbox`) and the dashboard review the same queue.
+
+## Context Compiler
+
+`compileContext(request)` is the retrieval front door. A `ContextRequest` — `query`, `task`,
+`agent`, `purpose`, `scope`/`scopes`, `type`, `entity`, `maxSensitivity`, `minSourceTrust`,
+`asOf`, `budget`/`maxChars`/`limit`, `retrieval` (`hybrid`/`lexical`/`vector`), `format`
+(`block`/`json`/`markdown`), `explain`, `includeSuperseded`, `includeStale` — compiles through
+a fixed pipeline:
+
+```text
+request → policy envelope → policy-filtered candidate discovery
+→ temporal resolution → conflict detection → ranking
+→ redundancy control → budget packing → render → receipt
+```
+
+- **Policy-filtered discovery:** the requester's `AccessPolicy` (allow/deny scope roots,
+  sensitivity ceiling, trust floor) is pushed into the retrieval query itself, so
+  policy-denied records never enter the bounded candidate window and can never starve
+  allowed results out of the top-k. A policy partition still runs afterwards as
+  defense-in-depth; requests can only narrow the envelope.
+- **Temporal resolution:** superseded records (`supersededAt`/`supersededBy`) are excluded
+  from current truth but remain discoverable history; `includeSuperseded`/`includeStale`
+  re-admit them, and `asOf` fixes the comparison instant.
+- **Budget packing:** `maxChars`, `maxTokens` (estimate), and `maxItems` bound the package;
+  `budget` policy ceilings override client-supplied larger budgets.
+- **Formats:** `block` (attributed text), `json` (structured memories), `markdown`.
+
+`buildContext` delegates to the compiler and projects the result back to the v1 shape —
+same output contract, stronger guarantees.
+
+## Explainable retrieval
+
+`compileContext(request, { policy })` with `explain: true` returns **receipt v2**: requester
+identity (clientId + label + agent), effective filters (allowed scopes, sensitivity ceiling,
+trust floor, dropped request scopes), budget usage, per-candidate decisions (`selected`,
+`skipped` with reasons such as `over-budget`, `duplicate-content`, `expired`,
+`not-yet-valid`, `superseded-by:*`), declared conflicts, and the signed `contextHash`
+citation. Client-facing receipts never enumerate policy-denied candidates — a denied record
+is indistinguishable from one that does not exist.
+
+Owner tools (CLI `openself context --explain`, the dashboard Context Debugger, the compiler
+evaluator) set `options.diagnostics: true`, which re-runs discovery without the policy
+clamps and reports denied candidates as id + contentHash + reason only — denied content,
+scope, type, and sensitivity never appear even there. The `diagnostics` flag lives on
+`options`, never on the request, so a client cannot self-enable it. `buildContext` with
+`explain: true` still returns the v1 receipt projection, which strips denied rows entirely.
+
+Signed receipts carry `receiptHash` (sha256 over the canonical receipt payload) and
+`receiptSignature` (Ed25519 over `receiptHash`), binding requester identity, filters,
+`asOf`, compiler version, budgets and per-candidate decisions — not just the context bytes.
+`verifyReceiptSignature(receipt, publicKey)` verifies current receipts and falls back to
+the legacy `signature`-over-`contextHash` scheme for receipts written before
+`receiptHash` existed.
+
 ## Retrieval
 
 The default retriever combines two local rankings:
@@ -82,6 +169,13 @@ for debugging and evaluation.
 The local vector is not presented as a neural embedding: it improves aliases, spelling variation,
 and fuzzy retrieval while remaining small, deterministic, inspectable, and offline. SQLite remains
 the canonical store. Existing databases are backfilled with vectors when opened after an upgrade.
+
+The vector leg is provider-pluggable: `feature-hash` (this default), `ollama`, or any
+`openai-compatible` endpoint via `OPENSELF_EMBEDDINGS` / `--embeddings`. Async providers index
+lazily — writes never block on a network call, `indexPending()` drains pending vectors, and the
+async read APIs (`searchAsync`, `buildContextAsync`, `findPotentialConflictsAsync`) await the
+provider for the query leg. Vectors are recorded per-model, so switching models re-indexes
+automatically. See [embeddings](./embeddings.md).
 
 Context blocks use an 8,000-character default budget, configurable from 500 to 50,000.
 The complete rendered string, including source attribution and separators, must fit.
@@ -142,6 +236,14 @@ overlapping validity window. Results are warnings for human review, not automate
 
 Returns a compact formatted context block plus the contributing records. Use it before a bounded
 task such as preparing a meeting brief or drafting a status update.
+
+### `openself_compile_context`
+
+Full Context Compiler: accepts `query`, `task`, `agent`, `purpose`, `scope`/`scopes`, `type`,
+`entity`, `maxSensitivity`, `minSourceTrust`, `asOf`, `maxChars`, `maxTokens`, `maxItems`,
+`retrieval`, `format`, `explain`, `includeSuperseded`, and `includeStale`; returns a structured
+`ContextPackage` with the bounded context plus receipt v2 when `explain` is set. Governed by the
+`read` capability and the client's policy envelope.
 
 ### `openself_forget`
 
@@ -278,6 +380,13 @@ The key provider is selected by platform:
 vault without the correct key and closes the SQLite handle on all initialization failures. For
 headless environments, `OPENSELF_VAULT_KEY` accepts exactly 32 bytes encoded as base64 or 64 hex
 characters; this bypasses OS-bound storage and shifts key protection to the operator.
+
+Separately from payload encryption, each vault directory holds `signing-key.json` — an Ed25519
+keypair (mode 0600) created on first signed operation. It signs context receipts (`contextHash`)
+and exchange-format exports (`exportHash`), giving consumers offline-verifiable integrity and
+origin. The key is not the encryption key: losing it only loses the ability to prove future
+signatures come from the same vault. Protect it like the vault — a copied key can impersonate
+the vault's signature.
 
 The following operational metadata remains plaintext so SQLite can enforce filters and lifecycle:
 memory UUID, type, scope, sensitivity, confidence, validity/event timestamps, status, lifecycle

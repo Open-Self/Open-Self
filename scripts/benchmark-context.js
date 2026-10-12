@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -6,6 +6,7 @@ import { ContextStore } from '../src/context/store.js';
 
 const countArg = process.argv.find((value) => value.startsWith('--count='));
 const count = Math.min(Math.max(Number(countArg?.split('=')[1] || 1_000), 100), 20_000);
+const outArg = process.argv.find((value) => value.startsWith('--out='));
 const directory = mkdtempSync(join(tmpdir(), 'openself-benchmark-'));
 const store = new ContextStore({ dataDir: directory });
 
@@ -37,23 +38,25 @@ try {
     }
     durations.sort((left, right) => left - right);
 
-    console.log(
-        JSON.stringify(
-            {
-                memories: count,
-                insertMs: Number(insertMs.toFixed(2)),
-                insertsPerSecond: Number(((count / insertMs) * 1_000).toFixed(1)),
-                hybridSearch: {
-                    samples: durations.length,
-                    medianMs: Number(durations[Math.floor(durations.length / 2)].toFixed(2)),
-                    p95Ms: Number(durations[Math.floor(durations.length * 0.95)].toFixed(2)),
-                },
-                vectorModel: store.stats().vectorModel,
-            },
-            null,
-            2,
-        ),
-    );
+    const report = {
+        memories: count,
+        insertMs: Number(insertMs.toFixed(2)),
+        insertsPerSecond: Number(((count / insertMs) * 1_000).toFixed(1)),
+        hybridSearch: {
+            samples: durations.length,
+            medianMs: Number(durations[Math.floor(durations.length / 2)].toFixed(2)),
+            p95Ms: Number(durations[Math.floor(durations.length * 0.95)].toFixed(2)),
+        },
+        vectorModel: store.stats().vectorModel,
+        recordedAt: new Date().toISOString(),
+        node: process.version,
+        platform: `${process.platform}/${process.arch}`,
+    };
+    const serialized = `${JSON.stringify(report, null, 2)}\n`;
+    console.log(serialized);
+    if (outArg) {
+        writeFileSync(outArg.split('=').slice(1).join('='), serialized, 'utf8');
+    }
 } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });

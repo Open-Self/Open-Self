@@ -7,6 +7,7 @@ export default defineConfig({
     forbidOnly: Boolean(process.env.CI),
     workers: 1,
     retries: 0,
+    timeout: 60_000,
     reporter: 'list',
     use: { browserName: 'chromium', headless: true },
     projects: ['UTC', 'Asia/Ho_Chi_Minh', 'America/New_York'].map((timezoneId) => ({

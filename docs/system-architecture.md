@@ -13,26 +13,61 @@ OpenSelf operates as a **4-layer system**:
 
 ## Context Vault subsystem (v0.8)
 
-The primary product path is now a local-first context layer alongside the legacy personality
+The primary product path is now a local-first Personal Context OS alongside the legacy personality
 runtime:
 
 ```text
-manual/import/capture -> typed memory -> SQLite + FTS5 + local vector -> CLI/MCP/dashboard
-                              |                         |
-                              +-- lifecycle versions   +-- scope/time/sensitivity filters
+manual/import/capture -> typed memory -> SQLite + FTS5 + local vector
+                              |                    |
+                              +-- lifecycle        +-- Context Compiler
+                                  versions         (policy -> temporal -> rank
+                                  + graph edges    -> dedupe -> budget -> receipt)
 ```
 
-- `ContextStore` owns typed memory, provenance, temporal validity, soft forgetting, hybrid
-  retrieval, conflict detection, and version history.
+- `ContextStore` owns typed memory, provenance, temporal validity, source trust, soft
+  forgetting, hybrid retrieval, conflict detection, owner-reviewed proposals, explain
+  receipts (with `contextHash`/`contentHash` citations), and version history.
+- **Schema v4** adds a lifecycle layer (`superseded_at`/`superseded_by`) and a context
+  graph (`memory_edges` typed relations, `entities`/`entity_aliases`/`memory_entities`
+  with alias resolution and reversible merges). Superseded records stay queryable
+  history; `timeline()` exposes the lifecycle feed. Migrations from v1–v3 are in place.
+- **Context Compiler** (`compileContext`) compiles a typed `ContextRequest` — task,
+  agent, purpose, scopes, entity, trust/sensitivity floors, `asOf`, budgets — through
+  a fixed pipeline: policy envelope → candidate discovery → policy partition →
+  temporal resolution → conflict detection → ranking → redundancy control → budget
+  packing → render (`block`/`json`/`markdown`) → **receipt v2**. `buildContext`
+  delegates and projects to the stable v1 shape. Receipts name the requester, show
+  budget usage, and explain every selected/skipped/denied candidate — denied rows
+  expose only id + contentHash + reason.
+- **Policy v2** requester envelopes add `deny` scope roots (deny wins over allow),
+  `minSourceTrust` floors, `label`/`transport` metadata, and `budget` ceilings that
+  cap client-supplied budgets; v1 policy files load unchanged.
+- Embedding providers are pluggable: `feature-hash` (offline default), `ollama`
+  (local LLM), and `openai-compatible` (opt-in remote). Async providers index
+  lazily via `indexPending()`; sync mutation paths never block on them. Providers
+  declare `locality` — remote providers never index `restricted` content
+  (`embeddingIndexMaxSensitivity` overrides).
 - Importers ingest documents and chat exports; polling connectors maintain project, ICS calendar,
-  EML/MBOX email, and browser bookmark/history sources with stable record IDs.
+  EML/MBOX email, and browser bookmark/history sources with stable record IDs. The versioned
+  JSONL interchange format (`openself memory export/import`) is specified in
+  `spec/context-exchange-format.md` with a normative JSON Schema; content-hash dedupe
+  makes re-imports idempotent.
 - Optional AES-256-GCM protects payload fields, local vectors, and versions. HMAC blind tokens
   replace plaintext FTS terms. Filter metadata remains plaintext.
 - `VaultKeyManager` binds the random key to Windows DPAPI, macOS Keychain, or Linux Secret Service.
-- CLI, authenticated localhost dashboard, JavaScript exports, and stdio MCP are separate access
-  surfaces over the same store.
+- A persistent Ed25519 vault identity (`signing-key.json`, mode 0600) signs explain receipts
+  and exchange-format exports; `validateContextExport()` verifies signatures offline and the
+  importer refuses tampered signed exports. Export scanning (`secrets.js`) detects
+  credential-shaped strings with optional `--redact` stripping.
+- `AccessAudit` records MCP calls in a SHA-256 hash chain (`prev_hash` → `entry_hash`);
+  `verify()` detects edited or deleted history, `toJSONL()` exports the trail for
+  external anchoring, and pruning anchors the surviving suffix via `audit_meta`.
+- CLI, authenticated localhost dashboard, JavaScript exports, and MCP (stdio or authenticated
+  Streamable HTTP) are separate access surfaces over the same store.
 - `eval:context` gates recall/MRR, temporal correctness, sensitivity leakage, and provenance against
   a versioned offline dataset.
+- Distribution: npm (`openself`), MCP Registry (`io.github.Open-Self/openself` via
+  `server.json` + `mcpName`), and OCI image (`ghcr.io/open-self/openself`).
 
 ## Message Processing Pipeline
 

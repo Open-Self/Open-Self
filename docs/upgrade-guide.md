@@ -3,6 +3,71 @@
 Before upgrading, keep a verified backup and read the intervening changelog entries.
 Close applications that own the vault before testing a migration against a copy.
 
+## From v1.2.x to v1.3.0 (Context Compiler, lifecycle, policy v2)
+
+Opening a vault migrates it to SQLite **schema 4** in place, preserving all memory data:
+
+- **New columns** `superseded_at` / `superseded_by` (both NULL for existing rows — every
+  memory stays active).
+- **New tables** `memory_edges`, `entities`, `entity_aliases`, `memory_entities` —
+  empty until you link or merge.
+- **`buildContext` behavior.** It now delegates to the Context Compiler and projects the
+  receipt back to the v1 shape. Output is the same contract, but identical-content
+  candidates are deduplicated and superseded/expired records resolve temporally — callers
+  relying on receiving every lexical hit may see tighter results.
+- **Policy v2** is opt-in. Version-1 policy files load unchanged; add `deny`,
+  `minSourceTrust`, `budget`, `label`, `transport` per client when needed. Unknown
+  versions still fail closed.
+- **Remote embedding privacy.** Remote providers (`openai-compatible`, non-loopback
+  Ollama) no longer index `restricted` content. Existing restricted vectors already
+  stored for remote models remain but receive no new content; switch
+  `embeddingIndexMaxSensitivity` only for remotes you trust.
+- **New surfaces:** `compileContext`/`compileContextAsync`, `openself_compile_context`,
+  lifecycle APIs (`supersede`, `unsupersede`, `timeline`), graph APIs (`addEdge`,
+  `ensureEntity`, `mergeEntities`, …), `npm run eval:compiler`,
+  `npm run benchmark:compiler`.
+
+## From v1.1.x to v1.2.0 (audit chain, embeddings, signatures)
+
+No vault migration is required — the memory schema is unchanged.
+
+- **`mcp-audit.db` upgrades itself.** The next writable open adds `prev_hash` /
+  `entry_hash` columns and the `audit_meta` table. Rows written before the
+  upgrade have no hashes and verify as `legacy`; new events chain normally.
+  `openself audit verify` reports `{ ok, checked, legacy, pending }`.
+- **Embedding providers.** Retrieval defaults to the unchanged offline
+  feature-hash encoder. To switch, set `OPENSELF_EMBEDDINGS` (or
+  `--embeddings`) to `ollama` or `openai-compatible`, then run
+  `openself memory index` — vectors are per-model, so old rows re-index lazily.
+- **Receipts and records** gain `contentHash` / `contextHash` fields; existing
+  code ignoring unknown fields is unaffected.
+- **Vault signing identity.** The first signed operation (explain receipt or
+  export) creates `<dataDir>/signing-key.json` (Ed25519, mode 0600). Receipts
+  gain `signer`/`signature`; exports gain `signer`/`publicKey`/`exportHash`/
+  `signature`. Unsigned third-party exports still import; a *bad* signature is
+  refused. Export with `--no-sign` to opt out, `--redact` to strip secrets.
+- **`openself memory sweep`** forgets memories past `validTo` — safe to run any
+  time; `--dry-run` previews.
+
+## From v1.0.x to v1.1.0
+
+Opening a vault migrates it to SQLite schema 3, which adds a `source_trust` column
+(existing owner records become `owner`) and the `memory_proposals` inbox table. The
+migration is additive — content, history, vectors, and import deduplication are
+preserved — but **OpenSelf ≤1.0 cannot reopen a schema-3 vault**. Take a verified
+`openself vault backup` before upgrading a primary vault; restore it into a fresh
+directory for rollback.
+
+All 1.0 public contracts are preserved. New surface area is additive: proposal methods
+on `ContextStore`, `buildContext` explain receipts, `minSourceTrust` filters, two
+additional MCP tools plus resources and a prompt, an authenticated HTTP transport, the
+JSONL export format, and the CLI commands `init`, `doctor`, `context`, `inbox`, `demo`,
+`connect`, and `skill`. The stable 1.x compatibility promise applies to the whole
+surface from this release forward.
+
+Encrypted vaults keep their OS-bound key; `source_trust` is an operational filter
+column (like sensitivity) and is intentionally not payload-encrypted.
+
 ## From v1.0.0-rc.2 to v1.0.0
 
 The stable release retains the same 50 public root value exports and SQLite schema 2.

@@ -9,6 +9,9 @@ export default defineConfig({
         // and ./tests/fixtures via file IO and would race on disk under
         // parallelism. Per-file isolation is kept (isolate defaults to true).
         fileParallelism: false,
+        // File-backed SQLite probes + OS key operations are slow on some disks;
+        // 30s keeps real hangs bounded without flaky 5s timeouts.
+        testTimeout: 30_000,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

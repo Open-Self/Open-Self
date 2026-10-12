@@ -25,9 +25,12 @@ describe('Context MCP server', () => {
         const tools = await client.listTools();
         expect(tools.tools.map((tool) => tool.name)).toEqual([
             'openself_remember',
+            'openself_propose_memory',
+            'openself_list_memory_proposals',
             'openself_search_memory',
             'openself_find_conflicts',
             'openself_get_context',
+            'openself_compile_context',
             'openself_forget',
         ]);
 
