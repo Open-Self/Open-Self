@@ -1,7 +1,7 @@
 {
   "name": "openself",
-  "version": "0.7.0",
-  "description": "Your AI clone. Your messages. Your machine. Open-source AI personality clone that lives in your messaging apps.",
+  "version": "1.2.0",
+  "description": "The user-owned context layer for AI agents: private, portable, provenance-aware memory for Claude, Codex, Cursor, and every MCP-compatible client.",
   "type": "module",
   "sideEffects": false,
   "bin": {
@@ -10,9 +10,11 @@
   "main": "./src/index.js",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "default": "./src/index.js"
     },
     "./cli": {
+      "types": "./types/cli.d.ts",
       "default": "./src/cli/index.js"
     },
     "./package.json": "./package.json"
@@ -22,33 +24,53 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "benchmark:context": "node scripts/benchmark-context.js",
+    "benchmark:compiler": "node scripts/benchmark-compiler.js",
+    "benchmark:table": "node scripts/benchmark-table.js",
+    "eval:context": "node scripts/evaluate-context.js",
+    "eval:compiler": "node scripts/evaluate-compiler.js",
     "test:clone": "node src/cli/index.js test",
-    "lint": "eslint src/ tests/",
-    "lint:fix": "eslint src/ tests/ --fix",
-    "format": "prettier --write src/ tests/",
-    "format:check": "prettier --check src/ tests/",
+    "lint": "eslint src/ tests/ scripts/",
+    "lint:fix": "eslint src/ tests/ scripts/ --fix",
+    "format": "prettier --write src/ tests/ types/ scripts/ tsconfig.types.json",
+    "format:check": "prettier --check src/ tests/ types/ scripts/ tsconfig.types.json",
     "feed": "node src/cli/index.js feed",
     "setup": "node src/cli/index.js setup",
     "arena": "node src/cli/index.js arena",
     "ghost": "node src/cli/index.js ghost",
     "profile": "node src/cli/index.js profile",
     "prepack": "npm run lint && npm test",
-    "prepublishOnly": "npm run lint && npm test && npx --yes publint --strict",
-    "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\""
+    "prepublishOnly": "npm run lint && npm test && npm run test:types && npx --yes publint --strict",
+    "prepare": "node -e \"try{require('fs').chmodSync('./src/cli/index.js',0o755)}catch{}\"",
+    "test:types": "tsc -p tsconfig.types.json",
+    "test:package": "node scripts/test-package.js",
+    "test:native-key": "node scripts/test-native-key.js",
+    "test:dashboard": "playwright test --config tests/browser/playwright.config.js"
   },
   "keywords": [
     "ai",
-    "clone",
+    "ai-memory",
+    "agent-context",
+    "agent-memory",
+    "context-layer",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "personal-context",
+    "local-first",
+    "llm",
+    "claude",
+    "codex",
+    "cursor",
     "personality",
     "whatsapp",
     "telegram",
     "discord",
-    "chatbot",
-    "llm",
     "openself"
   ],
   "author": "OpenSelf",
   "license": "MIT",
+  "mcpName": "io.github.Open-Self/openself",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Open-Self/Open-Self.git"
@@ -58,8 +80,16 @@
     "url": "https://github.com/Open-Self/Open-Self/issues"
   },
   "files": [
+    "types/",
     "src/",
+    "skills/",
+    "scripts/benchmark-context.js",
+    "scripts/benchmark-table.js",
+    "scripts/evaluate-context.js",
+    "evals/",
     "SOUL.md.example",
+    "spec/",
+    "server.json",
     "docs/",
     "README.md",
     "LICENSE",
@@ -69,7 +99,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.13.0"
   },
   "overrides": {
     "discord.js": {
@@ -81,7 +111,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.5.0",
     "@whiskeysockets/baileys": "^6.7.23",
+    "better-sqlite3": "^12.11.1",
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "discord.js": "^14.26.4",
@@ -99,11 +134,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@playwright/test": "^1.63.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
     "prettier": "^3.9.4",
-    "vitest": "^4.1.10"
-  }
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "types": "./types/index.d.ts"
 }

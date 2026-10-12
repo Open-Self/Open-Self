@@ -29,9 +29,15 @@ const DEFAULT_CONFIG = {
     },
     data: {
         dir: './data',
+        contextDb: 'context.db',
         soulFile: 'SOUL.md',
         memoryFile: 'memory.md',
         reviewQueue: 'review-queue.json',
+    },
+    context: {
+        defaultScope: 'personal',
+        defaultSensitivity: 'personal',
+        maxContextChars: 8000,
     },
 };
 

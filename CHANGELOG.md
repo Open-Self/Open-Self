@@ -1,5 +1,443 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — Context Compiler, context firewall & lifecycle graph
+
+- **Context Compiler.** `store.compileContext(request)` / `compileContextAsync` turn a
+  typed `ContextRequest` (query, task, agent, purpose, scope(s), type, entity,
+  sensitivity/trust floors, `asOf`, budgets, lifecycle flags) into an exact, bounded
+  `ContextPackage`: policy envelope → candidate discovery → policy partition →
+  temporal resolution → conflict detection → ranking → redundancy control → budget
+  packing → render → receipt. `buildContext` now delegates to the compiler and keeps
+  its stable v1 result shape; `openself context` gained `--task`, `--agent`,
+  `--purpose`, `--entity`, `--format`, `--max-tokens`, `--include-superseded`,
+  `--include-stale`; new MCP tool `openself_compile_context`; the dashboard Context
+  Debugger runs the compiler and renders receipt v2 including policy-denied rows.
+- **Receipt v2.** `explain` packages carry a version-2 receipt: requester identity
+  (clientId + label + agent), effective filters (allowed/denied/dropped scopes,
+  sensitivity ceiling, trust floor), budget usage, per-candidate decisions
+  (`selected`/`skipped`/`denied` with reasons: `within-budget`, `over-budget`,
+  `duplicate-content`, `expired`, `not-yet-valid`, `superseded-by:*`,
+  `policy-scope`/`policy-sensitivity`/`policy-trust`), declared conflicts, and the
+  signed `contextHash` citation. Policy-denied candidates are reported as
+  id + contentHash + reason only — denied content and its scope/type metadata
+  never appear in the package or the receipt.
+- **Policy v2.** MCP client policies accept `deny` scope roots (deny wins over
+  allow), `minSourceTrust` requester floors, `label`/`transport` metadata, and
+  `budget` ceilings (`maxChars`/`maxTokens`/`maxItems`). Requests can only narrow
+  the envelope — never widen it; version-1 policy files keep working unchanged.
+  New `AccessPolicy.clampBudget()`, `.denies()`, `deniedScopes`, `minSourceTrust`,
+  `label`, `transport`, `budget`, and `listMcpPolicyClients()`.
+- **Lifecycle & context graph (schema v4).** Memories carry `supersededAt` /
+  `supersededBy`: superseded records stay retrievable for historical queries while
+  current-truth compilation excludes them. `store.supersede(input, id, {at})` /
+  `unsupersede(id)` manage the lifecycle; `memory_edges` stores typed relations
+  (`supersedes`, `contradicts`, `relates_to`, …); `entities` + `entity_aliases` +
+  `memory_entities` model people/projects/systems with alias resolution and
+  reversible merges (`ensureEntity`, `findEntity`, `listEntities`, `addEntityAlias`,
+  `mergeEntities`, `linkEntity`/`unlinkEntity`, `entitiesForMemory`,
+  `memoriesForEntity`). `store.timeline()` exposes an inspectable lifecycle feed.
+  Schema migrates in place from v3 (and earlier) preserving all data.
+- **Compiler evaluation.** `npm run eval:compiler` scores the compiler corpus
+  (`evals/context-compiler.json`) across current-truth, temporal, policy,
+  staleness, redundancy, cross-scope, and receipt-integrity groups;
+  `evaluateCompilerVault` is exported. `npm run benchmark:compiler` measures
+  compile latency on large vaults with supersession chains and entities.
+- **Embedding privacy boundary.** Remote embedding providers (`openai-compatible`,
+  non-loopback `ollama`, and any provider without a declared `locality`) no longer
+  receive `restricted` memory content: indexing is capped below `restricted`
+  (`embeddingIndexMaxSensitivity` overrides). Forgotten memories are also skipped
+  during pending-vector backfill. Providers declare `locality: 'local'|'remote'`;
+  feature-hash remains fully local.
+- **New exports:** `ContextCompiler`, `contextRequestSchema`,
+  `normalizeContextRequest`, `COMPILER_VERSION`, `CONTEXT_FORMATS`,
+  `RETRIEVAL_MODES`, `PURPOSE_TYPE_AFFINITY`, `EDGE_PREDICATES`, `ENTITY_KINDS`,
+  `ensureEntity`, `findEntity`, `listEntities`, `mergeEntities`,
+  `listMcpPolicyClients`, `evaluateCompilerVault`.
+
+### Changed
+
+- `buildContext`/`buildContextAsync` delegate to the Context Compiler and project
+  receipts back to the v1 shape — identical output contract, stronger guarantees
+  (policy partition, temporal resolution, deduplication, conflict surfacing).
+- `ContextStore` schema version is now **4** (adds `superseded_at`, `superseded_by`,
+  `memory_edges`, `entities`, `entity_aliases`, `memory_entities`).
+
+## [1.2.0] - 2026-09-18
+
+### Added — cryptographic provenance, privacy tooling & release automation
+
+- **Signed vault identity.** Every vault generates a persistent Ed25519 keypair
+  (`<dataDir>/signing-key.json`, mode 0600) on first use. Explain receipts now
+  carry `signer` (key fingerprint) + `signature` over `contextHash`; exports
+  embed `signer`/`publicKey`/`exportHash`/`signature` in the header so any
+  consumer can verify integrity and origin offline. Tampered signed exports are
+  refused on import. `openself memory export --no-sign` opts out; `openself
+  doctor` reports the vault fingerprint.
+- **Secret hygiene on export.** Exports are scanned for credential-shaped
+  strings (AWS/GitHub/OpenAI/Slack/Google keys, JWTs, private-key blocks,
+  `key = value` assignments). Findings surface in the export report;
+  `--redact` strips them before hashing/signing.
+- **Memory hygiene.** `ContextStore.sweepExpired()` / `openself memory sweep`
+  forgets memories whose `validTo` has lapsed (`--dry-run` previews).
+- **Registry release automation.** The `release` workflow now publishes
+  `server.json` to the official MCP Registry via `mcp-publisher` GitHub OIDC —
+  no secrets required. CI uploads coverage to Codecov.
+- **New exports:** `loadSigningIdentity`, `signPayload`, `verifyPayload`,
+  `signingFingerprint`, `exportPayloadHash`, `scanForSecrets`, `redactSecrets`.
+
+### Added — verifiable trust, pluggable embeddings, standards & distribution
+
+- **Tamper-evident access audit.** Completed MCP access events are hash-chained
+  (`prev_hash` → `entry_hash`, SHA-256 over prevHash + timestamp + client + tool +
+  outcome). `AccessAudit.verify()` detects edited or deleted history, interrupted
+  `attempted` rows report as `pending`, pre-chain rows report as `legacy`, and
+  retention pruning anchors the surviving suffix via `audit_meta.pruned_hash`.
+  New CLI actions: `openself audit verify` (non-zero exit on tampering) and
+  `openself audit export` (JSONL trail for archival or transparency-log anchoring).
+  The dashboard Audit view shows live chain status.
+- **Verifiable context receipts.** Every memory carries `contentHash`
+  (`sha256("openself-memory-v1\n" + content)`); explain receipts gain `contextHash`
+  (`sha256("openself-context-v1\n" + renderedContext)`), per-candidate
+  `contentHash`, and a vector-index summary — an auditable citation of exactly
+  what an agent received.
+- **Pluggable embedding providers.** `feature-hash` remains the deterministic,
+  fully-offline default. `ollama` embeds through a local Ollama server;
+  `openai-compatible` targets any `/v1/embeddings` endpoint (the only provider
+  that can leave the machine — strictly opt-in). Async providers never block
+  synchronous writes: vectors are drained by `store.indexPending()`,
+  `openself memory index`, or automatically after MCP mutations. New async APIs:
+  `searchAsync`, `buildContextAsync`, `findPotentialConflictsAsync`. Select via
+  `--embeddings` on `memory`/`context`/`mcp` or `OPENSELF_EMBEDDINGS`.
+- **Formal exchange specification.** `spec/context-exchange-format.md` specifies
+  the `openself-context` JSONL format — header/record fields, `contentHash`
+  domain separation, trust clamping, idempotent import — with a normative JSON
+  Schema (`spec/context-exchange.schema.json`) and a non-throwing
+  `validateContextExport()` for third-party tooling.
+- **MCP Registry and container distribution.** `server.json` + `mcpName` publish
+  OpenSelf as `io.github.Open-Self/openself`; a multi-stage `Dockerfile` and
+  `docker` workflow publish `ghcr.io/open-self/openself`; `.devcontainer/` gives
+  a one-click development environment.
+- **Security posture.** CodeQL (`security-and-quality`) and OpenSSF Scorecard
+  workflows run on push/PR/schedule with minimal permissions; README badges
+  surface CI, CodeQL, Scorecard, registry, and container status.
+- **New exports:** `resolveVectorProvider`, `featureHashProvider`,
+  `OllamaEmbeddingProvider`, `OpenAiCompatibleProvider`, `validateContextExport`,
+  `memoryContentHash`, `contextBlockHash`, `auditEntryHash`.
+
+### Changed
+
+- `stats()` additionally reports `vectorProvider` and `pendingVectors`.
+- Audit list results include `prevHash`/`entryHash` fields; the dashboard audit
+  endpoint returns `{ events, chain }` and opens the log read-only.
+
+## [1.1.0] - 2026-09-17
+
+### Added — user-owned context layer for AI agents
+
+- **Source trust levels** on every memory: `untrusted` → `external` → `trusted` →
+  `verified` → `owner`. Agent-written and imported records are clamped to `external`
+  by default; retrieval accepts a `minSourceTrust` floor. Vault schema is now 3 and
+  migrates schema-1/2 vaults in place, preserving existing memories, history, and
+  import deduplication.
+- **Owner-approved memory proposals.** `ContextStore.proposeMemory`,
+  `listProposals`, `approveProposal`, and `rejectProposal` stage agent writes in a
+  pending inbox instead of the vault. Approvals support field overrides and review
+  notes; approved memories carry the proposal ID for provenance.
+- **Explainable context.** `store.buildContext(query, { explain: true })` returns a
+  receipt recording the query, filters, candidate set, lexical/vector ranks, recency,
+  character costs, and per-candidate selected/skipped reasons.
+- **MCP upgrades.** Two new tools (`openself_propose_memory`,
+  `openself_list_memory_proposals`) gated by a new `propose` capability and a
+  per-client `maxSourceTrust` ceiling; structured tool output on every tool;
+  `openself://recent` and `openself://memory/{id}` resources; and a
+  `prepare_task_context` prompt.
+- **Streamable HTTP MCP transport** (`openself mcp --http`): localhost-first bind,
+  bearer authentication, Host/Origin validation against DNS-rebinding and browser
+  cross-origin access, stateless `/mcp` endpoint, `/healthz`, and a hard refusal to
+  bind remotely without `--allow-remote` and an explicit token.
+- **CLI commands:** `openself init` (one-step vault setup with optional encryption),
+  `openself doctor` (vault health report), `openself context` (build context with an
+  optional explain receipt), `openself inbox` (list/approve/reject proposals),
+  `openself demo` (offline two-agent MCP walkthrough with a denial and audit trail),
+  `openself connect` (idempotent config writers for Claude Code, Cursor, VS Code,
+  Windsurf, Codex TOML, and generic clients with backups, `--project`, `--dry-run`,
+  and `--remove`), and `openself skill` (path/validate/install/uninstall for the
+  bundled Agent Skill).
+- **Portable context export/import.** `openself memory export` writes a versioned
+  `openself-context` JSONL interchange format preserving provenance, scope,
+  sensitivity, trust, and temporal bounds; `openself memory import` detects it and
+  clamps imported records to `external` trust. Plaintext export, not an encrypted
+  backup — restricted records excluded unless `--include-restricted`.
+- **Dashboard views:** Context Debugger (query + explain receipt table), Inbox
+  (proposal review with approve/approve-as-verified/reject), and Audit (MCP access
+  metadata) alongside the existing memory editor. New endpoints: `GET /debug`,
+  `GET/POST /proposals`, `GET /audit`.
+- **Bundled Agent Skill** at `skills/openself-context` teaching agents the
+  propose/review workflow, scope and sensitivity rules, and receipt interpretation.
+- **Benchmark tooling:** `benchmark:context --out=file.json` records reproducible
+  JSON results; `benchmark:table` renders reports as Markdown.
+
+### Changed
+
+- Package version is 1.1.0; description and keywords now reflect the agent context
+  layer positioning. The `skills/` bundle ships in the npm tarball.
+- The Playwright dashboard suite gains three-view coverage and a keep-alive
+  teardown fix; per-test timeout raised to 60s for slow machines.
+
+## [1.0.1] - 2026-09-09
+
+### Documentation
+
+- Correct the README shipped to npm to install the stable `latest` channel instead of the historical v0.13.2 tarball or release candidate.
+- Record the successful stable release gates, clean dependency audit, OIDC publication and matching GitHub/npm artifact digests.
+- No runtime API, dependency or SQLite schema change from 1.0.0.
+
+## [1.0.0] - 2026-09-09
+
+### Stable Context Vault
+
+- Establish the documented JavaScript/TypeScript, CLI and MCP contracts as the stable 1.x surface, with support and upgrade policies.
+- Includes typed, source-attributed memories, scoped temporal retrieval, local hybrid search, incremental capture, authenticated dashboard, encrypted backup/restore and MCP owner permissions.
+- Retains the 50 public root value exports and SQLite schema 2 from RC.2; no additional vault migration is introduced.
+- Release verification includes six OS/Node combinations, real native key providers, installed-package migration/consumer checks and Chromium date-edit regressions in three timezones.
+
+### Dependency security
+
+- Update Vitest and coverage tooling to the patched 4.1.11 line, Hono to 4.13.7 and Sharp to 0.35.4, resolving the dependency audit findings that blocked stable release.
+
+### Release engineering
+
+- Publish through npm Trusted Publishing (OIDC) without a long-lived token secret.
+- Recover npm publication of existing verified GitHub tarballs through a main-branch dispatch with a required SHA-256 check, preserving release tags and prerelease channels.
+
+## [1.0.0-rc.2] - 2026-09-09
+
+### Fixed
+
+- Dashboard content edits preserve unchanged timestamps exactly, including seconds, milliseconds, original offsets and repeated daylight-saving hours.
+- Clearing an optional date now removes its stored value; edited dates support millisecond precision.
+
+### Verification
+
+- Added real Chromium dashboard regressions in UTC, Ho Chi Minh City and New York timezones, exercising authenticated forms and persisted SQLite values.
+- Branch and release CI now require the browser regression job alongside the six OS/Node jobs.
+
+## [1.0.0-rc.1] - 2026-09-09
+
+This is an opt-in release candidate, not the stable 1.0 release. It retains the v0.13.2
+runtime API and schema 2. Registry publication remains a separate gate; consult the
+release-readiness audit for verified distribution status.
+
+### Release engineering
+
+- Validate release tags and route prerelease versions to GitHub prereleases and npm `next`, preserving the stable distribution channel.
+- Reject mismatched tags, noncanonical versions and build metadata before packaging.
+
+### Verification
+
+- Added a real OS key-provider integration gate: synthetic-key roundtrip, encrypted vault reopen in a fresh process, unavailable-provider failure and missing-key refusal.
+- CI prepares an isolated macOS keychain and Linux Secret Service session; Windows uses DPAPI with a test-owned temporary blob.
+
+## [0.13.2] - 2026-09-09
+
+### Fixed
+
+- Conflict detection selects overlapping validity intervals across the full proposed window instead of searching only at its start time.
+- Exact scope, sensitivity, owner policy, excluded IDs, non-overlap and identical content are removed before conflict candidate/result limits.
+- Reversed legacy validity intervals are excluded from conflict candidates.
+
+### Added
+
+- Full-window, open-bound, millisecond-boundary, policy and candidate-starvation regressions, including 5,001 identical records.
+- A schema-2 migration fixture frozen from v0.13.1, with synthetic capture checkpoint state verified by the installed consumer.
+
+### Documentation and maintenance
+
+- Corrected installation instructions while npm remains on v0.7.0; Context Vault users are directed to the verified GitHub artifact.
+- Updated security reporting, contribution checks and maintainer release instructions to match the current project and workflow.
+- Added an evidence-based v1.0 readiness audit, including remaining native-key-provider and conflict-window verification work.
+
+## [0.13.1] - 2026-09-09
+
+### Fixed
+
+- Temporal interval validation, filtering, chronological ordering and conflict overlap now compare instants rather than ISO timestamp strings.
+- Existing memories with numeric timezone offsets or differing fractional-second spellings return consistent results without a data rewrite.
+- Invalid `asOf` timestamps are rejected before retrieval, including empty/punctuation fallback paths.
+
+### Added
+
+- UTC/offset equivalence, inclusive millisecond boundaries, reversed interval and ordering regressions for plaintext and encrypted stores across all retrieval paths.
+- An installed-package MCP regression using a mixed-offset validity interval.
+
+## [0.13.0] - 2026-09-08
+
+### Added
+
+- Transactional SQLite capture checkpoints, encrypted with vault payloads and included in portable backups.
+- Process-exit, failed-checkpoint, partial-file, retry and legacy checkpoint migration regression checks.
+- Schema-1 backup restore compatibility with migration into schema 2.
+
+### Fixed
+
+- Failed record scans no longer leave partially committed memories; failed project files roll back all of their chunks while successful files can commit.
+- Checkpoint write failures roll back memory, history and index changes, preventing duplicate imports on retry.
+- Source keys such as `__proto__` and `constructor` remain ordinary record identities.
+
+### Changed
+
+- Vault schema is now 2; older releases refuse to open upgraded vaults.
+- Capture reads existing JSON checkpoints once, then uses SQLite. JSON files are no longer updated; `statePath` remains a legacy import path and optional identity.
+- Invalid checkpoints stop scans rather than silently resetting state. In-memory capture no longer writes checkpoint directories into source trees.
+
+## [0.12.1] - 2026-09-08
+
+### Fixed
+
+- Context character budgets now cover the first record, source attribution, headers and separators; `usedChars` equals the full returned context length.
+- Oversized records are skipped without truncation, allowing later complete candidates to fit. Returned memory metadata includes only the records in the context block.
+- API documentation now describes the existing filtered-list fallback for empty and punctuation-only searches accurately.
+
+### Added
+
+- Boundary, oversized-record, Unicode and attribution regression checks in plaintext and encrypted vaults, plus an installed-package MCP budget and policy check.
+
+## [0.12.0] - 2026-09-08
+
+### Added
+
+- TypeScript declarations for all 50 existing root exports, including nullable memory results, optional retrieval metadata, policy/capability types, backup results, and legacy API signatures.
+- Public export parity and strict positive/negative consumer type checks.
+- Isolated npm-tarball consumer checks under NodeNext and Bundler, with runtime CLI, MCP, dashboard, encrypted recovery, and frozen-schema upgrade tests.
+- Synthetic migration fixtures frozen from v0.9.1 and v0.11.0, preserving history, forgotten state, IDs, and import deduplication.
+- API reference, support/compatibility policy, and upgrade guide.
+
+### Fixed
+
+- Punctuation-only conflict proposals return no candidates instead of reading absent vector match metadata.
+
+### Changed
+
+- CI and tag-release verification now run type and installed-package gates on every supported platform/runtime.
+- Public declaration dependencies ship with the package; TypeScript remains a development-only tool.
+
+## [0.11.0] - 2026-09-08
+
+### Added
+
+- Owner-managed MCP policy files with fixed client aliases, literal scope roots, sensitivity ceilings, and independent read/remember/forget capabilities.
+- Local metadata-only MCP audit with attempted/allowed/denied/error outcomes, bounded retention, and owner list/prune/clear commands.
+- Fail-closed policy loading, denied-ID indistinguishability, write-only conflict suppression, and memory rollback when terminal audit recording fails.
+- Adversarial MCP tests and a policy configuration, upgrade, trust-boundary, and audit guide.
+
+### Security
+
+- Conflict responses now honor the MCP sensitivity ceiling rather than implicitly reading restricted records.
+- Punctuation-only search fallback preserves sensitivity and temporal filters.
+- Scope hierarchy matching is case-sensitive and treats SQL wildcard characters literally; allowed-scope unions filter candidates before ranking and limits.
+- **MCP behavior change:** requesting restricted sensitivity alone no longer grants it. Configure an explicit owner policy; trusted-local mode has a fixed private ceiling.
+
+## [0.10.0] - 2026-09-08
+
+### Added
+
+- Passphrase-encrypted portable Context Vault backup/restore through CLI and JavaScript API.
+- Consistent live-WAL snapshots preserve memories, forgotten records, history, vectors, lexical indexes, and import deduplication.
+- AES-256-GCM archive encryption with scrypt-derived keys; payload keys are recovered inside the archive and rebound to the destination OS account.
+- Restore validates authentication, schema, SQLite integrity, foreign keys, payloads, history, and vectors before publishing a new destination.
+- Recovery guide covering key management, automation, exclusions, interrupted operations, and the 256 MiB archive limit.
+
+### Security
+
+- Existing backup files and restore destinations are refused; incomplete writes are never published as completed backups.
+- Plaintext source vaults are encrypted and rebuilt entirely in memory before writing the restored database.
+- Explicit database schema versioning rejects newer schemas before normal initialization modifies them.
+
+## [0.9.1] - 2026-09-08
+
+### Security
+
+- Update locked `fast-uri` to 3.1.7 and `qs` to 6.16.0 to resolve the two dependencies flagged by npm audit.
+- CI and release verification now block on moderate or higher dependency advisories instead of ignoring audit failures.
+
+## [0.9.0] - 2026-09-08
+
+### Added
+
+- `openself memory import` for Markdown/MDX, plain text, WhatsApp text exports, and Telegram JSON.
+- Source-attributed document chunking and private timestamped chat-event ingestion.
+- SHA-256 import fingerprints and a durable SQLite import ledger make repeated imports idempotent.
+- `--dry-run`, explicit format override, scope, sensitivity, type, confidence, and tag controls.
+- Deterministic 256-dimensional local feature vectors with automatic backfill for existing vaults.
+- Hybrid FTS5/vector retrieval using reciprocal-rank fusion; lexical and vector-only modes remain
+  available for debugging and evaluation.
+- Potential conflict detection for active facts, preferences, and decisions with matching type,
+  exact scope, and overlapping validity windows.
+- `openself memory conflicts` and MCP `openself_find_conflicts`; MCP remember responses now include
+  conflict warnings.
+- Reproducible `benchmark:context` command for local insertion and hybrid-search measurements.
+- Authenticated localhost Context Vault dashboard with search, create/edit/forget, conflict review,
+  duplicate merge, provenance fields, and version history.
+- Immutable lifecycle snapshots for create, update, merge, migration baseline, and forget actions.
+- Token-to-HttpOnly-cookie bootstrap, localhost-only binding, CSP/security headers, API no-store,
+  cross-origin mutation blocking, and a dedicated `/api/context` namespace.
+- `openself capture project` for one-shot or continuously polled project-folder ingestion.
+- Incremental connector state that versions changed source chunks, skips unchanged files, and
+  soft-forgets context removed from disk.
+- Safe project-capture defaults for dependency/build directories, symlinks, binary or oversized
+  files, environment files, and common credential/private-key filenames; plus dry-run, extension,
+  ignore, scope, sensitivity, size, and polling controls.
+- Incremental `calendar`, `email`, and `browser` capture from local ICS, EML/MBOX, bookmark
+  HTML/JSON, Chromium History, and Firefox places.sqlite sources.
+- Browser URL sanitization removes credentials, query strings, fragments, and non-HTTP(S) schemes
+  before storage; structured connectors use stable keys for update/forget lifecycle handling.
+- `openself vault init/status` with AES-256-GCM payload/vector/version encryption, HMAC blind FTS
+  indexes, transactional plaintext migration, and OS-bound keys through Windows DPAPI, macOS
+  Keychain, or Linux Secret Service.
+- `eval:context` regression suite and versioned dataset for Recall@K/MRR, temporal correctness,
+  sensitivity leakage, and provenance completeness, with non-zero exit on threshold failure.
+
+### Changed
+
+- **Requires Node.js >=22.13.0.** Upgrade Node before installing; current CLI dependencies no longer support Node 20.
+- CLI and MCP versions now read the package manifest to prevent release version drift.
+- CI validates Linux, Windows, and macOS on Node 22.13 and 24; tag releases run the same gates.
+- Release packaging produces a GitHub artifact and fails explicitly when npm credentials are missing.
+- Telegram parsing now preserves the export's normalized ISO timestamp for Context Vault ingestion.
+- WhatsApp and Telegram imports default to `private`; document imports default to `personal`.
+
+## [0.8.0] — 2026-08-13
+
+### Added
+
+- **Personal Context Vault:** typed facts, preferences, decisions, commitments, relationships,
+  events, and notes with provenance, scope, sensitivity, confidence, and temporal validity.
+- **SQLite + FTS5 storage:** local source of truth, Unicode full-text search, deterministic security
+  filters, bounded context construction, and recoverable forgetting.
+- **MCP server:** `openself_remember`, `openself_search_memory`, `openself_get_context`, and
+  `openself_forget` over stdio for compatible AI clients.
+- **Context CLI:** `openself memory add/search/list/forget/stats`.
+- Context Vault architecture, schema, security semantics, client configuration, and limitations in
+  `docs/context-vault.md`.
+
+### Changed
+
+- Product direction evolved from autonomous personality impersonation to private, persistent
+  context for AI agents. Existing personality, clone, and messaging commands remain compatible.
+- Privacy language now distinguishes local-first storage from cloud model configurations that send
+  selected context to a provider.
+- Package and CLI version bumped to 0.8.0; CLI onboarding now leads with memory and MCP workflows.
+- MCP SDK is lazy-loaded so non-MCP CLI commands do not pay its startup cost.
+
+### Security
+
+- Retrieval enforces memory status, hierarchical scope, temporal validity, type, and an ordered
+  sensitivity ceiling.
+- `restricted` memories are excluded from MCP search/context by default.
+- Dependency audit returned to zero known vulnerabilities after adding the new storage/MCP stack.
+
 ## [0.7.0] — 2026-07-07
 
 ### Changed (BREAKING)
