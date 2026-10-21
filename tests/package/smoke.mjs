@@ -189,6 +189,24 @@ try {
         headers: { Authorization: `Bearer ${dashboard.token}` },
     });
     assert.equal((await codexStatus.json()).status, 'disabled');
+    const labScript = await fetch(`${origin}/lab.js`, {
+        headers: { Authorization: `Bearer ${dashboard.token}` },
+    });
+    assert.equal(labScript.status, 200);
+    const labComparison = await fetch(`${origin}/api/context/lab/compare`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${dashboard.token}`,
+            Origin: origin,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ a: { retrieval: 'lexical' }, b: { retrieval: 'lexical' } }),
+    });
+    assert.equal(labComparison.status, 200);
+    const lab = await labComparison.json();
+    assert.equal(lab.a.contextHash, lab.b.contextHash);
+    assert.equal(lab.scenario.kind, 'openself-context-lab');
+
     mkdirSync('capture-source');
     writeFileSync('capture-source/notes.md', 'Installed capture recovery fixture');
     assert.equal(new api.ProjectFolderCapture(store, 'capture-source').scan().added, 1);

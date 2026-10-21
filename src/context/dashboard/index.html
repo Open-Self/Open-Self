@@ -22,6 +22,7 @@
         <nav class="tabs" aria-label="Dashboard views">
             <button class="tab" data-view="view-home" type="button">Home</button>
             <button class="tab active" data-view="view-memories" type="button">Memories</button>
+            <button class="tab" data-view="view-lab" type="button">Context Lab</button>
             <button class="tab" data-view="view-debugger" type="button">Context Debugger</button>
             <button class="tab" data-view="view-inbox" type="button">
                 Inbox <span id="inbox-count" class="tab-badge hidden">0</span>
@@ -62,6 +63,9 @@
                         </p>
                         <button data-open-view="debugger" type="button">
                             Preview agent context
+                        </button>
+                        <button data-open-view="lab" type="button">
+                            Compare context in the Lab
                         </button>
                         <button data-open-view="audit" type="button">View access history</button>
                     </article>
@@ -250,6 +254,125 @@
             </section>
         </main>
 
+        <section id="view-lab" class="view hidden">
+            <div class="app-home lab-home">
+                <div class="app-hero">
+                    <p class="eyebrow">CONTEXT LAB · LOCAL, REPEATABLE, PRIVATE</p>
+                    <h2>Change the context.<br />See the difference.</h2>
+                    <p>
+                        Compare budgets, scopes or moments in time against one frozen vault
+                        baseline. No model calls. No memory changes.
+                    </p>
+                </div>
+                <form id="lab-form">
+                    <label for="lab-query">What should the context help with?</label>
+                    <input
+                        id="lab-query"
+                        type="search"
+                        maxlength="2000"
+                        placeholder="Search your memories, or leave blank to browse"
+                    />
+                    <div class="lab-columns">
+                        <fieldset>
+                            <legend>A · Baseline</legend>
+                            <label for="lab-a-scope">Scope (optional)</label
+                            ><input
+                                id="lab-a-scope"
+                                maxlength="200"
+                                placeholder="e.g. project/atlas"
+                            />
+                            <label for="lab-a-chars">Maximum characters</label
+                            ><input
+                                id="lab-a-chars"
+                                type="number"
+                                min="500"
+                                max="200000"
+                                value="8000"
+                                required
+                            />
+                            <label for="lab-a-asof">As of (optional ISO date/time)</label
+                            ><input id="lab-a-asof" placeholder="e.g. 2026-01-01T00:00:00Z" />
+                        </fieldset>
+                        <fieldset>
+                            <legend>B · Experiment</legend>
+                            <label for="lab-b-scope">Scope (optional)</label
+                            ><input id="lab-b-scope" maxlength="200" placeholder="e.g. personal" />
+                            <label for="lab-b-chars">Maximum characters</label
+                            ><input
+                                id="lab-b-chars"
+                                type="number"
+                                min="500"
+                                max="200000"
+                                value="1000"
+                                required
+                            />
+                            <label for="lab-b-asof">As of (optional ISO date/time)</label
+                            ><input
+                                id="lab-b-asof"
+                                placeholder="Leave both blank for the same current time"
+                            />
+                        </fieldset>
+                    </div>
+                    <p class="hint">
+                        Uses the existing context compiler with local lexical retrieval. Tokens are
+                        a characters ÷ 4 estimate, not provider usage or billing. This owner preview
+                        is not a test of a particular agent's configured permissions.
+                    </p>
+                    <div class="lab-actions">
+                        <button id="lab-run" class="primary" type="submit">Compare A and B</button
+                        ><button id="lab-cancel" type="button" class="hidden">Cancel</button>
+                    </div>
+                </form>
+                <p id="lab-status" role="status" aria-live="polite">
+                    Ready. Your vault stays unchanged.
+                </p>
+                <label for="lab-import" class="hint"
+                    >Replay a previously exported scenario on this vault</label
+                >
+                <input id="lab-import" type="file" accept="application/json,.json" />
+                <div id="lab-results" class="hidden">
+                    <p id="lab-baseline" class="hint"></p>
+                    <div class="lab-columns">
+                        <article class="app-card">
+                            <h3>A · Compiled context</h3>
+                            <p id="lab-a-stats" class="hint"></p>
+                            <pre id="lab-a-context" class="context-block"></pre>
+                        </article>
+                        <article class="app-card">
+                            <h3>B · Compiled context</h3>
+                            <p id="lab-b-stats" class="hint"></p>
+                            <pre id="lab-b-context" class="context-block"></pre>
+                        </article>
+                    </div>
+                    <h3>What changed?</h3>
+                    <p id="lab-diff-summary"></p>
+                    <ul id="lab-diff-list" class="lab-diffs"></ul>
+                    <p class="hint">
+                        These owner-only diagnostics describe selection decisions. They are not
+                        included in context sent to agents. A hash verifies identity, not factual
+                        truth.
+                    </p>
+                    <button id="lab-export" type="button">Export regression scenario</button>
+                </div>
+            </div>
+        </section>
+        <dialog id="lab-export-consent" aria-labelledby="lab-export-title">
+            <h2 id="lab-export-title">Save a private scenario file?</h2>
+            <p>
+                The file contains your query, task/scope parameters, memory IDs and hashes. It does
+                not include memory text, but metadata can still be private. Review it before
+                sharing.
+            </p>
+            <p>
+                Replay requires the same vault baseline and compiler version. Changed data is
+                rejected rather than silently compared.
+            </p>
+            <button id="lab-export-back" type="button">Not now</button
+            ><button id="lab-export-confirm" class="primary" type="button">
+                Save metadata-only JSON
+            </button>
+        </dialog>
+
         <section id="view-debugger" class="view hidden">
             <div class="pane">
                 <div class="pane-heading">
@@ -360,5 +483,6 @@
         <script src="/inbox.js" defer></script>
         <script src="/audit.js" defer></script>
         <script src="/app.js" defer></script>
+        <script src="/lab.js" defer></script>
     </body>
 </html>

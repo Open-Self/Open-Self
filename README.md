@@ -148,6 +148,30 @@ reviewing agent proposals, previewing scoped context and inspecting access histo
 Back/Forward and reload preserve the selected view. The existing `dashboard` command remains
 available and opens Memories directly. No account is needed for the vault.
 
+### Context Lab
+
+Open **Context Lab** to compare two compiled context packages before sharing anything with an
+agent. Change character budgets, scope or an ISO `asOf` date; both sides run through the existing
+compiler against one frozen SQLite read snapshot. Blank dates use the same current timestamp.
+The UI shows selected memory IDs, content hashes and selection reasons, plus actual character
+counts and clearly estimated tokens (characters / 4, not a provider tokenizer or bill).
+
+- Uses local lexical retrieval and the compiler's default local policy (private sensitivity
+  ceiling). It does not emulate every MCP client's configured permissions, call a model, or
+  change memories. Superseded/forgotten records retain the compiler's existing privacy rules.
+- Owner-only diagnostics remain separate from the context blocks. A hash establishes identity,
+  not factual accuracy or evidence that a model answer will improve.
+- Export a regression scenario only after reviewing the privacy warning. It includes request
+  metadata (query/task/scope), IDs and hashes, **not memory plaintext**. Metadata can still be
+  sensitive. No form or context data is saved to browser storage.
+- Replay checks the vault baseline/compiler version and expected context hashes. If the vault
+  changed, it fails visibly instead of reporting a false successful comparison. The file is
+  a regression recipe, not a vault backup or portable plaintext dataset. The conservative
+  fingerprint scans vault tables, so cost grows with vault size and even unrelated vault changes
+  invalidate old scenarios.
+- Cancelling, editing parameters or navigating away invalidates pending results. Reopening or
+  reloading starts clean. Exporting or importing a local file never uploads it to an AI provider.
+
 ### Optional Codex connection
 
 Install the official [Codex CLI](https://learn.chatgpt.com/docs/cli) separately, then launch
