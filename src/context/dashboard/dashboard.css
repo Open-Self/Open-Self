@@ -745,3 +745,26 @@ button:disabled {
         grid-template-columns: 1fr;
     }
 }
+
+#workspace-form {
+    display: grid;
+    gap: 12px;
+    max-width: 760px;
+}
+#workspace-task {
+    min-height: 110px;
+}
+#workspace-package,
+#workspace-run {
+    margin-top: 24px;
+}
+#workspace-package .context-block,
+#workspace-run .context-block {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 360px;
+    overflow-y: auto;
+}
+#workspace-receipt {
+    overflow-wrap: anywhere;
+}

@@ -172,6 +172,14 @@ counts and clearly estimated tokens (characters / 4, not a provider tokenizer or
 - Cancelling, editing parameters or navigating away invalidates pending results. Reopening or
   reloading starts clean. Exporting or importing a local file never uploads it to an AI provider.
 
+### Workspace rehearsal (simulation only)
+
+The **Workspace rehearsal** view previews selected context and exercises explicit start consent,
+synthetic streaming, cancellation and mock proposal review. It never starts Codex, calls a model,
+runs shell/network tools, or saves mock proposals into your vault. Live execution is unavailable,
+even when the optional Codex connection is signed in. This is a control-flow prototype, not proof
+that an agent completed the entered task. See [the boundaries and live-adapter prerequisites](docs/workspace-rehearsal.md).
+
 ### Optional Codex connection
 
 Install the official [Codex CLI](https://learn.chatgpt.com/docs/cli) separately, then launch
