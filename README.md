@@ -134,6 +134,15 @@ OpenSelf is also listed on the MCP Registry as `io.github.Open-Self/openself`
 (see [`server.json`](./server.json)), so registry-aware clients can discover it
 directly.
 
+### Read-only MCP context card
+
+Compatible MCP Apps hosts can show an experimental Context receipt card for
+`openself_compile_context`: inspect selected sources, budgets, hashes and the exact context.
+It is offered only on explicitly read-only server policies; default writable and unsupported
+clients keep the existing text output. No client permissions are changed automatically.
+See [availability, security boundaries and test coverage](./docs/mcp-context-card.md).
+Production-host compatibility has not been manually verified.
+
 ## OpenSelf app
 
 For an approachable local app, run:

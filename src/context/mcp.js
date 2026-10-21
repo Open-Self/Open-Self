@@ -6,6 +6,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { ContextStore } from './store.js';
+import { CONTEXT_RECEIPT_URI, MCP_APP_MIME_TYPE, getContextReceiptHtml } from './mcp-app.js';
 import { MEMORY_TYPES, SENSITIVITY_LEVELS, SOURCE_TRUST_LEVELS } from './schema.js';
 
 const TOOL_CAPABILITIES = {
@@ -109,6 +110,12 @@ function writeDraft(input, policy) {
 
 export function createContextMcpServer(store, options = {}) {
     const policy = new AccessPolicy(options.policy);
+    // UI visibility is not authorization: AppBridge can forward arbitrary calls.
+    // Only a backend-enforced read-only connection may host this app.
+    const readOnly =
+        policy.capabilities.includes('read') &&
+        policy.capabilities.every((capability) => capability === 'read');
+    const registeredTools = new Map();
     const audit =
         options.audit ||
         new AccessAudit({
@@ -126,8 +133,8 @@ export function createContextMcpServer(store, options = {}) {
         },
         {
             capabilities: {
-                tools: { listChanged: false },
-                resources: { listChanged: false },
+                tools: { listChanged: true },
+                resources: { listChanged: true },
                 prompts: { listChanged: false },
             },
             instructions:
@@ -184,7 +191,7 @@ export function createContextMcpServer(store, options = {}) {
 
     function register(name, configuration, handler) {
         const capability = TOOL_CAPABILITIES[name] || 'read';
-        server.registerTool(name, configuration, async (input) => {
+        const registered = server.registerTool(name, configuration, async (input) => {
             try {
                 const execute = () => runAudited(name, capability, () => handler(input));
                 // Memory mutations roll back if terminal audit recording fails.
@@ -219,6 +226,7 @@ export function createContextMcpServer(store, options = {}) {
                 };
             }
         });
+        registeredTools.set(name, registered);
     }
 
     function registerReadResource(name, uriOrTemplate, metadata, handler) {
@@ -627,6 +635,60 @@ export function createContextMcpServer(store, options = {}) {
                 };
             }),
     );
+
+    if (readOnly) {
+        let appEnabled = false;
+        const receiptResource = server.registerResource(
+            'context-receipt',
+            CONTEXT_RECEIPT_URI,
+            { title: 'OpenSelf context receipt', mimeType: MCP_APP_MIME_TYPE },
+            (uri) => {
+                if (!appEnabled) throw new Error('Context receipt app is unavailable');
+                return runAudited('resource:context-receipt', 'read', () => ({
+                    contents: [
+                        {
+                            uri: uri.href,
+                            mimeType: MCP_APP_MIME_TYPE,
+                            text: getContextReceiptHtml(),
+                            _meta: {
+                                ui: {
+                                    csp: {
+                                        connectDomains: [],
+                                        resourceDomains: [],
+                                        frameDomains: [],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                }));
+            },
+        );
+        receiptResource.disable();
+        const previousInitialized = server.server.oninitialized;
+        server.server.oninitialized = function () {
+            const mimeTypes =
+                this.getClientCapabilities()?.extensions?.['io.modelcontextprotocol/ui']?.mimeTypes;
+            appEnabled = Array.isArray(mimeTypes) && mimeTypes.includes(MCP_APP_MIME_TYPE);
+            if (appEnabled) {
+                for (const [name, tool] of registeredTools) {
+                    tool.update({
+                        _meta: {
+                            ...tool._meta,
+                            ui: {
+                                visibility: ['model'],
+                                ...(name === 'openself_compile_context'
+                                    ? { resourceUri: CONTEXT_RECEIPT_URI }
+                                    : {}),
+                            },
+                        },
+                    });
+                }
+                receiptResource.enable();
+            }
+            return previousInitialized?.call(this);
+        };
+    }
 
     return server;
 }

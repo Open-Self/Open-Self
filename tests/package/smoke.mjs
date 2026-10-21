@@ -81,6 +81,46 @@ try {
     client = new Client({ name: 'installed-client', version: '1' });
     const [left, right] = InMemoryTransport.createLinkedPair();
     await Promise.all([client.connect(left), mcp.connect(right)]);
+    assert.equal(
+        (await client.listTools()).tools.find((tool) => tool.name === 'openself_compile_context')
+            ._meta,
+        undefined,
+    );
+    const cardServer = api.createContextMcpServer(store, {
+        policy: {
+            clientId: 'installed-card',
+            scopes: ['project/fixture'],
+            maxSensitivity: 'public',
+            capabilities: ['read'],
+        },
+    });
+    const cardClient = new Client(
+        { name: 'installed-card-host', version: '1' },
+        {
+            capabilities: {
+                extensions: {
+                    'io.modelcontextprotocol/ui': { mimeTypes: ['text/html;profile=mcp-app'] },
+                },
+            },
+        },
+    );
+    try {
+        const [cardLeft, cardRight] = InMemoryTransport.createLinkedPair();
+        await Promise.all([cardClient.connect(cardLeft), cardServer.connect(cardRight)]);
+        const tool = (await cardClient.listTools()).tools.find(
+            (item) => item.name === 'openself_compile_context',
+        );
+        assert.equal(tool._meta.ui.resourceUri, 'ui://openself/context-receipt/v1');
+        const resource = await cardClient.readResource({ uri: tool._meta.ui.resourceUri });
+        assert.equal(resource.contents[0].mimeType, 'text/html;profile=mcp-app');
+        assert.ok(resource.contents[0].text.includes('Content-Security-Policy'));
+        assert.ok(resource.contents[0].text.includes('ui/initialize'));
+        assert.ok(!resource.contents[0].text.includes('{{SCRIPT}}'));
+        assert.ok(!resource.contents[0].text.includes('Hidden database decision'));
+    } finally {
+        await cardClient.close();
+        await cardServer.close();
+    }
     const result = await client.callTool({
         name: 'openself_search_memory',
         arguments: { query: 'database', maxSensitivity: 'restricted' },

@@ -1,0 +1,99 @@
+:root {
+    color-scheme: light;
+    font-family: system-ui, sans-serif;
+    color: #192b27;
+    background: #f5f7f3;
+}
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    color: #e3eee8;
+    background: #18221e;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+}
+main {
+    max-width: 880px;
+    margin: auto;
+    padding: 24px;
+}
+.eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+}
+h1 {
+    margin: 8px 0 16px;
+    font-size: 25px;
+}
+h2 {
+    font-size: 16px;
+}
+p,
+li {
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.metric {
+    flex: 1 1 150px;
+    padding: 14px;
+    border: 1px solid #74867a;
+    border-radius: 12px;
+}
+.metric strong {
+    display: block;
+    font-size: 21px;
+}
+.metric span,
+footer,
+.note {
+    font-size: 12px;
+}
+footer {
+    margin-top: 24px;
+    opacity: 0.8;
+    line-height: 1.5;
+}
+details {
+    margin: 16px 0;
+    border-top: 1px solid #74867a;
+    padding-top: 14px;
+}
+summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+summary:focus-visible {
+    outline: 3px solid #559874;
+    outline-offset: 5px;
+}
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid #74867a;
+    border-radius: 8px;
+}
+ul {
+    padding-left: 20px;
+}
+li {
+    margin: 10px 0;
+    font-size: 13px;
+}
+@media (max-width: 420px) {
+    main {
+        padding: 16px;
+    }
+}
