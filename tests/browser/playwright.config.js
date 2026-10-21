@@ -9,7 +9,13 @@ export default defineConfig({
     retries: 0,
     timeout: 60_000,
     reporter: 'list',
-    use: { browserName: 'chromium', headless: true },
+    use: {
+        browserName: 'chromium',
+        headless: true,
+        launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+            ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+            : {},
+    },
     projects: ['UTC', 'Asia/Ho_Chi_Minh', 'America/New_York'].map((timezoneId) => ({
         name: timezoneId.replaceAll('/', '-'),
         use: { timezoneId },

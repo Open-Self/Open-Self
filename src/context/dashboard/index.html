@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>OpenSelf Context Vault</title>
+        <title>OpenSelf · Your personal context</title>
         <link rel="stylesheet" href="/dashboard.css" />
     </head>
     <body>
@@ -20,6 +20,7 @@
         </header>
 
         <nav class="tabs" aria-label="Dashboard views">
+            <button class="tab" data-view="view-home" type="button">Home</button>
             <button class="tab active" data-view="view-memories" type="button">Memories</button>
             <button class="tab" data-view="view-debugger" type="button">Context Debugger</button>
             <button class="tab" data-view="view-inbox" type="button">
@@ -27,6 +28,102 @@
             </button>
             <button class="tab" data-view="view-audit" type="button">Audit</button>
         </nav>
+
+        <section id="view-home" class="view hidden">
+            <div class="app-home">
+                <div class="app-hero">
+                    <p class="eyebrow">YOUR PERSONAL CONTEXT, UNDER YOUR CONTROL</p>
+                    <h2>A memory layer that belongs to you.</h2>
+                    <p>
+                        Remember what matters. Review what agents propose. See exactly what leaves
+                        your vault.
+                    </p>
+                    <span class="local-badge">Local vault · No account required</span>
+                </div>
+                <div class="app-cards">
+                    <article class="app-card">
+                        <p class="eyebrow">01 · REMEMBER</p>
+                        <h3>Start with one useful memory</h3>
+                        <p>
+                            A project decision, a preference, or a commitment. You choose its scope
+                            and sensitivity.
+                        </p>
+                        <button id="app-add-memory" class="primary" type="button">
+                            Add a memory
+                        </button>
+                        <button data-open-view="inbox" type="button">Review agent proposals</button>
+                    </article>
+                    <article class="app-card">
+                        <p class="eyebrow">02 · INSPECT</p>
+                        <h3>Preview before sharing</h3>
+                        <p>
+                            Build a scoped context package and inspect its receipt. Nothing here is
+                            sent to an AI provider.
+                        </p>
+                        <button data-open-view="debugger" type="button">
+                            Preview agent context
+                        </button>
+                        <button data-open-view="audit" type="button">View access history</button>
+                    </article>
+                    <article class="app-card codex-card">
+                        <p class="eyebrow">03 · CONNECT, WHEN YOU CHOOSE</p>
+                        <h3>Codex connection</h3>
+                        <p>
+                            Optional sign-in for this local app. Your ChatGPT plan and Codex usage
+                            limits apply. Connecting does not send memories or run an agent.
+                        </p>
+                        <p id="codex-status" class="status-pill" role="status">
+                            Checking connection controls…
+                        </p>
+                        <p id="codex-help" class="hint"></p>
+                        <div id="codex-controls" class="hidden">
+                            <button id="codex-refresh" type="button">Check Codex</button>
+                            <button id="codex-sign-in" type="button" class="primary">
+                                Connect ChatGPT
+                            </button>
+                            <button id="codex-cancel" type="button" class="hidden">
+                                Cancel sign-in
+                            </button>
+                            <button id="codex-logout" type="button" class="hidden">
+                                Disconnect
+                            </button>
+                        </div>
+                        <div id="codex-pending" class="hidden">
+                            <p>
+                                Complete sign-in on OpenAI's site. Opening the link is not
+                                confirmation of connection.
+                            </p>
+                            <a id="codex-auth-link" target="_blank" rel="noopener noreferrer"
+                                >Continue to OpenAI</a
+                            >
+                        </div>
+                        <p id="codex-error" class="message error hidden" role="alert"></p>
+                    </article>
+                </div>
+                <p class="app-footnote">
+                    Your browser is a local administration surface, not a hosted multi-user service.
+                    Existing MCP clients still connect separately with their own access policies.
+                </p>
+            </div>
+        </section>
+        <dialog id="codex-consent" aria-labelledby="codex-consent-title">
+            <h2 id="codex-consent-title">Connect this app to Codex?</h2>
+            <p>
+                Continue only if you want the installed Codex CLI to sign in to your ChatGPT
+                account. OpenAI handles sign-in; OpenSelf never asks for your password.
+            </p>
+            <p>
+                Codex stores credentials in this vault's separate Codex home. This does not reuse
+                other Codex sessions, send vault memories, or authorize agent actions.
+            </p>
+            <p>Use only on a trusted local machine. Do not expose this app publicly.</p>
+            <div class="actions">
+                <button id="codex-consent-cancel" type="button">Not now</button>
+                <button id="codex-consent-confirm" type="button" class="primary">
+                    Continue to sign-in
+                </button>
+            </div>
+        </dialog>
 
         <main id="view-memories" class="workspace view">
             <aside class="memory-panel">
@@ -262,5 +359,6 @@
         <script src="/debugger.js" defer></script>
         <script src="/inbox.js" defer></script>
         <script src="/audit.js" defer></script>
+        <script src="/app.js" defer></script>
     </body>
 </html>

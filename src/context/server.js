@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
+import { CodexAuthBridge } from './codex-bridge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -15,6 +17,13 @@ export function createContextServer(options = {}) {
     const port = Number(options.port || 3210);
     const ownsStore = !options.store;
     const store = options.store || new ContextStore({ dataDir: options.dataDir });
+
+    const codex =
+        options.codexBridge ||
+        new CodexAuthBridge({
+            dataDir: options.dataDir || './data',
+            enabled: options.codexEnabled === true,
+        });
 
     app.disable('x-powered-by');
     app.use((req, res, next) => {
@@ -36,7 +45,7 @@ export function createContextServer(options = {}) {
             'Set-Cookie',
             `openself_context=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`,
         );
-        return res.redirect(303, '/');
+        return res.redirect(303, options.appMode ? '/#home' : '/');
     });
 
     app.get('/', requireAuth(token), (_req, res) => {
@@ -45,7 +54,7 @@ export function createContextServer(options = {}) {
     app.get('/dashboard.js', requireAuth(token), (_req, res) => {
         res.type('application/javascript').sendFile(join(__dirname, 'dashboard', 'dashboard.js'));
     });
-    for (const script of ['debugger.js', 'inbox.js', 'audit.js']) {
+    for (const script of ['debugger.js', 'inbox.js', 'audit.js', 'app.js']) {
         app.get(`/${script}`, requireAuth(token), (_req, res) => {
             res.type('application/javascript').sendFile(join(__dirname, 'dashboard', script));
         });
@@ -56,6 +65,41 @@ export function createContextServer(options = {}) {
 
     const api = express.Router();
     api.use(requireAuth(token));
+
+    // Status reads never start Codex, log in, or reveal credentials.
+    api.get('/codex', (_req, res) => res.json(codex.getStatus()));
+    const connectionLimiter = rateLimit({
+        windowMs: 60_000,
+        limit: 10,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        // Never prevent a user from cancelling or disconnecting a session.
+        skip: (req) => /\/(cancel|logout)$/.test(req.path),
+        message: { error: 'Too many connection attempts. Wait one minute and retry.' },
+    });
+    for (const action of ['refresh', 'login', 'cancel', 'logout']) {
+        api.post(
+            `/codex/${action}`,
+            requireSameOriginMutation,
+            connectionLimiter,
+            async (req, res) => {
+                if (action === 'login' && req.body?.consent !== true) {
+                    return res.status(400).json({ error: 'Explicit sign-in consent is required' });
+                }
+                try {
+                    const result =
+                        action === 'login'
+                            ? await codex.login({ type: 'chatgpt' })
+                            : await codex[action]();
+                    return res.json(result || codex.getStatus());
+                } catch {
+                    return res.status(503).json({
+                        error: 'Codex connection unavailable. Check the installed CLI and try again.',
+                    });
+                }
+            },
+        );
+    }
 
     api.get('/stats', (_req, res) => res.json(store.stats()));
 
@@ -248,6 +292,7 @@ export function createContextServer(options = {}) {
         port,
         store,
         close() {
+            codex.close();
             if (ownsStore) store.close();
         },
     };
@@ -296,4 +341,17 @@ function optionalString(value) {
 function numberParam(value, fallback) {
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
+}
+
+// The bridge is a privileged local control surface. An Origin must match the
+// actual server, including its port; other localhost apps are not trusted.
+function requireSameOriginMutation(req, res, next) {
+    if (
+        req.headers.origin !== `http://${req.headers.host}` ||
+        !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(req.headers.origin)
+    ) {
+        return res.status(403).json({ error: 'Same-origin app request required' });
+    }
+    if (!req.is('application/json')) return res.status(415).json({ error: 'JSON required' });
+    return next();
 }
