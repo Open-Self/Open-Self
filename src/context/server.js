@@ -8,6 +8,7 @@ import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
 import { CodexAuthBridge } from './codex-bridge.js';
 import { compareContextLab, ContextLabError } from './lab.js';
+import { WorkspaceRehearsal, WorkspaceError } from './workspace.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,8 @@ export function createContextServer(options = {}) {
             dataDir: options.dataDir || './data',
             enabled: options.codexEnabled === true,
         });
+
+    const workspace = new WorkspaceRehearsal(store);
 
     app.disable('x-powered-by');
     app.use((req, res, next) => {
@@ -55,7 +58,14 @@ export function createContextServer(options = {}) {
     app.get('/dashboard.js', requireAuth(token), (_req, res) => {
         res.type('application/javascript').sendFile(join(__dirname, 'dashboard', 'dashboard.js'));
     });
-    for (const script of ['debugger.js', 'inbox.js', 'audit.js', 'app.js', 'lab.js']) {
+    for (const script of [
+        'debugger.js',
+        'inbox.js',
+        'audit.js',
+        'app.js',
+        'lab.js',
+        'workspace.js',
+    ]) {
         app.get(`/${script}`, requireAuth(token), (_req, res) => {
             res.type('application/javascript').sendFile(join(__dirname, 'dashboard', script));
         });
@@ -101,6 +111,22 @@ export function createContextServer(options = {}) {
             },
         );
     }
+
+    // Rehearsal is permanently mock-only; no HTTP option can select a live transport.
+    api.post('/workspace/preview', requireSameOriginMutation, (req, res) =>
+        res.json(workspace.preview(req.body)),
+    );
+    api.post('/workspace/start', requireSameOriginMutation, (req, res) =>
+        res.json({ run: workspace.start(req.body) }),
+    );
+    api.get('/workspace/runs/:id', (req, res) => res.json({ run: workspace.get(req.params.id) }));
+    api.post('/workspace/runs/:id/cancel', requireSameOriginMutation, (req, res) =>
+        res.json({ run: workspace.cancel(req.params.id) }),
+    );
+
+    api.post('/workspace/runs/:id/proposal', requireSameOriginMutation, (req, res) =>
+        res.json({ run: workspace.decideProposal(req.params.id, req.body) }),
+    );
 
     api.get('/stats', (_req, res) => res.json(store.stats()));
 
@@ -299,6 +325,9 @@ export function createContextServer(options = {}) {
 
     app.use('/api/context', api);
     app.use((error, _req, res, _next) => {
+        if (error instanceof WorkspaceError) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
         const status = error?.name === 'ZodError' || error instanceof SyntaxError ? 400 : 500;
         res.status(status).json({ error: status === 400 ? error.message : 'Context server error' });
     });
@@ -310,6 +339,7 @@ export function createContextServer(options = {}) {
         port,
         store,
         close() {
+            workspace.close();
             codex.close();
             if (ownsStore) store.close();
         },

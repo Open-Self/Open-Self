@@ -22,6 +22,9 @@
         <nav class="tabs" aria-label="Dashboard views">
             <button class="tab" data-view="view-home" type="button">Home</button>
             <button class="tab active" data-view="view-memories" type="button">Memories</button>
+            <button class="tab" data-view="view-rehearsal" type="button">
+                Workspace rehearsal
+            </button>
             <button class="tab" data-view="view-lab" type="button">Context Lab</button>
             <button class="tab" data-view="view-debugger" type="button">Context Debugger</button>
             <button class="tab" data-view="view-inbox" type="button">
@@ -254,6 +257,90 @@
             </section>
         </main>
 
+        <section id="view-rehearsal" class="view hidden">
+            <div class="app-home">
+                <div class="app-hero">
+                    <p class="eyebrow">WORKSPACE REHEARSAL · SIMULATION ONLY</p>
+                    <h2>Preview. Approve.<br />Stay in control.</h2>
+                    <p>
+                        Practice the task approval flow with a local mock transport. No Codex task,
+                        model inference, shell command or external request runs here. Connecting
+                        Codex does not change that.
+                    </p>
+                </div>
+                <form id="workspace-form">
+                    <label for="workspace-task">Task to preview (not sent to a model)</label>
+                    <textarea
+                        id="workspace-task"
+                        maxlength="2000"
+                        required
+                        placeholder="What would you ask an agent to do?"
+                    ></textarea>
+                    <label for="workspace-scope">Memory scope (optional)</label
+                    ><input id="workspace-scope" maxlength="200" placeholder="project/atlas" />
+                    <label for="workspace-chars">Context character limit</label
+                    ><input
+                        id="workspace-chars"
+                        type="number"
+                        min="500"
+                        max="16000"
+                        value="4000"
+                        required
+                    />
+                    <button id="workspace-preview" class="primary" type="submit">
+                        Preview selected context
+                    </button>
+                </form>
+                <p id="workspace-status" role="status" aria-live="polite">
+                    Live execution unavailable. This is a local control-flow rehearsal.
+                </p>
+                <article id="workspace-package" class="app-card hidden">
+                    <h3>Exact context preview</h3>
+                    <p id="workspace-receipt" class="hint"></p>
+                    <pre id="workspace-context" class="context-block"></pre>
+                    <p class="hint">
+                        This package uses the local compiler policy. The next step authorizes only a
+                        simulation using this exact preview. Nothing is sent to an AI provider.
+                    </p>
+                    <button id="workspace-start" type="button" class="primary">
+                        Review simulation consent
+                    </button>
+                </article>
+                <article id="workspace-run" class="app-card hidden">
+                    <h3>Mock transport output</h3>
+                    <p id="workspace-run-state" role="status"></p>
+                    <pre id="workspace-output" class="context-block"></pre>
+                    <button id="workspace-cancel" type="button">Cancel rehearsal</button>
+                    <div id="workspace-proposal" class="hidden">
+                        <h3>Simulation-only proposal</h3>
+                        <p id="workspace-proposal-text"></p>
+                        <p id="workspace-proposal-state"></p>
+                        <p class="hint">
+                            Approving here only exercises the mock state machine. It cannot save a
+                            memory or create an item in your real Inbox.
+                        </p>
+                        <button id="workspace-proposal-approve" type="button">
+                            Simulate approval
+                        </button>
+                        <button id="workspace-proposal-reject" type="button">
+                            Simulate rejection
+                        </button>
+                    </div>
+                </article>
+            </div>
+        </section>
+        <dialog id="workspace-consent" aria-labelledby="workspace-consent-title">
+            <h2 id="workspace-consent-title">Start this local simulation?</h2>
+            <p>
+                The task and preview remain in this local app. No model or Codex task runs, and no
+                vault memory is changed. A real model connection is not available in this milestone.
+            </p>
+            <button id="workspace-consent-back" type="button">Not now</button>
+            <button id="workspace-consent-confirm" class="primary" type="button">
+                Start simulation only
+            </button>
+        </dialog>
+
         <section id="view-lab" class="view hidden">
             <div class="app-home lab-home">
                 <div class="app-hero">
@@ -484,5 +571,6 @@
         <script src="/audit.js" defer></script>
         <script src="/app.js" defer></script>
         <script src="/lab.js" defer></script>
+        <script src="/workspace.js" defer></script>
     </body>
 </html>

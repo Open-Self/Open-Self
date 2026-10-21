@@ -206,6 +206,23 @@ try {
     const lab = await labComparison.json();
     assert.equal(lab.a.contextHash, lab.b.contextHash);
     assert.equal(lab.scenario.kind, 'openself-context-lab');
+    const workspaceScript = await fetch(`${origin}/workspace.js`, {
+        headers: { Authorization: `Bearer ${dashboard.token}` },
+    });
+    assert.equal(workspaceScript.status, 200);
+    const workspacePreview = await fetch(`${origin}/api/context/workspace/preview`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${dashboard.token}`,
+            Origin: origin,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ task: 'Synthetic package rehearsal preview' }),
+    });
+    assert.equal(workspacePreview.status, 200);
+    const rehearsal = await workspacePreview.json();
+    assert.equal(rehearsal.mode, 'simulation');
+    assert.equal(rehearsal.liveAvailable, false);
 
     mkdirSync('capture-source');
     writeFileSync('capture-source/notes.md', 'Installed capture recovery fixture');
