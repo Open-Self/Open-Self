@@ -124,7 +124,7 @@ test('mobile home has no horizontal overflow and disabled integration remains op
 test('direct links restore lazy views after reload', async ({ page, app: _app }) => {
     await page.getByRole('button', { name: 'Review agent proposals' }).click();
     await page.reload();
-    await expect(page.locator('#inbox-list')).toContainText(/No .*proposals/i);
+    await expect(page.locator('#proposal-list')).toContainText(/No .*proposals/i);
     await page.getByRole('button', { name: 'Audit', exact: true }).click();
     await page.reload();
     await expect(page.locator('#audit-list')).toContainText(/No .*events/i);
