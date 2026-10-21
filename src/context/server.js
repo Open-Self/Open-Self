@@ -7,6 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
 import { CodexAuthBridge } from './codex-bridge.js';
+import { compareContextLab, ContextLabError } from './lab.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -54,7 +55,7 @@ export function createContextServer(options = {}) {
     app.get('/dashboard.js', requireAuth(token), (_req, res) => {
         res.type('application/javascript').sendFile(join(__dirname, 'dashboard', 'dashboard.js'));
     });
-    for (const script of ['debugger.js', 'inbox.js', 'audit.js', 'app.js']) {
+    for (const script of ['debugger.js', 'inbox.js', 'audit.js', 'app.js', 'lab.js']) {
         app.get(`/${script}`, requireAuth(token), (_req, res) => {
             res.type('application/javascript').sendFile(join(__dirname, 'dashboard', script));
         });
@@ -217,6 +218,23 @@ export function createContextServer(options = {}) {
             },
         );
         return res.json(result);
+    });
+
+    // Owner-only local lab. Even read-only POSTs require same-origin JSON.
+    api.post('/lab/compare', requireSameOriginMutation, (req, res) => {
+        try {
+            return res.json(compareContextLab(store, req.body, { diagnostics: true }));
+        } catch (error) {
+            if (error instanceof ContextLabError) {
+                return res.status(error.status).json({ error: error.message, code: error.code });
+            }
+            if (error?.name === 'ZodError') {
+                return res
+                    .status(400)
+                    .json({ error: 'Invalid Context Lab request', code: 'LAB_INVALID_REQUEST' });
+            }
+            throw error;
+        }
     });
 
     api.get('/proposals', (req, res) => {
