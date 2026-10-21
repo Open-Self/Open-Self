@@ -591,3 +591,93 @@ summary {
         font-size: 11px;
     }
 }
+
+.app-home {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 28px;
+}
+.app-hero {
+    max-width: 760px;
+    padding: 12px 0 36px;
+}
+.app-hero h2 {
+    font-size: clamp(30px, 5vw, 52px);
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+    margin: 18px 0;
+}
+.app-hero p,
+.app-card p,
+.app-footnote {
+    color: var(--muted);
+    line-height: 1.6;
+}
+.app-hero .eyebrow,
+.app-card .eyebrow {
+    color: var(--accent);
+}
+.local-badge {
+    color: var(--accent);
+    font-size: 13px;
+}
+.app-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+.app-card {
+    padding: 24px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    min-width: 0;
+}
+.app-card h3 {
+    font-size: 22px;
+    margin: 10px 0;
+}
+.app-card button {
+    margin: 6px 8px 0 0;
+}
+.codex-card {
+    grid-column: 1 / -1;
+}
+.app-footnote {
+    font-size: 13px;
+    margin-top: 28px;
+}
+#codex-pending a {
+    color: var(--accent);
+    overflow-wrap: anywhere;
+}
+dialog {
+    max-width: min(560px, calc(100vw - 32px));
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    color: var(--text);
+    background: var(--panel);
+    line-height: 1.6;
+}
+dialog::backdrop {
+    background: rgb(0 0 0 / 70%);
+}
+button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+@media (max-width: 640px) {
+    .app-home {
+        padding: 22px 16px;
+    }
+    .app-cards {
+        grid-template-columns: 1fr;
+    }
+    .app-card {
+        padding: 20px;
+    }
+    .tabs {
+        overflow-x: auto;
+    }
+}

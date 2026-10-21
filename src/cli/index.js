@@ -240,6 +240,17 @@ program
     .action(wrapAction(auditCommand));
 
 program
+    .command('app')
+    .description('Open the local OpenSelf app with guided setup and optional Codex sign-in')
+    .option('--port <port>', 'Local app port', '3210')
+    .option('--data-dir <path>', 'OpenSelf data directory')
+    .option(
+        '--codex',
+        'Enable the local Codex connection controls (sign-in still requires consent)',
+    )
+    .action(wrapAction((options) => dashboardCommand({ ...options, appMode: true })));
+
+program
     .command('dashboard')
     .description('Launch the authenticated local Context Vault dashboard')
     .option('--port <port>', 'Local dashboard port', '3210')

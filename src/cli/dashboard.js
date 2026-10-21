@@ -6,6 +6,8 @@ export async function dashboardCommand(options = {}) {
         dataDir: options.dataDir || process.env.DATA_DIR || './data',
         port: Number(options.port || 3210),
         host: '127.0.0.1',
+        appMode: options.appMode === true,
+        codexEnabled: options.codex === true,
     });
     const server = context.app.listen(context.port, context.host, () => {
         const url = `http://${context.host}:${context.port}/auth?token=${encodeURIComponent(context.token)}`;

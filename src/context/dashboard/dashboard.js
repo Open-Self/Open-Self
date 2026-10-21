@@ -288,17 +288,27 @@ for (const id of ['search', 'scope-filter', 'type-filter'])
         );
     });
 
-// Tab navigation — lazily refresh secondary views on first visit.
-for (const tab of document.querySelectorAll('.tab')) {
-    tab.addEventListener('click', () => {
-        for (const item of document.querySelectorAll('.tab'))
-            item.classList.toggle('active', item === tab);
-        for (const view of document.querySelectorAll('.view')) view.classList.add('hidden');
-        document.getElementById(tab.dataset.view).classList.remove('hidden');
-        // Provided by inbox.js / audit.js, which load after this script.
-        if (tab.dataset.view === 'view-inbox') window.refreshInbox?.().catch(() => {});
-        if (tab.dataset.view === 'view-audit') window.refreshAudit?.().catch(() => {});
-    });
+// Hash navigation supports reload, Back and Forward without duplicating views.
+function showView() {
+    const name = location.hash.slice(1) || 'memories';
+    const tab =
+        [...document.querySelectorAll('.tab')].find(
+            (item) => item.dataset.view === `view-${name}`,
+        ) || document.querySelector('[data-view="view-memories"]');
+    for (const item of document.querySelectorAll('.tab')) {
+        item.classList.toggle('active', item === tab);
+        item.setAttribute('aria-current', item === tab ? 'page' : 'false');
+    }
+    for (const view of document.querySelectorAll('.view'))
+        view.classList.toggle('hidden', view.id !== tab.dataset.view);
+    if (tab.dataset.view === 'view-inbox') window.refreshInbox?.().catch(() => {});
+    if (tab.dataset.view === 'view-audit') window.refreshAudit?.().catch(() => {});
 }
+for (const tab of document.querySelectorAll('.tab'))
+    tab.addEventListener('click', () => {
+        location.hash = tab.dataset.view.slice(5);
+    });
+window.addEventListener('hashchange', showView);
+window.addEventListener('DOMContentLoaded', showView);
 
 refresh().catch((error) => showMessage(error.message, true));
