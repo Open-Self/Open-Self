@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { AccessAudit } from './access-audit.js';
 import { ContextStore } from './store.js';
 import { CodexAuthBridge } from './codex-bridge.js';
@@ -67,23 +68,37 @@ export function createContextServer(options = {}) {
 
     // Status reads never start Codex, log in, or reveal credentials.
     api.get('/codex', (_req, res) => res.json(codex.getStatus()));
+    const connectionLimiter = rateLimit({
+        windowMs: 60_000,
+        limit: 10,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        // Never prevent a user from cancelling or disconnecting a session.
+        skip: (req) => /\/(cancel|logout)$/.test(req.path),
+        message: { error: 'Too many connection attempts. Wait one minute and retry.' },
+    });
     for (const action of ['refresh', 'login', 'cancel', 'logout']) {
-        api.post(`/codex/${action}`, requireSameOriginMutation, async (req, res) => {
-            if (action === 'login' && req.body?.consent !== true) {
-                return res.status(400).json({ error: 'Explicit sign-in consent is required' });
-            }
-            try {
-                const result =
-                    action === 'login'
-                        ? await codex.login({ type: 'chatgpt' })
-                        : await codex[action]();
-                return res.json(result || codex.getStatus());
-            } catch {
-                return res.status(503).json({
-                    error: 'Codex connection unavailable. Check the installed CLI and try again.',
-                });
-            }
-        });
+        api.post(
+            `/codex/${action}`,
+            requireSameOriginMutation,
+            connectionLimiter,
+            async (req, res) => {
+                if (action === 'login' && req.body?.consent !== true) {
+                    return res.status(400).json({ error: 'Explicit sign-in consent is required' });
+                }
+                try {
+                    const result =
+                        action === 'login'
+                            ? await codex.login({ type: 'chatgpt' })
+                            : await codex[action]();
+                    return res.json(result || codex.getStatus());
+                } catch {
+                    return res.status(503).json({
+                        error: 'Codex connection unavailable. Check the installed CLI and try again.',
+                    });
+                }
+            },
+        );
     }
 
     api.get('/stats', (_req, res) => res.json(store.stats()));

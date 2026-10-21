@@ -69,6 +69,15 @@ describe('Local app Codex controls', () => {
         expect(response.status).toBe(503);
         expect(await response.text()).not.toContain('secret-access-token');
     });
+    it('throttles repeated connection attempts without blocking cancel or logout', async () => {
+        for (let i = 0; i < 10; i++) expect((await post('refresh')).status).toBe(200);
+        const limited = await post('login', { consent: true });
+        expect(limited.status).toBe(429);
+        expect(bridge.login).not.toHaveBeenCalled();
+        expect(limited.headers.get('retry-after')).toBeTruthy();
+        expect((await post('cancel')).status).toBe(200);
+        expect((await post('logout')).status).toBe(200);
+    });
     it('serves the local app shell and script behind authentication', async () => {
         for (const path of ['/', '/app.js']) {
             expect((await fetch(`${url}${path}`)).status).toBe(401);

@@ -95,7 +95,7 @@ test('dismissed consent does nothing; repeated sign-in and cancel stay honest', 
     await expect(page.locator('#codex-status')).toHaveText('Waiting for sign-in');
     await expect(page.locator('#codex-auth-link')).toHaveAttribute(
         'href',
-        /https:\/\/auth.openai.com\//,
+        'https://auth.openai.com/authorize?state=synthetic',
     );
     expect(app.calls).toEqual(['login']);
     await page.getByRole('button', { name: 'Cancel sign-in', exact: true }).click();
