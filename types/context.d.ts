@@ -846,6 +846,10 @@ export function runContextMcpHttpServer(options?: McpHttpOptions): Promise<
     }
 >;
 export function createContextServer(options?: {
+    /** Start at the guided local app Home view. */
+    appMode?: boolean;
+    /** Enable explicit local Codex connection controls; disabled by default. */
+    codexEnabled?: boolean;
     token?: string;
     host?: string;
     port?: number;

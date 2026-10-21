@@ -18,6 +18,12 @@ const version = execFileSync(process.execPath, [require.resolve('openself/cli'),
     windowsHide: true,
 }).trim();
 assert.equal(version, pkg.version);
+const appHelp = execFileSync(process.execPath, [require.resolve('openself/cli'), 'app', '--help'], {
+    encoding: 'utf8',
+    windowsHide: true,
+});
+assert.ok(appHelp.includes('--codex'));
+assert.ok(appHelp.includes('--data-dir'));
 
 for (const released of ['v0.9.1', 'v0.11.0', 'v0.13.1']) {
     const db = new Database(`${released}.db`);
@@ -158,7 +164,7 @@ try {
         { envelope: { clientId: 'smoke' } },
     );
     assert.equal(direct.receipt.version, 2);
-    const dashboard = api.createContextServer({ store });
+    const dashboard = api.createContextServer({ store, appMode: true });
     await new Promise((resolve) => {
         http = dashboard.app.listen(0, '127.0.0.1', resolve);
     });
@@ -169,6 +175,20 @@ try {
     });
     assert.equal(response.status, 200);
     assert.ok((await response.text()).includes('/api/context'));
+    const appAuth = await fetch(`${origin}/auth?token=${dashboard.token}`, { redirect: 'manual' });
+    assert.equal(appAuth.headers.get('location'), '/#home');
+    const appShell = await fetch(origin, {
+        headers: { Authorization: `Bearer ${dashboard.token}` },
+    });
+    assert.ok((await appShell.text()).includes('A memory layer that belongs to you.'));
+    const appScript = await fetch(`${origin}/app.js`, {
+        headers: { Authorization: `Bearer ${dashboard.token}` },
+    });
+    assert.equal(appScript.status, 200);
+    const codexStatus = await fetch(`${origin}/api/context/codex`, {
+        headers: { Authorization: `Bearer ${dashboard.token}` },
+    });
+    assert.equal((await codexStatus.json()).status, 'disabled');
     mkdirSync('capture-source');
     writeFileSync('capture-source/notes.md', 'Installed capture recovery fixture');
     assert.equal(new api.ProjectFolderCapture(store, 'capture-source').scan().added, 1);
