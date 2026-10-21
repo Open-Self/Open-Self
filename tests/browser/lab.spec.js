@@ -173,6 +173,9 @@ test('mobile lab and comparison results have no horizontal overflow', async ({
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    // Reset scroll before full-page capture so sticky navigation stays at the page top.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
     await page.screenshot({ path: testInfo.outputPath('context-lab-mobile.png'), fullPage: true });
 });
 
